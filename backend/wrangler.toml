@@ -1,0 +1,23 @@
+name = "frontieratlas-backend"
+main = "src/index.ts"
+compatibility_date = "2026-06-23"
+compatibility_flags = [ "nodejs_compat" ]
+workers_dev = true
+
+# ── Environment Variables (secrets are set via `wrangler secret put`) ──
+[vars]
+NODE_VERSION = "22"
+
+# ── Routes ──
+# Uncomment and customize for custom domain:
+# routes = [
+#   { pattern = "api.frontieratlas.com/*", zone_id = "<zone-id>" }
+# ]
+
+# ── Logging ──
+[observability]
+enabled = true
+head_sampling_rate = 0.1
+  
+[triggers]
+crons = ["*/4 * * * *"]

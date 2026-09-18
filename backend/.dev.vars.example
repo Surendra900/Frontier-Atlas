@@ -1,0 +1,30 @@
+# FrontierAtlas Backend — Cloudflare Worker local development
+# Copy to .dev.vars for `wrangler dev`. Never commit real credentials.
+
+# Database (required)
+DATABASE_URL="postgresql://USER:PASSWORD@HOST/DB?sslmode=require"
+
+# Authentication (required if auth endpoints are used)
+JWT_ACCESS_SECRET="your-access-secret-here"
+JWT_REFRESH_SECRET="your-refresh-secret-here"
+OAUTH_STATE_SECRET="your-oauth-state-secret-here"
+
+# Query Router
+# QUERY_TIMEOUT_MS=30000
+
+# Redis Cache (optional)
+# UPSTASH_REDIS_REST_URL="https://your-redis.upstash.io"
+# UPSTASH_REDIS_REST_TOKEN="your-upstash-token"
+
+# OAuth Providers (optional for social login)
+# GOOGLE_CLIENT_ID="your-google-client-id"
+# GOOGLE_CLIENT_SECRET="your-google-client-secret"
+# GITHUB_CLIENT_ID="your-github-client-id"
+# GITHUB_CLIENT_SECRET="your-github-client-secret"
+
+# Optional
+# BCRYPT_SALT_ROUNDS=12
+# NODE_ENV=production
+
+# OAuth callbacks use a dedicated short-lived signed state plus a nonce cookie.
+# Never commit real database URLs, JWT secrets, OAuth client secrets, or API tokens.

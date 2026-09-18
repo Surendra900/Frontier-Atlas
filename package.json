@@ -1,0 +1,16 @@
+{
+  "name": "frontier-atlas-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=frontend",
+    "build": "cd frontend && npm run build",
+    "lint": "npm run lint --workspace=frontend"
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.38.0"
+  }
+}

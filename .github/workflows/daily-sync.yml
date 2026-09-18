@@ -1,0 +1,53 @@
+name: Daily Paper Sync
+
+on:
+  schedule:
+    # Runs every day at 02:00 UTC (07:30 IST)
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+    # Allow manual runs from GitHub Actions UI with optional custom window
+    inputs:
+      lookback_hours:
+        description: "Hours to look back for papers (default: 24, increase for backfills)"
+        required: false
+        default: "24"
+
+jobs:
+  sync:
+    name: Sync Research Papers
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: backend
+        run: npm ci
+      - name: Generate Prisma Client
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: npx prisma generate
+      - name: Run daily sync
+        working-directory: backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SYNC_LOOKBACK_HOURS: ${{ github.event.inputs.lookback_hours || '24' }}
+          HTTP_MAX_RETRIES: "3"
+          HTTP_TIMEOUT_MS: "15000"
+          HUGGINGFACE_API_KEY: ${{ secrets.HUGGINGFACE_API_KEY }}
+        run: npm run daily-sync
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Daily paper sync failed. Check the logs above."
+          # You can add Slack/Discord/email notification here later.

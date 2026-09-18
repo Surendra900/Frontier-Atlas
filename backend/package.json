@@ -1,0 +1,52 @@
+{
+  "name": "frontieratlas-backend",
+  "version": "1.0.0",
+  "description": "",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "tsc --noEmit",
+    "daily-sync": "prisma generate --schema=prisma/schema.prisma && tsx scripts/daily-sync.ts",
+    "import-papers-github": "tsx scripts/importPapersWithGithub.ts",
+    "import-sota": "tsx scripts/importSota.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "security:revoke-refresh-tokens": "tsx scripts/revoke-refresh-tokens.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@hono/zod-validator": "^0.8.0",
+    "@neondatabase/serverless": "^1.1.0",
+    "@prisma/adapter-neon": "^7.8.0",
+    "@prisma/adapter-pg": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@upstash/redis": "^1.38.0",
+    "bcryptjs": "^3.0.3",
+    "csv-parser": "^3.2.1",
+    "date-fns": "^4.4.0",
+    "dotenv": "^17.4.2",
+    "fast-xml-parser": "^5.9.3",
+    "hono": "^4.12.27",
+    "jsonwebtoken": "^9.0.3",
+    "pg": "^8.22.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@napi-rs/canvas": "^1.0.1",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.10",
+    "@types/node": "^26.0.1",
+    "@types/pg": "^8.20.0",
+    "pdfjs-dist": "^6.1.200",
+    "prisma": "^7.8.0",
+    "slugify": "^1.6.9",
+    "ts-node": "^10.9.2",
+    "tsx": "^4.19.4",
+    "typescript": "^6.0.3",
+    "wrangler": "^4.105.0",
+    "xlsx": "^0.18.5",
+    "xml2js": "^0.6.2"
+  }
+}

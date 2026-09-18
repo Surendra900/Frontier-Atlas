@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Frontier Atlas — All Research Domains</title>
+<style>
+  :root{
+    --orange:#FF4519;
+    --bg:#F5F2EC;
+    --card-border:#E7E3DB;
+    --text:#171411;
+    --muted:#8A8478;
+    --muted-2:#A9A39A;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Inter","Segoe UI",Helvetica,Arial,sans-serif;
+    background:var(--bg);
+    color:var(--text);
+  }
+
+  /* ---------- NAV ---------- */
+  .nav{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:14px 40px;
+    border-bottom:1px solid var(--card-border);
+    background:var(--bg);
+  }
+  .nav-left{display:flex; align-items:center; gap:36px;}
+  .logo{display:flex; align-items:center; gap:8px; font-weight:800; font-size:16px;}
+  .logo svg{width:18px;height:18px;}
+  .nav-links{display:flex; gap:26px; font-size:13.5px; font-weight:500; color:#3a3531;}
+  .nav-links a{color:inherit; text-decoration:none;}
+  .nav-right{display:flex; align-items:center; gap:12px;}
+  .search-box{
+    display:flex; align-items:center; gap:8px;
+    border:1px solid var(--card-border); border-radius:8px;
+    padding:7px 12px; font-size:12.5px; color:var(--muted-2);
+    width:260px; background:#fff;
+  }
+  .kbd{margin-left:auto; font-size:11px; color:#bfb9ae; border:1px solid #e8e3d9; border-radius:4px; padding:1px 5px;}
+  .btn-submit{
+    border:1px solid var(--card-border); background:#fff; color:var(--text);
+    font-size:13px; font-weight:600; padding:8px 16px; border-radius:8px; cursor:pointer;
+  }
+  .btn-signin{
+    background:var(--orange); color:#fff; border:none;
+    font-size:13px; font-weight:600; padding:8px 16px; border-radius:8px; cursor:pointer;
+  }
+
+  /* ---------- HERO ---------- */
+  .hero{
+    display:flex; justify-content:space-between; align-items:flex-start;
+    padding:44px 40px 30px;
+  }
+  .hero-left{max-width:560px;}
+  .eyebrow{font-size:11px; font-weight:700; letter-spacing:.06em; color:var(--muted); margin-bottom:10px;}
+  .hero h1{font-size:40px; line-height:1.08; font-weight:800; letter-spacing:-0.02em;}
+  .hero h1 .accent{color:var(--orange);}
+  .hero p{margin-top:14px; font-size:14.5px; color:#65605a; max-width:430px; line-height:1.5;}
+  .stats{display:flex; align-items:center; gap:30px; margin-top:22px;}
+  .stat b{font-size:18px; display:block;}
+  .stat span{font-size:11.5px; color:var(--muted);}
+  .updates-pill{
+    display:flex; align-items:center; gap:6px;
+    border:1px solid var(--card-border); border-radius:20px;
+    padding:7px 14px; font-size:12px; font-weight:600; color:#3a3531; background:#fff;
+  }
+
+  .hero-graphic{display:flex; align-items:flex-end; gap:6px; height:140px; margin-top:6px;}
+  .panel{width:34px; border-radius:4px; opacity:.85;}
+  .p1{height:120px; background:linear-gradient(180deg,#FFB7A5,#FF6B45);}
+  .p2{height:135px; background:linear-gradient(180deg,#FFD0C2,#FF9476);}
+  .p3{height:110px; background:linear-gradient(180deg,#E9DFFB,#C9B6F2);}
+  .p4{height:128px; background:linear-gradient(180deg,#DCE6FA,#A9C0EE);}
+  .p5{height:100px; background:linear-gradient(180deg,#D4E6E0,#9FC7BA);}
+  .p6{height:118px; background:linear-gradient(180deg,#D8E6E0,#A8C9BD);}
+  .p7{height:96px; background:linear-gradient(180deg,#E2EAE6,#BFD3C9);}
+
+  /* ---------- FILTER BAR ---------- */
+  .filterbar{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:0 40px 18px;
+  }
+  .chips{display:flex; gap:8px; flex-wrap:wrap;}
+  .chip{
+    font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px;
+    border:1px solid var(--card-border); background:#fff; color:#3a3531; cursor:pointer;
+  }
+  .chip.active{background:#171411; color:#fff; border-color:#171411;}
+  .view-toggle{display:flex; gap:8px;}
+  .view-toggle button{
+    font-size:12.5px; font-weight:600; padding:8px 14px; border-radius:8px;
+    border:1px solid var(--card-border); background:#fff; color:#3a3531; cursor:pointer;
+  }
+  .view-toggle button.active{background:#171411; color:#fff; border-color:#171411;}
+
+  /* ---------- SECTIONS ---------- */
+  .wrap{padding:0 40px 60px;}
+  .section{
+    border:1px solid var(--card-border); border-radius:14px;
+    background:var(--bg); padding:26px 26px 22px; margin-bottom:22px;
+  }
+  .section-head{display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:18px;}
+  .section-title-row{display:flex; gap:12px;}
+  .section-icon{
+    width:36px; height:36px; border-radius:9px; display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; font-size:16px;
+  }
+  .section-title h2{font-size:17px; font-weight:700;}
+  .section-title p{font-size:12.5px; color:var(--muted); margin-top:3px;}
+  .section-meta{display:flex; align-items:center; gap:10px;}
+  .domain-count{font-size:12px; color:var(--muted-2);}
+  .view-all{
+    font-size:12px; font-weight:700; border:1px solid var(--card-border); border-radius:7px;
+    padding:6px 12px; background:#fff; cursor:pointer; white-space:nowrap;
+  }
+
+  .grid{
+    display:grid; grid-template-columns:repeat(4,1fr);
+    border-top:1px solid var(--card-border); border-left:1px solid var(--card-border);
+  }
+  .card{
+    border-right:1px solid var(--card-border); border-bottom:1px solid var(--card-border);
+    padding:20px 24px; display:flex; gap:14px; cursor:pointer;
+    transition:background .15s ease, box-shadow .15s ease;
+  }
+  .card:hover{
+    background:#fff;
+    box-shadow:0 4px 18px rgba(20,16,10,0.09);
+    position:relative; z-index:2;
+  }
+  .card-icon{
+    width:42px; height:42px; border-radius:11px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center; font-size:18px;
+  }
+  .card-title{font-size:15px; font-weight:700; transition:color .15s ease;}
+  .card:hover .card-title{color:var(--orange);}
+  .card-desc{font-size:13px; color:var(--muted); margin-top:4px; line-height:1.45;}
+  .card-count{font-size:12px; color:var(--muted-2); margin-top:10px; display:flex; align-items:center; gap:5px;}
+
+  /* footer CTA */
+  .footer-cta{
+    border:1px solid var(--card-border); border-radius:14px; background:#fff;
+    padding:20px 26px; display:flex; align-items:center; justify-content:space-between;
+  }
+  .footer-cta h3{font-size:14px; font-weight:700;}
+  .footer-cta p{font-size:12px; color:var(--muted); margin-top:3px;}
+  .suggest-btn{
+    background:var(--orange); color:#fff; border:none; font-weight:700; font-size:13px;
+    padding:10px 18px; border-radius:9px; cursor:pointer;
+  }
+
+  @media(max-width:900px){
+    .grid{grid-template-columns:repeat(2,1fr);}
+    .hero{flex-direction:column; gap:24px;}
+  }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-left">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" fill="none"><path d="M12 2L2 21H22L12 2Z" fill="#FF4519"/><path d="M12 2L6.5 21H17.5L12 2Z" fill="#171411" opacity=".0"/></svg>
+      Frontier Atlas
+    </div>
+    <div class="nav-links">
+      <a href="#">Papers</a><a href="#">Methods</a><a href="#">Tasks</a><a href="#">Conferences</a><a href="#">About</a>
+    </div>
+  </div>
+  <div class="nav-right">
+    <div class="search-box">🔍 Search papers, authors, topics... <span class="kbd">⌘K</span></div>
+    <button class="btn-submit">Submit</button>
+    <button class="btn-signin">Sign in</button>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-left">
+    <div class="eyebrow">BROWSE RESEARCH</div>
+    <h1>All Research<br><span class="accent">Domains</span></h1>
+    <p>Explore the full spectrum of AI research across tasks, methods, and applications.</p>
+    <div class="stats">
+      <div class="stat"><b>56</b><span>Domains</span></div>
+      <div class="stat"><b>100K+</b><span>Papers</span></div>
+      <div class="stat"><b>12K+</b><span>Researchers</span></div>
+      <div class="updates-pill">✦ Daily updates</div>
+    </div>
+  </div>
+  <div class="hero-graphic">
+    <div class="panel p1"></div><div class="panel p2"></div><div class="panel p3"></div>
+    <div class="panel p4"></div><div class="panel p5"></div><div class="panel p6"></div><div class="panel p7"></div>
+  </div>
+</section>
+
+<div class="filterbar">
+  <div class="chips">
+    <div class="chip active">▦ All Domains</div>
+    <div class="chip">Core Capabilities</div>
+    <div class="chip">Perception &amp; Understanding</div>
+    <div class="chip">Content Generation</div>
+    <div class="chip">Language &amp; Communication</div>
+    <div class="chip">Audio</div>
+    <div class="chip">More ▾</div>
+  </div>
+  <div class="view-toggle">
+    <button class="active">▦ Grid</button>
+    <button>☰ List</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <!-- CORE CAPABILITIES -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title-row">
+        <div class="section-icon" style="background:#FDE3DD;">👤</div>
+        <div class="section-title">
+          <h2>Core Capabilities</h2>
+          <p>Fundamental building blocks powering intelligent systems</p>
+        </div>
+      </div>
+      <div class="section-meta"><span class="domain-count">16 domains</span></div>
+    </div>
+    <div class="grid" id="core"></div>
+  </div>
+
+  <!-- PERCEPTION -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title-row">
+        <div class="section-icon" style="background:#E2E9FB;">👁️</div>
+        <div class="section-title">
+          <h2>Perception &amp; Understanding</h2>
+          <p>Interpreting and understanding visual and multimodal information</p>
+        </div>
+      </div>
+      <div class="section-meta"><span class="domain-count">20 domains</span><button class="view-all">View all →</button></div>
+    </div>
+    <div class="grid" id="perception"></div>
+  </div>
+
+  <!-- CONTENT GENERATION -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title-row">
+        <div class="section-icon" style="background:#DFF3E6;">✨</div>
+        <div class="section-title">
+          <h2>Content Generation</h2>
+          <p>Creating and synthesizing various types of content</p>
+        </div>
+      </div>
+      <div class="section-meta"><span class="domain-count">9 domains</span><button class="view-all">View all →</button></div>
+    </div>
+    <div class="grid" id="content"></div>
+  </div>
+
+  <!-- LANGUAGE -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title-row">
+        <div class="section-icon" style="background:#FBE9C8;">💬</div>
+        <div class="section-title">
+          <h2>Language &amp; Communication</h2>
+          <p>Processing and understanding human language</p>
+        </div>
+      </div>
+      <div class="section-meta"><span class="domain-count">10 domains</span><button class="view-all">View all →</button></div>
+    </div>
+    <div class="grid" id="language"></div>
+  </div>
+
+  <!-- AUDIO -->
+  <div class="section">
+    <div class="section-head">
+      <div class="section-title-row">
+        <div class="section-icon" style="background:#EAE2FB;">🎧</div>
+        <div class="section-title">
+          <h2>Audio</h2>
+          <p>Processing and generating audio signals</p>
+        </div>
+      </div>
+      <div class="section-meta"><span class="domain-count">4 domains</span><button class="view-all">View all →</button></div>
+    </div>
+    <div class="grid" id="audio"></div>
+  </div>
+
+  <div class="footer-cta">
+    <div>
+      <h3>Can't find what you're looking for?</h3>
+      <p>Suggest a new domain or help us improve our taxonomy to better organize AI research.</p>
+    </div>
+    <button class="suggest-btn">✎ Suggest a Domain</button>
+  </div>
+
+</div>
+
+<script>
+const palette = {
+  green:  {bg:'#E3F3E8', fg:'#3FA56C'},
+  orange: {bg:'#FCEBD9', fg:'#D98A2B'},
+  pink:   {bg:'#FBE2E2', fg:'#E0563B'},
+  blue:   {bg:'#E2E9FB', fg:'#4D6FD8'},
+  purple: {bg:'#EAE2FB', fg:'#8E5DD0'},
+  red:    {bg:'#FBE2E2', fg:'#D9457F'},
+  teal:   {bg:'#DDF0EE', fg:'#2E9C90'},
+};
+
+const cycleKeys = ['green','orange','pink','blue','purple','red','teal'];
+let cycleIndex = 0;
+
+function card(a,b,c,d,e){
+  // support both card(colorKey, icon, title, desc, count) and card(icon, title, desc, count)
+  let colorKey, icon, title, desc, count;
+  if(e !== undefined){
+    [colorKey, icon, title, desc, count] = [a,b,c,d,e];
+  } else {
+    colorKey = cycleKeys[cycleIndex % cycleKeys.length]; cycleIndex++;
+    [icon, title, desc, count] = [a,b,c,d];
+  }
+  const col = palette[colorKey] || palette.blue;
+  return `<div class="card">
+    <div class="card-icon" style="background:${col.bg};color:${col.fg}">${icon}</div>
+    <div>
+      <div class="card-title">${title}</div>
+      <div class="card-desc">${desc}</div>
+      <div class="card-count">📄 ${count}</div>
+    </div>
+  </div>`;
+}
+
+const core = [
+  ['green','🧑','Agents','Autonomous systems that perceive, reason, and act.','1,120 papers'],
+  ['orange','⚠','Anomaly Detection','Identifying unusual patterns in data.','335 papers'],
+  ['pink','🚗','Autonomous Driving','AI for self-driving and intelligent vehicles.','551 papers'],
+  ['blue','&lt;/&gt;','Coding Agents','AI agents for code generation and assistance.','351 papers'],
+  ['orange','🖥','Computer Use Agents','Agents that interact with computers.','228 papers'],
+  ['purple','🛡','Deepfake & Forensics','Synthesizing detection and media forensics.','287 papers'],
+  ['blue','📄','Document Understanding','Extracting insights from documents.','448 papers'],
+  ['teal','☀','Embedding Models','Representational learning and embeddings.','957 papers'],
+  ['purple','🌐','Language Modeling','Models for understanding and generation.','57,842 papers'],
+  ['teal','🗺','OCR','Optical character recognition.','687 papers'],
+  ['purple','◎','Omni Models','Unified models for multi-modal I/O.','184 papers'],
+  ['red','◉','Reasoning','Logical reasoning and inference.','5,761 papers'],
+  ['blue','🕐','Reinforcement Learning','Learning through rewards and feedback.','7,759 papers'],
+  ['orange','★','Remote Sensing','Earth observation and satellite data.','441 papers'],
+  ['red','✦','Robotics','Robotic perception and control.','779 papers'],
+  ['purple','▤','Scene Text Recognition','Reading text in natural scenes.','180 papers'],
+  ['blue','▦','World Models','Learning internal world representations.','853 papers'],
+];
+document.getElementById('core').innerHTML = core.map(c=>card(...c)).join('');
+
+const perception = [
+  ['🧊','3D Generation','','2,136 papers'],
+  ['🧩','3D Instance Segmentation','','799 papers'],
+  ['📦','3D Object Detection','','525 papers'],
+  ['🗺','3D Semantic Segmentation','','136 papers'],
+  ['🌀','3D Understanding','','1,768 papers'],
+  ['📐','Depth Estimation','','862 papers'],
+  ['📑','Document Layout Analysis','','169 papers'],
+  ['🌍','Earth Observation','','564 papers'],
+  ['🙂','Face Recognition','','172 papers'],
+  ['✅','Face Verification','','170 papers'],
+  ['🏷','Image Classification','','6,481 papers'],
+  ['✂️','Image Editing','','777 papers'],
+  ['🖌','Image Generation','','3,128 papers'],
+  ['🎨','Image Inpainting','','497 papers'],
+  ['🔗','Image Matching','','138 papers'],
+  ['🖼','Image Marking','','87 papers'],
+  ['🧵','Image Segmentation','','2,317 papers'],
+  ['🔎','Image Super-Resolution','','261 papers'],
+  ['🛠','Image Restoration','','441 papers'],
+  ['📖','Image Understanding','','7,431 papers'],
+  ['🩻','Medical Imaging','','1,861 papers'],
+  ['🔢','Object Counting','','97 papers'],
+  ['📦','Object Detection','','1,361 papers'],
+  ['🚶','Pose Estimation','','87 papers'],
+  ['✂️','Zero-Shot Segmentation','','126 papers'],
+  ['🧪','Semi-Supervised Image Classification','','468 papers'],
+];
+document.getElementById('perception').innerHTML = perception.map(c=>card(...c)).join('');
+
+const content = [
+  ['🎵','Audio Generation','','156 papers'],
+  ['🎧','Audio Understanding','','242 papers'],
+  ['🏃','Motion Generation','','331 papers'],
+  ['🌊','Optical Flow','','89 papers'],
+  ['🪞','Stereo Matching','','87 papers'],
+  ['🗃','Text-to-SQL','','343 papers'],
+  ['✍️','Text Generation','','1,991 papers'],
+  ['🎬','Video Generation','','1,001 papers'],
+  ['📼','Video Understanding','','111 papers'],
+  ['🧹','Video Restoration','','58 papers'],
+  ['✂️','Video Segmentation','','226 papers'],
+  ['🪄','Video Matting','','87 papers'],
+];
+document.getElementById('content').innerHTML = content.map(c=>card(...c)).join('');
+
+const language = [
+  ['🏷','Entity Typing','','624 papers'],
+  ['🌐','Machine Translation','','1,236 papers'],
+  ['🔖','Named Entity Recognition','','531 papers'],
+  ['🔤','Part-of-Speech Tagging','','169 papers'],
+  ['❓','Question Answering','','4,781 papers'],
+  ['🔗','Relation Extraction','','187 papers'],
+  ['📋','Summarization','','1,289 papers'],
+  ['📊','Table Question Answering','','183 papers'],
+  ['🏷','Text Classification','','4,311 papers'],
+  ['🗃','Text-to-SQL','','343 papers'],
+];
+document.getElementById('language').innerHTML = language.map(c=>card(...c)).join('');
+
+const audio = [
+  ['🎚','Audio Classification','','335 papers'],
+  ['🎵','Audio Generation','','156 papers'],
+  ['🎧','Audio Understanding','','242 papers'],
+  ['🛠','Audio Restoration','','58 papers'],
+];
+document.getElementById('audio').innerHTML = audio.map(c=>card(...c)).join('');
+</script>
+
+</body>
+</html>

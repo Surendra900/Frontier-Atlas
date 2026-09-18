@@ -1,0 +1,13 @@
+{
+  "name": "frontieratlas-backend",
+  "compatibility_date": "2026-06-23",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "src/index.ts",
+  "vars": {
+    "NODE_VERSION": "22"
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  }
+}

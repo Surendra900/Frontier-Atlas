@@ -1,0 +1,145 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 45 14% 96%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 9%;
+    --primary: 15 100% 56%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 35%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 57%;
+    --muted-foreground: 0 0% 57%;
+    --accent: 15 100% 56%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 92%;
+    --input: 0 0% 92%;
+    --ring: 15 100% 56%;
+    --radius: 18px;
+  }
+
+  * {
+    @apply border-border;
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: hsl(var(--background));
+  }
+
+  body {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at top left, rgba(255, 90, 31, 0.08), transparent 24%),
+      radial-gradient(circle at top right, rgba(255, 255, 255, 0.7), transparent 18%),
+      hsl(var(--background));
+    color: hsl(var(--foreground));
+    font-size: 14px;
+    line-height: 1.5;
+    letter-spacing: -0.01em;
+  }
+
+  ::selection {
+    background: rgba(255, 90, 31, 0.16);
+    color: hsl(var(--foreground));
+  }
+}
+
+@layer utilities {
+  .ds-card {
+    @apply rounded-2xl border border-border bg-card shadow-card;
+  }
+
+  .ds-card-hero {
+    @apply rounded-[28px] border border-border bg-card shadow-soft;
+  }
+
+  .ds-surface {
+    @apply rounded-[24px] border border-border bg-card;
+  }
+
+  .ds-chip {
+    @apply inline-flex items-center rounded-full border border-transparent bg-[rgba(255,90,31,0.08)] px-3 py-1 text-xs font-medium text-[#FF5A1F];
+  }
+
+  .ds-button {
+    @apply inline-flex items-center justify-center rounded-full bg-[#FF5A1F] px-4 py-2 text-sm font-semibold text-white transition-colors duration-200 ease-in-out hover:bg-[#FF6C37] active:bg-[#FF5A1F]/90;
+  }
+
+  .ds-button-ghost {
+    @apply inline-flex items-center justify-center rounded-full border border-border bg-white px-4 py-2 text-sm font-medium text-foreground transition-colors duration-200 ease-in-out hover:bg-[#FFF7F3] hover:text-[#FF5A1F];
+  }
+
+  .ds-input {
+    @apply rounded-full border border-border bg-white px-8 py-2 text-sm text-foreground placeholder:text-[#909090] shadow-none outline-none transition-colors duration-200 ease-in-out focus:border-[#FF5A1F] focus:ring-2 focus:ring-[rgba(255,90,31,0.14)];
+  }
+
+  .ds-text-primary {
+    color: #171717;
+  }
+
+  .ds-text-secondary {
+    color: #5b5b5b;
+  }
+
+  .ds-text-muted {
+    color: #909090;
+  }
+
+  .ds-border {
+    border-color: #ececec;
+  }
+
+  .ds-shadow {
+    box-shadow: 0 10px 35px rgba(0, 0, 0, 0.05);
+  }
+
+  .ds-transition {
+    transition: all 200ms ease;
+  }
+}
+
+/* Custom scrollbar */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #E1E1D7;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #C1C1B7;
+}
+
+.hide-scroll::-webkit-scrollbar { display: none; }
+.hide-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Shadow utilities (referenced in JSX) */
+.shadow-card  { box-shadow: 0 1px 6px rgba(0,0,0,0.06); }
+.shadow-soft  { box-shadow: 0 4px 24px rgba(0,0,0,0.05); }
+
+/* Keyframes */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in  { animation: fade-in  0.35s ease both; }
+.animate-slide-up { animation: slide-up 0.4s ease both; }
