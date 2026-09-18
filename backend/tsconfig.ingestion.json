@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/ingestion/config/**/*",
+    "src/ingestion/logger/**/*",
+    "src/ingestion/http/**/*",
+    "src/ingestion/types/**/*",
+    "src/ingestion/validators/**/*",
+    "src/ingestion/collectors/**/*",
+    "src/ingestion/normalizers/**/*",
+    "src/ingestion/merger/**/*",
+    "src/ingestion/source-manager.ts"
+  ],
+  "exclude": []
+}
