@@ -26,6 +26,7 @@ export interface BackendModelItem {
   paperUrl: string | null;
   repositoryUrl: string | null;
   apiUrl: string | null;
+  huggingFaceUrl?: string | null;
   createdAt: string;
   paperCount: number;
   citationCount: number;
@@ -79,8 +80,9 @@ export interface ModelItem {
   contextWindow: string | null;
   license: string | null;
   paperUrl: string | null;
-repositoryUrl: string | null;
-apiUrl: string | null;
+  repositoryUrl: string | null;
+  apiUrl: string | null;
+  huggingFaceUrl?: string | null;
   createdAt: string;
   paperCount: number;
   citationCount: number;
@@ -113,8 +115,9 @@ export interface ModelDetail {
   contextWindow: string | null;
   license: string | null;
   paperUrl: string | null;
-repositoryUrl: string | null;
-apiUrl: string | null;
+  repositoryUrl: string | null;
+  apiUrl: string | null;
+  huggingFaceUrl?: string | null;
   createdAt: string;
   paperCount: number;
   citationCount: number;
@@ -123,6 +126,7 @@ apiUrl: string | null;
   papers: ModelPaper[];
   tasks: ModelTask[];
   familyModels?: ModelItem[];
+  benchmarks?: any[];
 }
 
 export interface FacetItem {
@@ -181,6 +185,7 @@ function mapModelItem(m: BackendModelItem | any): ModelItem {
     paperUrl: m.paperUrl ?? m.paper_url ?? null,
     repositoryUrl: m.repositoryUrl ?? m.repository_url ?? null,
     apiUrl: m.apiUrl ?? m.api_url ?? null,
+    huggingFaceUrl: m.huggingFaceUrl ?? m.hugging_face_url ?? null,
     createdAt: m.createdAt || '',
     paperCount: m.paperCount || 0,
     citationCount: m.citationCount || 0,
@@ -361,6 +366,7 @@ export async function getModelBySlug(slug: string): Promise<ModelDetail> {
       paperUrl: data.paperUrl,
       repositoryUrl: data.repositoryUrl,
       apiUrl: data.apiUrl,
+      huggingFaceUrl: data.huggingFaceUrl ?? null,
       createdAt: data.createdAt,
       paperCount: data.paperCount,
       citationCount: data.citationCount,
@@ -371,6 +377,7 @@ export async function getModelBySlug(slug: string): Promise<ModelDetail> {
       familyModels: Array.isArray(data.familyModels)
         ? data.familyModels.map(mapModelItem)
         : [],
+      benchmarks: Array.isArray(data.benchmarks) ? data.benchmarks : [],
     };
     saveCachedModelDetail(cleanSlug, detail);
     return detail;

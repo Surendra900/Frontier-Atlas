@@ -299,15 +299,40 @@ const [logoError, setLogoError] = useState(false);
 }, [cleanId]);
 
   const benchmarkArray = useMemo(() => {
-    if (!model?.benchmarkScore) return [];
-    return Object.entries(model.benchmarkScore)
-      .map(([name, value]) => ({
-        name,
-        value: Number(value) || 0,
-        score: typeof value === "number" ? value.toFixed(1) : String(value),
-        rank: null as number | null,
-      }))
-      .filter((item) => item.value > 0);
+    const items: Array<{ name: string; value: number; score: string; rank: number | null }> = [];
+    const seen = new Set<string>();
+
+    if (model?.benchmarkScore) {
+      Object.entries(model.benchmarkScore).forEach(([name, value]) => {
+        const numVal = Number(value) || 0;
+        if (numVal > 0) {
+          seen.add(name.toLowerCase());
+          items.push({
+            name,
+            value: numVal,
+            score: typeof value === "number" ? value.toFixed(1) : String(value),
+            rank: null,
+          });
+        }
+      });
+    }
+
+    if (Array.isArray((model as any)?.benchmarks)) {
+      for (const b of (model as any).benchmarks) {
+        if (b && b.name && !seen.has(b.name.toLowerCase())) {
+          seen.add(b.name.toLowerCase());
+          const numVal = typeof b.score === "number" ? b.score : (parseFloat(b.scoreStr || b.score) || 0);
+          items.push({
+            name: b.name,
+            value: numVal,
+            score: b.scoreStr || (typeof b.score === "number" ? b.score.toFixed(1) : String(b.score || "")),
+            rank: b.rank ?? null,
+          });
+        }
+      }
+    }
+
+    return items;
   }, [model]);
 
   const metaTags = useMemo(() => {
@@ -338,6 +363,12 @@ const [logoError, setLogoError] = useState(false);
   const externalLinks = useMemo(() => {
     const source = (model ?? {}) as Record<string, string | undefined | null>;
     return [
+      {
+        key: "huggingface",
+        href: source.huggingFaceUrl,
+        label: "Hugging Face",
+        icon: <span className="text-[16px] leading-none">🤗</span>,
+      },
       {
         key: "repository",
         href: source.repositoryUrl,

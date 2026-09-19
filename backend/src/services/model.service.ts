@@ -1,6 +1,24 @@
 import { QueryRouter } from "../routing/index.js";
 import { QueryIntent, QueryType } from "../routing/types.js";
 
+export function resolveHuggingFaceUrl(model: {
+  name: string;
+  slug: string;
+  vendor?: string | null;
+  repositoryUrl?: string | null;
+  repository_url?: string | null;
+  apiUrl?: string | null;
+  api_url?: string | null;
+}): string {
+  const repo = model.repositoryUrl ?? model.repository_url ?? "";
+  const api = model.apiUrl ?? model.api_url ?? "";
+  if (repo.includes("huggingface.co")) return repo;
+  if (api.includes("huggingface.co")) return api;
+
+  const cleanName = model.name.trim();
+  return `https://huggingface.co/models?search=${encodeURIComponent(cleanName)}`;
+}
+
 export const getModels = async (
   queryRouter: QueryRouter,
   limit: number = 50,
@@ -228,6 +246,7 @@ export const getModels = async (
       paperUrl: model.paperUrl ?? model.paper_url,
       repositoryUrl: model.repositoryUrl ?? model.repository_url,
       apiUrl: model.apiUrl ?? model.api_url,
+      huggingFaceUrl: resolveHuggingFaceUrl(model),
       createdAt: model.createdAt,
       trendingScore: model.trendingScore,
       paperCount: model._count.papers,
@@ -295,9 +314,77 @@ export const getModelBySlug = async (
   };
 
   const routingResult = await queryRouter.routeQuery(intent, async (prisma) => {
-    return Promise.all([
-      prisma.model.findUnique({
-        where: { slug },
+    // 1. First try findUnique by slug
+    let modelRecord = await prisma.model.findUnique({
+      where: { slug },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        vendor: true,
+        vendor_logo_url: true,
+        releaseDate: true,
+        parameterCount: true,
+        modality: true,
+        accessType: true,
+        opennessType: true,
+        description: true,
+        benchmark_score: true,
+        model_family: true,
+        modelFamily: true,
+        category: true,
+        capabilities: true,
+        research_areas: true,
+        researchAreas: true,
+        architecture: true,
+        context_window: true,
+        contextWindow: true,
+        license: true,
+        model_versions: true,
+        modelVersions: true,
+        release_notes: true,
+        releaseNotes: true,
+        paper_url: true,
+        paperUrl: true,
+        repository_url: true,
+        repositoryUrl: true,
+        api_url: true,
+        apiUrl: true,
+        createdAt: true,
+        _count: {
+          select: {
+            papers: true,
+          },
+        },
+        papers: {
+          take: 100,
+          select: {
+            paper: {
+              select: {
+                id: true,
+                title: true,
+                slug: true,
+                citationCount: true,
+                githubStars: true,
+              },
+            },
+          },
+          orderBy: { paper: { githubStars: "desc" } },
+        },
+      },
+    });
+
+    // 2. Fallback to findFirst if findUnique failed (case-insensitive or name match)
+    if (!modelRecord) {
+      modelRecord = await prisma.model.findFirst({
+        where: {
+          OR: [
+            { slug: { equals: slug, mode: "insensitive" as const } },
+            { id: slug },
+            { name: { equals: slug, mode: "insensitive" as const } },
+            { slug: { contains: slug, mode: "insensitive" as const } },
+          ],
+        },
         select: {
           id: true,
           name: true,
@@ -353,14 +440,29 @@ export const getModelBySlug = async (
             orderBy: { paper: { githubStars: "desc" } },
           },
         },
-      }),
+      });
+    }
 
+    if (!modelRecord) {
+      return [null, [], [], []];
+    }
+
+    const actualSlug = modelRecord.slug;
+    const actualId = modelRecord.id;
+
+    // 3. Fetch related papers, related models, and direct benchmark rankings in parallel
+    const [modelPapers, relatedModels, directRankings] = await Promise.all([
       prisma.paper.findMany({
         take: 200,
         where: {
           models: {
             some: {
-              model: { slug },
+              model: {
+                OR: [
+                  { id: actualId },
+                  { slug: actualSlug },
+                ],
+              },
             },
           },
         },
@@ -422,14 +524,19 @@ export const getModelBySlug = async (
         take: 6,
         where: {
           slug: {
-            not: slug,
+            not: actualSlug,
           },
           papers: {
             some: {
               paper: {
                 models: {
                   some: {
-                    model: { slug },
+                    model: {
+                      OR: [
+                        { id: actualId },
+                        { slug: actualSlug },
+                      ],
+                    },
                   },
                 },
               },
@@ -447,7 +554,38 @@ export const getModelBySlug = async (
           },
         },
       }),
+
+      prisma.ranking.findMany({
+        where: {
+          OR: [
+            { model_id: actualId },
+            { model_name: { equals: modelRecord.name, mode: "insensitive" as const } },
+            { model_name: { contains: modelRecord.name, mode: "insensitive" as const } },
+            { model_name: { contains: actualSlug, mode: "insensitive" as const } },
+          ],
+        },
+        take: 25,
+        orderBy: { rank: "asc" as const },
+        select: {
+          rank: true,
+          score: true,
+          score_str: true,
+          metric: true,
+          verified: true,
+          benchmark: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              category: true,
+              domain: true,
+            },
+          },
+        },
+      }),
     ]);
+
+    return [modelRecord, modelPapers, relatedModels, directRankings];
   });
 
   let baseModel: any = null;
@@ -455,11 +593,12 @@ export const getModelBySlug = async (
 
   const allPapers: any[] = [];
   const allModelPapers: any[] = [];
+  const directRankingsList: any[] = [];
 
   const relatedModelsById = new Map<string, any>();
 
   for (const result of routingResult.results) {
-    const [model, modelPapers, relatedModels] = result;
+    const [model, modelPapers, relatedModels, directRankings] = result;
 
     if (model) {
       paperCount += model._count.papers;
@@ -472,12 +611,20 @@ export const getModelBySlug = async (
       allPapers.push(...model.papers);
     }
 
-    allModelPapers.push(...modelPapers);
+    if (Array.isArray(modelPapers)) {
+      allModelPapers.push(...modelPapers);
+    }
 
-    for (const relatedModel of relatedModels) {
-      if (!relatedModelsById.has(relatedModel.id)) {
-        relatedModelsById.set(relatedModel.id, relatedModel);
+    if (Array.isArray(relatedModels)) {
+      for (const relatedModel of relatedModels) {
+        if (!relatedModelsById.has(relatedModel.id)) {
+          relatedModelsById.set(relatedModel.id, relatedModel);
+        }
       }
+    }
+
+    if (Array.isArray(directRankings)) {
+      directRankingsList.push(...directRankings);
     }
   }
 
@@ -493,8 +640,6 @@ export const getModelBySlug = async (
     }
   }
 
-  const seenModelPaperIds = new Set<string>();
-
   const tasksBySlug = new Map<string, any>();
   const methodsBySlug = new Map<string, any>();
   const datasetsBySlug = new Map<string, any>();
@@ -502,6 +647,117 @@ export const getModelBySlug = async (
 
   let citationCount = 0;
   let githubStars = 0;
+
+  // Fallback search across papers if junction table has 0 papers
+  if (dedupPapers.length === 0 && baseModel.name) {
+    const searchTerms = [
+      baseModel.name,
+      baseModel.slug.replace(/-/g, " "),
+    ].filter((t: string) => t && t.length > 2);
+
+    if (searchTerms.length > 0) {
+      const fallbackIntent: QueryIntent = {
+        type: QueryType.READ,
+        entity: "paper",
+        operation: "findMany",
+      };
+
+      const fallbackResult = await queryRouter.routeQuery(fallbackIntent, async (prisma) => {
+        return prisma.paper.findMany({
+          where: {
+            OR: searchTerms.map((term: string) => [
+              { title: { contains: term, mode: "insensitive" as const } },
+              { abstract: { contains: term, mode: "insensitive" as const } },
+            ]).flat(),
+          },
+          take: 50,
+          orderBy: [
+            { githubStars: "desc" as const },
+            { citationCount: "desc" as const },
+          ],
+          select: {
+            id: true,
+            title: true,
+            slug: true,
+            citationCount: true,
+            githubStars: true,
+            tasks: {
+              select: {
+                task: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    color: true,
+                  },
+                },
+              },
+            },
+            methods: {
+              select: {
+                method: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                    category: true,
+                  },
+                },
+              },
+            },
+            datasets: {
+              select: {
+                dataset: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                  },
+                },
+              },
+            },
+            rankings: {
+              select: {
+                rank: true,
+                benchmark: {
+                  select: {
+                    id: true,
+                    name: true,
+                    slug: true,
+                  },
+                },
+              },
+            },
+          },
+        });
+      });
+
+      for (const res of fallbackResult.results) {
+        if (Array.isArray(res)) {
+          for (const p of res) {
+            if (!seenPaperIds.has(p.id)) {
+              seenPaperIds.add(p.id);
+              dedupPapers.push({
+                paper_id: p.id,
+                model_id: baseModel.id,
+                paper: {
+                  id: p.id,
+                  title: p.title,
+                  slug: p.slug,
+                  citationCount: p.citationCount || 0,
+                  githubStars: p.githubStars || 0,
+                },
+              });
+              allModelPapers.push(p);
+            }
+          }
+        }
+      }
+      paperCount = dedupPapers.length;
+    }
+  }
+
+  const seenModelPaperIds = new Set<string>();
 
   for (const paper of allModelPapers) {
     if (seenModelPaperIds.has(paper.id)) continue;
@@ -511,37 +767,54 @@ export const getModelBySlug = async (
     citationCount += paper.citationCount || 0;
     githubStars += paper.githubStars || 0;
 
-    for (const taskRelation of paper.tasks) {
+    for (const taskRelation of paper.tasks || []) {
       const task = taskRelation.task;
-
-      if (!tasksBySlug.has(task.slug)) {
+      if (task && !tasksBySlug.has(task.slug)) {
         tasksBySlug.set(task.slug, task);
       }
     }
 
-    for (const methodRelation of paper.methods) {
+    for (const methodRelation of paper.methods || []) {
       const method = methodRelation.method;
-
-      if (!methodsBySlug.has(method.slug)) {
+      if (method && !methodsBySlug.has(method.slug)) {
         methodsBySlug.set(method.slug, method);
       }
     }
 
-    for (const datasetRelation of paper.datasets) {
+    for (const datasetRelation of paper.datasets || []) {
       const dataset = datasetRelation.dataset;
-
-      if (!datasetsBySlug.has(dataset.slug)) {
+      if (dataset && !datasetsBySlug.has(dataset.slug)) {
         datasetsBySlug.set(dataset.slug, dataset);
       }
     }
 
-    for (const ranking of paper.rankings) {
+    for (const ranking of paper.rankings || []) {
       const benchmark = ranking.benchmark;
-
-      if (!benchmarksBySlug.has(benchmark.slug)) {
+      if (benchmark && !benchmarksBySlug.has(benchmark.slug)) {
         benchmarksBySlug.set(benchmark.slug, {
           ...benchmark,
           rank: ranking.rank,
+        });
+      }
+    }
+  }
+
+  // Integrate direct SOTA rankings for this model
+  for (const directRank of directRankingsList) {
+    if (directRank && directRank.benchmark) {
+      const b = directRank.benchmark;
+      if (!benchmarksBySlug.has(b.slug)) {
+        benchmarksBySlug.set(b.slug, {
+          id: b.id,
+          name: b.name,
+          slug: b.slug,
+          category: b.category,
+          domain: b.domain,
+          rank: directRank.rank,
+          score: directRank.score,
+          scoreStr: directRank.score_str,
+          metric: directRank.metric,
+          verified: directRank.verified,
         });
       }
     }
@@ -656,6 +929,7 @@ export const getModelBySlug = async (
     paperUrl: baseModel.paperUrl ?? baseModel.paper_url,
     repositoryUrl: baseModel.repositoryUrl ?? baseModel.repository_url,
     apiUrl: baseModel.apiUrl ?? baseModel.api_url,
+    huggingFaceUrl: resolveHuggingFaceUrl(baseModel),
     createdAt: baseModel.createdAt,
     paperCount,
     citationCount,

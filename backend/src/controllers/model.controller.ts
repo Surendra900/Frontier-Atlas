@@ -56,6 +56,7 @@ export const getModels = async (c: Context) => {
   ].join(':');
 
   try {
+    c.header('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     const memCached = getFromMemoryCache(cacheKey);
     if (memCached) {
       return c.json(memCached, 200);
@@ -123,6 +124,7 @@ export const getModelFacets = async (c: Context) => {
   const cacheKey = 'models:facets';
 
   try {
+    c.header('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=1200');
     const memCached = getFromMemoryCache(cacheKey);
     if (memCached) {
       return c.json(memCached, 200);
@@ -178,6 +180,7 @@ export const getModelBySlug = async (c: Context) => {
   const cacheKey = `model:${slug}`;
 
   try {
+    c.header('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     const memCached = getFromMemoryCache(cacheKey);
     if (memCached) {
       return c.json(memCached, 200);
