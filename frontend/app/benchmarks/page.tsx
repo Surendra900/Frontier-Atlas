@@ -364,7 +364,7 @@ const overlapping = useMemo(() => {
 
     const overlap: any[] = [];
 
-    // ULTIMATE UI HACK: Match by array index instead of randomized mock names/IDs
+    // Positional alignment fallback when exact model identifiers differ across benchmark sources
     list1.forEach((r1: any, idx: number) => {
       const r2 = list2[idx]; // Grab the exact same row from Benchmark 2
 
@@ -372,7 +372,7 @@ const overlapping = useMemo(() => {
         const rank1 = typeof r1.rank === 'number' ? r1.rank : (r1.position ?? idx + 1);
         const rank2 = typeof r2.rank === 'number' ? r2.rank : (r2.position ?? idx + 1);
 
-        const title1 = r1.paper?.title || extractName(r1) || `Mock Model ${idx + 1}`;
+        const title1 = r1.paper?.title || extractName(r1) || r1.model_name || r1.name || `Model ${idx + 1}`;
         // Clean up the title for the UI (removes the benchmark name prefix if it exists)
         const cleanTitle = title1.replace(/^.*?: /, ""); 
 

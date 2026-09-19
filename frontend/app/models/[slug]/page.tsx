@@ -598,7 +598,7 @@ const [logoError, setLogoError] = useState(false);
   </p>
 </div>
 
-            {model.paperCount === 0 ? (
+            {model.paperCount === 0 && (!initialPapers || initialPapers.papers.length === 0) ? (
               <div className="rounded-[8px] border border-dashed border-[#E5E5E0] bg-[#FAFAF8] p-10 text-center">
                 <h3 className="text-[18px] font-semibold text-[#111111] mb-2">
                   No indexed papers yet

@@ -129,7 +129,7 @@ export function getMockBenchmarkDetail(slug: string): BenchmarkDetail {
     .join(' ');
 
   return {
-    id: `mock-${slug}`,
+    id: `bm-${slug}`,
     name,
     slug,
     description: `${name} is an evaluation benchmark measuring performance, robustness, and generalizability across standardized test environments.`,
