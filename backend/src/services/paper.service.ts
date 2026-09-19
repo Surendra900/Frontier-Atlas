@@ -440,6 +440,7 @@ export const getPapers = async (
             { publicationDate: "desc" as const },
             { slug: "asc" as const },
           ];
+  let effectiveWhere = where;
   let papers = await queryRouter.routeQuery<any>(
     async (prisma: PrismaClient) => {
       return prisma.paper.findMany({
@@ -461,6 +462,7 @@ export const getPapers = async (
       fallbackCutoff.setDate(fallbackCutoff.getDate() - lookbackDays);
 
       const fallbackWhere = { ...where, publicationDate: { gte: fallbackCutoff } };
+      effectiveWhere = fallbackWhere;
 
       papers = await queryRouter.routeQuery<any>(
         async (prisma: PrismaClient) => {
@@ -476,6 +478,7 @@ export const getPapers = async (
     } else {
       // Fallback for period === "all"
       const fallbackWhere = { ...where, publicationDate: { not: null } };
+      effectiveWhere = fallbackWhere;
       papers = await queryRouter.routeQuery<any>(
         async (prisma: PrismaClient) => {
           return prisma.paper.findMany({
@@ -493,6 +496,17 @@ export const getPapers = async (
   const hasMore = papers.length > limit;
   const pagePapers = hasMore ? papers.slice(0, limit) : papers;
 
+  const total =
+    skip === 0 && !hasMore
+      ? pagePapers.length
+      : await queryRouter.routeQuery<number>(
+        async (prisma: PrismaClient) => {
+          return prisma.paper.count({
+            where: effectiveWhere,
+          });
+        },
+      );
+
   return {
     papers: pagePapers.map((paper: any) => ({
       ...exposeThumbnailUrl(paper),
@@ -505,7 +519,7 @@ export const getPapers = async (
       methods: paper.methods.map(({ method }: any) => method),
 
     })),
-    total: pagePapers.length, // Let the frontend use hasMore rather than a fake total
+    total,
     page,
     hasMore,
     nextCursor: null, // Legacy cursor unused now
@@ -751,4 +765,68 @@ export const searchPapers = async (
     hasMore: papers.length >= limit,
     query: searchTerm,
   };
+};
+
+export const getOrganizationPaperCounts = async (
+  queryRouter: QueryRouter,
+): Promise<Record<string, number>> => {
+  return queryRouter.routeQuery<Record<string, number>>(
+    async (prisma: PrismaClient) => {
+      const counts: Record<string, number> = {};
+
+      try {
+        const directGroups = await prisma.paper.groupBy({
+          by: ["organization"],
+          where: {
+            organization: { not: null },
+          },
+          _count: {
+            id: true,
+          },
+        });
+
+        for (const g of directGroups) {
+          if (g.organization) {
+            counts[g.organization] = g._count.id;
+          }
+        }
+      } catch (err) {
+        console.error("Direct paper organization groupBy failed:", err);
+      }
+
+      try {
+        const modelPapers = await prisma.paperModel.findMany({
+          where: {
+            model: { vendor: { not: null } },
+          },
+          select: {
+            paper_id: true,
+            model: {
+              select: { vendor: true },
+            },
+          },
+        });
+
+        const vendorPaperSets = new Map<string, Set<string>>();
+        for (const mp of modelPapers) {
+          const vendor = mp.model?.vendor;
+          if (!vendor) continue;
+          let set = vendorPaperSets.get(vendor);
+          if (!set) {
+            set = new Set<string>();
+            vendorPaperSets.set(vendor, set);
+          }
+          set.add(mp.paper_id);
+        }
+
+        for (const [vendor, set] of vendorPaperSets.entries()) {
+          counts[vendor] = Math.max(counts[vendor] || 0, set.size);
+        }
+      } catch (err) {
+        console.error("Model vendor paper aggregation failed:", err);
+      }
+
+      return counts;
+    },
+  );
 };
