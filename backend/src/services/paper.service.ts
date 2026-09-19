@@ -752,3 +752,67 @@ export const searchPapers = async (
     query: searchTerm,
   };
 };
+
+export const getOrganizationPaperCounts = async (
+  queryRouter: QueryRouter,
+): Promise<Record<string, number>> => {
+  return queryRouter.routeQuery<Record<string, number>>(
+    async (prisma: PrismaClient) => {
+      const counts: Record<string, number> = {};
+
+      try {
+        const directGroups = await prisma.paper.groupBy({
+          by: ["organization"],
+          where: {
+            organization: { not: null },
+          },
+          _count: {
+            id: true,
+          },
+        });
+
+        for (const g of directGroups) {
+          if (g.organization) {
+            counts[g.organization] = g._count.id;
+          }
+        }
+      } catch (err) {
+        console.error("Direct paper organization groupBy failed:", err);
+      }
+
+      try {
+        const modelPapers = await prisma.paperModel.findMany({
+          where: {
+            model: { vendor: { not: null } },
+          },
+          select: {
+            paper_id: true,
+            model: {
+              select: { vendor: true },
+            },
+          },
+        });
+
+        const vendorPaperSets = new Map<string, Set<string>>();
+        for (const mp of modelPapers) {
+          const vendor = mp.model?.vendor;
+          if (!vendor) continue;
+          let set = vendorPaperSets.get(vendor);
+          if (!set) {
+            set = new Set<string>();
+            vendorPaperSets.set(vendor, set);
+          }
+          set.add(mp.paper_id);
+        }
+
+        for (const [vendor, set] of vendorPaperSets.entries()) {
+          counts[vendor] = Math.max(counts[vendor] || 0, set.size);
+        }
+      } catch (err) {
+        console.error("Model vendor paper aggregation failed:", err);
+      }
+
+      return counts;
+    },
+  );
+};

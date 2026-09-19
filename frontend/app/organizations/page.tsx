@@ -7,11 +7,10 @@ import Navbar from "@/components/Navbar";
 import {
   getCachedModelFacets,
   getCachedModels,
-  getModels,
   type ModelFacets,
   type ModelItem,
 } from "@/lib/models";
-import { getOrganizationDirectory } from "@/lib/organizations";
+import { getOrganizationCatalog, getOrganizationDirectory } from "@/lib/organizations";
 
 type SortMode = "trending" | "models" | "az";
 
@@ -114,6 +113,19 @@ export default function OrganizationsPage() {
   useEffect(() => {
     let cancelled = false;
 
+    // Load fast catalog immediately for instant rendering
+    getOrganizationCatalog()
+      .then((catalog) => {
+        if (cancelled) return;
+        setModels(catalog.models);
+        setFacets(catalog.facets);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Unable to load organization catalog", error);
+      });
+
+    // Load directory with paper counts
     getOrganizationDirectory()
       .then((directory) => {
         if (cancelled) return;
@@ -121,7 +133,7 @@ export default function OrganizationsPage() {
         setFacets(directory.facets);
         setPaperCounts(directory.paperCounts);
       })
-      .catch((error) => console.error("Unable to load organizations", error))
+      .catch((error) => console.error("Unable to load organization directory counts", error))
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
