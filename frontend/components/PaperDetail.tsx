@@ -22,7 +22,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, type ReactNode } from "react";
 import type { PaperDetail as PaperDetailType, PaperRanking, PaperSotaClaim } from "@/lib/papers";
-import { getPapers, getArxivAbsUrl, getArxivPdfUrl, type Paper } from "@/lib/paperApi";
+import { getPapers, getArxivAbsUrl, getArxivPdfUrl, resolveHfModelUrl, type Paper } from "@/lib/paperApi";
 import { atlasUiFont } from "@/lib/fonts";
 import { fetchWithAuthRetry } from "@/lib/auth-client";
 
@@ -274,7 +274,7 @@ function RepositoryPanel({ paper, resolvedGithubUrl }: { paper: PaperDetailType;
 }
 
 function HuggingFacePanel({ paper, hfUrl }: { paper: PaperDetailType; hfUrl: string }) {
-  const hfRepos = (paper.repositories || []).filter((r) => r.url?.includes("huggingface.co"));
+  const hfRepos = (paper.repositories || []).filter((r) => r.url?.includes("huggingface.co") && !r.url?.includes("/papers/"));
   const hfRepo = hfRepos[0];
   const repoName = hfRepo?.name || (hfRepo?.owner ? `${hfRepo.owner}/${hfRepo.name}` : null);
 
@@ -289,7 +289,7 @@ function HuggingFacePanel({ paper, hfUrl }: { paper: PaperDetailType; hfUrl: str
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex flex-col gap-1.5">
             <p className="font-mono text-[15px] font-extrabold text-[#171717] m-0 truncate">
-              {repoName || (paper.arxivId ? `hf.co/papers/${paper.arxivId}` : "Hugging Face Model")}
+              {repoName || ((paper as any).models?.[0]?.name ? (paper as any).models[0].name : "Hugging Face Model")}
             </p>
             {paper.hfUpvotes != null && paper.hfUpvotes > 0 && (
               <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#FF5A1F]">
@@ -803,7 +803,7 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
     huggingFaceRepo?.url ||
     (paper.paperUrl?.includes("huggingface.co") && !paper.paperUrl.includes("/papers/") ? paper.paperUrl : null) ||
     (paper.sourceUrl?.includes("huggingface.co") && !paper.sourceUrl.includes("/papers/") ? paper.sourceUrl : null);
-  const hfResolvedUrl = candidateHfUrl && !candidateHfUrl.includes("/papers/") ? candidateHfUrl : null;
+  const hfResolvedUrl = (candidateHfUrl && !candidateHfUrl.includes("/papers/")) ? candidateHfUrl : resolveHfModelUrl(paper);
   const rawProjectPageUrl = formatExternalUrl(paper.projectUrl);
   const projectPageUrl = rawProjectPageUrl && !rawProjectPageUrl.includes("huggingface.co") ? rawProjectPageUrl : null;
   const previewHref =

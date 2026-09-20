@@ -25,6 +25,7 @@ import {
   getPapersSync,
   getArxivAbsUrl,
   getArxivPdfUrl,
+  resolveHfModelUrl,
   type GetPapersParams,
   type GetPapersResult,
   type Paper,
@@ -478,10 +479,6 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
   const githubRepo = paper.repositories?.find(
     (repo: any) => repo.url?.includes("github.com")
   );
-  const resolvedGithubUrl = paper.githubUrl || githubRepo?.url || null;
-  const huggingFaceRepo = paper.repositories?.find(
-    (repo: any) => repo.url?.includes("huggingface.co")
-  );
  
   const handlePrefetch = useCallback(() => {
     router.prefetch(`/papers/${paper.slug}`);
@@ -651,11 +648,7 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const hfUrl =
-                  huggingFaceRepo?.url ||
-                  (paper as any).hfUrl ||
-                  (paper as any).huggingface_url ||
-                  (paper.arxivId ? `https://huggingface.co/papers/${paper.arxivId}` : null);
+                const hfUrl = resolveHfModelUrl(paper);
                 if (hfUrl) {
                   window.open(hfUrl, "_blank");
                 } else {

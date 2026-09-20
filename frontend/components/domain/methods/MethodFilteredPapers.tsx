@@ -283,6 +283,7 @@ export default function MethodFilteredPapers({ papers, methodName }: Props) {
               conference: paper.conference ?? "",
               // Additional properties expected by PaperCard
               ...(paper.githubUrl ? { githubUrl: paper.githubUrl } : {}),
+              ...((paper as any).hf_model_url ? { hf_model_url: (paper as any).hf_model_url } : {}),
             } as ApiPaper;
 
             // PaperCard reads these from (paper as any)
@@ -293,8 +294,9 @@ export default function MethodFilteredPapers({ papers, methodName }: Props) {
             if (paper.githubUrl) {
               apiPaper.repositories.push({ url: paper.githubUrl, name: "GitHub", owner: "" });
             }
-            if ((paper as any).paperUrl?.includes('huggingface.co') || (paper as any).pdfUrl?.includes('huggingface.co')) {
-              apiPaper.repositories.push({ url: (paper as any).paperUrl || (paper as any).pdfUrl, name: "HuggingFace", owner: "" });
+            const hfCandidate = (paper as any).paperUrl || (paper as any).pdfUrl;
+            if (hfCandidate?.includes('huggingface.co') && !hfCandidate.includes('/papers/')) {
+              apiPaper.repositories.push({ url: hfCandidate, name: "HuggingFace", owner: "" });
             }
 
             return (

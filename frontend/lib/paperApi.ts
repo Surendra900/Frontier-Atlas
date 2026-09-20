@@ -25,6 +25,7 @@ export interface Paper {
   hfUrl?: string;
   huggingface_url?: string;
   hf_model_url?: string;
+  models?: any[];
   trendingScore?: number;
   hfUpvotes?: number;
   arxivId?: string;
@@ -234,7 +235,71 @@ export function mapBackendPaper(raw: Record<string, unknown>): Paper {
     sourceUrl: raw.sourceUrl ? String(raw.sourceUrl) : undefined,
     projectUrl: (raw.projectUrl || raw.project_url) ? String(raw.projectUrl || raw.project_url) : undefined,
     repositories: Array.isArray(raw.repositories) ? raw.repositories : undefined,
+    models: Array.isArray(raw.models) ? raw.models : undefined,
   };
+}
+
+export function resolveHfModelUrl(paper: Paper | any): string | null {
+  if (!paper) return null;
+
+  const isValidModelUrl = (url?: string | null): boolean => {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (!trimmed) return false;
+    if (trimmed.includes('/papers/')) return false;
+    return trimmed.includes('huggingface.co') || /^[\w.-]+\/[\w.-]+$/.test(trimmed);
+  };
+
+  const formatHfUrl = (url: string): string => {
+    const trimmed = url.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    return `https://huggingface.co/${trimmed}`;
+  };
+
+  if (isValidModelUrl(paper.hf_model_url)) {
+    return formatHfUrl(paper.hf_model_url);
+  }
+
+  if (Array.isArray(paper.repositories)) {
+    const hfRepo = paper.repositories.find((r: any) => isValidModelUrl(r?.url));
+    if (hfRepo?.url) {
+      return formatHfUrl(hfRepo.url);
+    }
+  }
+
+  if (isValidModelUrl(paper.hfUrl)) {
+    return formatHfUrl(paper.hfUrl);
+  }
+  if (isValidModelUrl(paper.huggingface_url)) {
+    return formatHfUrl(paper.huggingface_url);
+  }
+
+  if (Array.isArray(paper.models) && paper.models.length > 0) {
+    for (const m of paper.models) {
+      const modelObj = m?.model || m;
+      if (isValidModelUrl(modelObj?.repository_url)) {
+        return formatHfUrl(modelObj.repository_url);
+      }
+      if (modelObj?.name || modelObj?.slug) {
+        const modelName = String(modelObj.name || modelObj.slug).trim();
+        if (modelName) {
+          return `https://huggingface.co/models?search=${encodeURIComponent(modelName)}`;
+        }
+      }
+    }
+  }
+
+  if (paper.title && typeof paper.title === 'string') {
+    const cleanTitle = paper.title.split(/[:—–(]/)[0].trim();
+    const query = cleanTitle.length >= 3 ? cleanTitle : paper.title.trim();
+    if (query) {
+      return `https://huggingface.co/models?search=${encodeURIComponent(query)}`;
+    }
+  }
+
+  return null;
 }
 
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
