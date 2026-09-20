@@ -318,17 +318,19 @@ export const getPapers = async (
   const sort = query.sort || "trending";
   const period = query.period || "all";
 
-  const where: any = {};
+  const andConditions: Prisma.PaperWhereInput[] = [];
 
   if (query.task) {
     const rawTask = query.task.trim();
     const cleanTask = rawTask.toLowerCase().replace(/-models$/, "").replace(/-tasks?$/, "");
     const taskKeywords = cleanTask.replace(/-/g, " ");
-    where.OR = [
-      { tasks: { some: { task: { slug: { in: [rawTask, cleanTask, `${cleanTask}-models`, `${cleanTask}-tasks`] } } } } },
-      { task: { contains: cleanTask, mode: "insensitive" } },
-      { title: { contains: taskKeywords, mode: "insensitive" } },
-    ];
+    andConditions.push({
+      OR: [
+        { tasks: { some: { task: { slug: { in: [rawTask, cleanTask, `${cleanTask}-models`, `${cleanTask}-tasks`] } } } } },
+        { task: { contains: cleanTask, mode: "insensitive" } },
+        { title: { contains: taskKeywords, mode: "insensitive" } },
+      ],
+    });
   }
   if (query.method) {
     const rawMethod = query.method.trim();
@@ -337,18 +339,31 @@ export const getPapers = async (
     const mcpVariants = cleanMethod.includes("mcp") || cleanMethod.includes("model-context-protocol")
       ? ["mcp", "model-context-protocol", "model-context-protocol-mcp"]
       : [rawMethod, cleanMethod];
-    where.OR = [
-      { methods: { some: { method: { slug: { in: mcpVariants } } } } },
-      { title: { contains: methodKeywords, mode: "insensitive" } },
-      { abstract: { contains: methodKeywords, mode: "insensitive" } },
-    ];
+    andConditions.push({
+      OR: [
+        { methods: { some: { method: { slug: { in: mcpVariants } } } } },
+        { title: { contains: methodKeywords, mode: "insensitive" } },
+        { abstract: { contains: methodKeywords, mode: "insensitive" } },
+      ],
+    });
   }
-  if (query.model) where.models = { some: { model: { slug: query.model } } };
+  if (query.model) {
+    andConditions.push({
+      models: { some: { model: { slug: query.model } } },
+    });
+  }
   if (query.organization) {
-    where.OR = [
-      { organization: { equals: query.organization, mode: "insensitive" } },
-      { models: { some: { model: { vendor: { equals: query.organization, mode: "insensitive" } } } } },
-    ];
+    andConditions.push({
+      OR: [
+        { organization: { equals: query.organization, mode: "insensitive" } },
+        { models: { some: { model: { vendor: { equals: query.organization, mode: "insensitive" } } } } },
+      ],
+    });
+  }
+
+  const where: Prisma.PaperWhereInput = {};
+  if (andConditions.length > 0) {
+    where.AND = andConditions;
   }
 
   let baseDate = new Date();
