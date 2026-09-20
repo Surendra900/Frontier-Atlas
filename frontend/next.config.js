@@ -4,8 +4,8 @@ const isProd = process.env.NODE_ENV === 'production';
 const nextConfig = {
   reactStrictMode: true,
   
-  // This is the new line! It fetches styles from your trusted pages.dev domain in production
-  assetPrefix: isProd ? 'https://frontieratlas.pages.dev' : undefined,
+  // On Vercel, serve assets directly. On Cloudflare Pages, use pages.dev domain if specified
+  assetPrefix: process.env.VERCEL ? undefined : (isProd ? 'https://frontieratlas.pages.dev' : undefined),
 
   images: {
     remotePatterns: [

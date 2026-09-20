@@ -1,8 +1,66 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import * as LucideIcons from "lucide-react";
+import {
+  Brain,
+  Layers,
+  Puzzle,
+  Dumbbell,
+  Shield,
+  MessageSquare,
+  Bot,
+  DatabaseZap,
+  Sliders,
+  TrendingUp,
+  CircleDot,
+  Zap,
+  GitBranch,
+  Share2,
+  Repeat2,
+  Eye,
+  BookOpen,
+  Mic,
+  Video,
+  Cpu,
+  BarChart2,
+  Microscope,
+  Telescope,
+  Lock,
+  Server,
+  HardDrive,
+  FlaskConical,
+} from "lucide-react";
 import { getCategoryColors } from "@/lib/categoryColors";
+
+const ICON_MAP: Record<string, React.ElementType> = {
+  Brain,
+  Layers,
+  Puzzle,
+  Dumbbell,
+  Shield,
+  MessageSquare,
+  Bot,
+  DatabaseZap,
+  Sliders,
+  TrendingUp,
+  CircleDot,
+  Zap,
+  GitBranch,
+  Share2,
+  Repeat2,
+  Eye,
+  BookOpen,
+  Mic,
+  Video,
+  Cpu,
+  BarChart2,
+  Microscope,
+  Telescope,
+  Lock,
+  Server,
+  HardDrive,
+  FlaskConical,
+};
 
 export function CategoryPillBar({ categories }: { categories: any[] }) {
   const [activeId, setActiveId] = useState<string>(categories[0]?.id || "");
@@ -59,9 +117,7 @@ export function CategoryPillBar({ categories }: { categories: any[] }) {
         {categories.map((group) => {
           const active = activeId === group.id;
           const colors = getCategoryColors(group.id);
-          const Icon = group.iconName
-            ? ((LucideIcons as any)[group.iconName] as React.ElementType)
-            : LucideIcons.Layers;
+          const Icon = (group.iconName && ICON_MAP[group.iconName]) || Layers;
 
           return (
             <button

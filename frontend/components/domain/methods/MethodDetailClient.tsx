@@ -2,29 +2,46 @@
 
 import React from "react";
 import Link from "next/link";
-import { FileText } from "lucide-react";
-import * as LucideIcons from "lucide-react";
+import {
+  FileText,
+  Settings,
+  MessageSquare,
+  Eye,
+  Mic,
+  Bot,
+  Brain,
+  Dumbbell,
+  LineChart,
+  Zap,
+  Search,
+  Gamepad2,
+  Wand2,
+  Layers,
+  Cpu,
+  CheckSquare,
+  Binary,
+} from "lucide-react";
 import Navbar from "@/components/Navbar";
 import MethodFilteredPapers from "@/components/domain/methods/MethodFilteredPapers";
 import { useMethodDetail } from "@/lib/methodCache";
 
-const ICON_MAP: Record<string, string> = {
-  "General": "Settings",
-  "Language": "MessageSquare",
-  "Vision": "Eye",
-  "Audio & Speech": "Mic",
-  "Agents": "Bot",
-  "Reasoning": "Brain",
-  "Training": "Dumbbell",
-  "Optimization": "LineChart",
-  "Inference": "Zap",
-  "Retrieval": "Search",
-  "Reinforcement Learning": "Gamepad2",
-  "Diffusion & Generation": "Wand2",
-  "Multimodal": "Layers",
-  "Architectures": "Cpu",
-  "Evaluation": "CheckSquare",
-  "Embeddings": "Binary"
+const ICON_MAP: Record<string, React.ElementType> = {
+  "General": Settings,
+  "Language": MessageSquare,
+  "Vision": Eye,
+  "Audio & Speech": Mic,
+  "Agents": Bot,
+  "Reasoning": Brain,
+  "Training": Dumbbell,
+  "Optimization": LineChart,
+  "Inference": Zap,
+  "Retrieval": Search,
+  "Reinforcement Learning": Gamepad2,
+  "Diffusion & Generation": Wand2,
+  "Multimodal": Layers,
+  "Architectures": Cpu,
+  "Evaluation": CheckSquare,
+  "Embeddings": Binary
 };
 
 function MethodDetailSkeleton() {
@@ -105,8 +122,7 @@ export default function MethodDetailClient({ slug }: { slug: string }) {
   const categoryName = methodDetail.category || methodDetail.categoryName || "Methods";
   const actualPaperCount = methodDetail.paperCount ?? methodDetail.papers?.length ?? 0;
 
-  const iconName = ICON_MAP[categoryName] || "FileText";
-  const DynamicIcon = (LucideIcons as any)[iconName] as React.ElementType || FileText;
+  const DynamicIcon = ICON_MAP[categoryName] || FileText;
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#fafafa] text-slate-900 antialiased" style={{ fontFamily: "'Inter', sans-serif" }}>
