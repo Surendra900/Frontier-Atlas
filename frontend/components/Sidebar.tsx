@@ -23,6 +23,7 @@ import {
   Target,
   Plug,
   Search,
+  TrendingUp,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -122,6 +123,7 @@ export default function Sidebar({
     },
     { label: "Latest Papers", icon: <Clock size={16} />, slug: "latest" },
     { label: "Most GitHub Stars", icon: <Star size={16} />, slug: "github-stars" },
+    { label: "GitHub Hourly", icon: <TrendingUp size={16} />, slug: "github-hourly" },
   ];
 
   const tasks = [

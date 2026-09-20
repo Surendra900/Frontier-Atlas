@@ -1,4 +1,4 @@
-export type PaperSortKey = 'latest' | 'stars' | 'citations' | 'alphabetical' | 'ranking' | 'trending' | string;
+export type PaperSortKey = 'latest' | 'stars' | 'hourly' | 'citations' | 'alphabetical' | 'ranking' | 'trending' | string;
 
 export type SortDirection = 'asc' | 'desc';
 
@@ -12,6 +12,7 @@ export interface SortablePaper {
   updatedAt?: Date | string | null;
   createdAt?: Date | string | null;
   githubStars?: number | null;
+  github_hourly_increase?: number | null;
   citationCount?: number | null;
   trendingScore?: number | null;
   rankings?: Array<{ rank?: number | null }> | null;
@@ -74,6 +75,10 @@ export class SortingEngine {
       return 'latest';
     }
 
+    if (['hourly', 'github_hourly', 'github_hourly_increase', 'githubhourly', 'stars_hourly'].includes(normalized)) {
+      return 'hourly';
+    }
+
     if (['stars', 'github_stars', 'githubstars', 'github'].includes(normalized)) {
       return 'stars';
     }
@@ -95,6 +100,15 @@ export class SortingEngine {
 
   static getSortFields<T extends SortablePaper>(sort?: PaperSortKey): SortField<T>[] {
     const normalized = this.normalizeSort(sort);
+
+    if (normalized === 'hourly') {
+      return [
+        { direction: 'desc', getValue: (paper) => toNumber(paper.github_hourly_increase) },
+        { direction: 'desc', getValue: (paper) => toNumber(paper.githubStars) },
+        { direction: 'desc', getValue: (paper) => toTime(paper.publicationDate) },
+        { direction: 'asc', getValue: (paper) => paper.slug },
+      ];
+    }
 
     if (normalized === 'latest') {
       return [

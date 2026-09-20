@@ -46,7 +46,8 @@ export default function HomeContent({
   if (
     label === "Trending Papers" ||
     label === "Latest Papers" ||
-    label === "Most GitHub Stars"
+    label === "Most GitHub Stars" ||
+    label === "GitHub Hourly"
   ) {
     setIsFilterChanging(true);
     setActiveSort(label);
@@ -70,7 +71,14 @@ export default function HomeContent({
       selectedPeriod === "This Week" ? "week" :
         selectedPeriod === "This Month" ? "month" : "all";
 
-  const apiSort = activeSort === "Trending Papers" ? "trending" : activeSort === "Most GitHub Stars" ? "stars" : "latest";
+  const apiSort =
+    activeSort === "Trending Papers"
+      ? "trending"
+      : activeSort === "Most GitHub Stars"
+      ? "stars"
+      : activeSort === "GitHub Hourly"
+      ? "hourly"
+      : "latest";
 
   // Distinguish methods from tasks and ensure case-insensitivity
  const isMethod =
