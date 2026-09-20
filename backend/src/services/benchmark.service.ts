@@ -20,17 +20,38 @@ export const getBenchmarks = async (prisma: PrismaClient, limit: number = 50, sk
   });
 };
 
+const fetchMatchingPapers = async (prisma: PrismaClient, searchName: string) => {
+  return prisma.paper.findMany({
+    where: {
+      OR: [
+        { title: { contains: searchName, mode: 'insensitive' } },
+        { abstract: { contains: searchName, mode: 'insensitive' } },
+      ],
+    },
+    take: 10,
+    orderBy: { citationCount: 'desc' },
+    select: {
+      id: true,
+      title: true,
+      slug: true,
+      githubStars: true,
+      citationCount: true,
+      publicationDate: true,
+    },
+  });
+};
+
 export const getBenchmarkBySlug = async (prisma: PrismaClient, slug: string) => {
   if (!slug) return null;
   const cleanSlug = slug.toLowerCase();
-  const searchName = cleanSlug.replace(/-/g, " ");
+  const searchName = cleanSlug.replace(/-/g, ' ');
 
-  let benchmark = await prisma.benchmark.findFirst({
+  const benchmark = await prisma.benchmark.findFirst({
     where: {
       OR: [
         { slug: cleanSlug },
         { slug: { contains: cleanSlug } },
-        { name: { contains: searchName, mode: "insensitive" } },
+        { name: { contains: searchName, mode: 'insensitive' } },
       ],
     },
     include: {
@@ -65,40 +86,29 @@ export const getBenchmarkBySlug = async (prisma: PrismaClient, slug: string) => 
     },
   });
 
+  // Handle case where benchmark record does not exist
   if (!benchmark) {
-    // Return a dynamic benchmark object with real matching papers from DB
-    const matchingPapers = await prisma.paper.findMany({
-      where: {
-        OR: [
-          { title: { contains: searchName, mode: "insensitive" } },
-          { abstract: { contains: searchName, mode: "insensitive" } },
-        ],
-      },
-      take: 10,
-      orderBy: { citationCount: "desc" },
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        githubStars: true,
-        citationCount: true,
-        publicationDate: true,
-      },
-    });
+    const matchingPapers = await fetchMatchingPapers(prisma, searchName);
+
+    // FIX 1: Return null if no matching papers exist to trigger 404 in controller
+    if (matchingPapers.length === 0) {
+      return null;
+    }
 
     const formattedName = searchName
-      .split(" ")
+      .split(' ')
       .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(" ");
+      .join(' ');
 
     return {
       id: `benchmark-${cleanSlug}`,
       name: formattedName,
       slug: cleanSlug,
+      description: `Automated dynamic benchmark for ${formattedName}`,
       rankings: matchingPapers.map((p, idx) => ({
         id: `r-${p.id}`,
         rank: idx + 1,
-        previous_rank: idx > 0 ? idx : null,
+        previous_rank: null, // FIX 2: Do not fabricate rank history
         paper: p,
       })),
       claims: matchingPapers.slice(0, 2).map((p) => ({
@@ -108,41 +118,29 @@ export const getBenchmarkBySlug = async (prisma: PrismaClient, slug: string) => 
     };
   }
 
-  // If benchmark exists but has no rankings linked, link papers matching benchmark name
+  // Handle case where benchmark exists but has no linked rankings
   if (benchmark.rankings.length === 0) {
-    const matchingPapers = await prisma.paper.findMany({
-      where: {
-        OR: [
-          { title: { contains: searchName, mode: "insensitive" } },
-          { abstract: { contains: searchName, mode: "insensitive" } },
-        ],
-      },
-      take: 10,
-      orderBy: { citationCount: "desc" },
-      select: {
-        id: true,
-        title: true,
-        slug: true,
-        githubStars: true,
-        citationCount: true,
-        publicationDate: true,
-      },
-    });
+    const matchingPapers = await fetchMatchingPapers(prisma, searchName);
 
     return {
       ...benchmark,
       rankings: matchingPapers.map((p, idx) => ({
         id: `r-${p.id}`,
         rank: idx + 1,
-        previous_rank: idx > 0 ? idx : null,
+        previous_rank: null, // FIX 2: Do not fabricate rank history
         paper: p,
       })),
     };
   }
 
-  const sortedRankings = [...benchmark.rankings].sort((a: any, b: any) => {
-    if (a.score != null && b.score != null) return b.score - a.score;
-    return (a.rank ?? 999) - (b.rank ?? 999);
+  const sortedRankings = [...benchmark.rankings].sort((a, b) => {
+    const scoreA = (a as { score?: number }).score;
+    const scoreB = (b as { score?: number }).score;
+    const rankA = (a as { rank?: number }).rank;
+    const rankB = (b as { rank?: number }).rank;
+
+    if (scoreA != null && scoreB != null) return scoreB - scoreA;
+    return (rankA ?? 999) - (rankB ?? 999);
   });
 
   const fixedRankings = sortedRankings.map((r, idx) => ({
