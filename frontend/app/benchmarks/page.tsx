@@ -363,17 +363,17 @@ const overlapping = useMemo(() => {
 
     const overlap: any[] = [];
 
-    // ULTIMATE UI HACK: Match by array index instead of randomized mock names/IDs
-    list1.forEach((r1: any, idx: number) => {
-      const r2 = list2[idx]; // Grab the exact same row from Benchmark 2
+    list1.forEach((r1: any) => {
+      const name1 = extractName(r1);
+      if (!name1) return;
 
-      if (r2) {
-        const rank1 = typeof r1.rank === 'number' ? r1.rank : (r1.position ?? idx + 1);
-        const rank2 = typeof r2.rank === 'number' ? r2.rank : (r2.position ?? idx + 1);
+      const norm1 = normalize(name1);
+      const match2 = list2.find((r2: any) => normalize(extractName(r2)) === norm1);
 
-        const title1 = r1.paper?.title || extractName(r1) || `Mock Model ${idx + 1}`;
-        // Clean up the title for the UI (removes the benchmark name prefix if it exists)
-        const cleanTitle = title1.replace(/^.*?: /, ""); 
+      if (match2) {
+        const rank1 = typeof r1.rank === 'number' ? r1.rank : (r1.position ?? 1);
+        const rank2 = typeof match2.rank === 'number' ? match2.rank : (match2.position ?? 1);
+        const cleanTitle = name1.replace(/^.*?: /, "");
 
         overlap.push({
           entity: r1.paper || r1,
@@ -537,14 +537,19 @@ function BenchmarksContent() {
 
   // Popular benchmarks matched from API
   const popularBenchmarks = useMemo(() =>
-    POPULAR_BENCHMARK_NAMES.map(name => {
-      const found = benchmarks.find(b =>
-        b.name.toLowerCase().includes(name.toLowerCase()) ||
-        name.toLowerCase().includes(b.name.toLowerCase())
-      );
-      return found ?? { id: name, name, slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), _count: { rankings: 0, claims: 0 } };
-    }),
-  [benchmarks]);
+  POPULAR_BENCHMARK_NAMES.map((name, i) => {
+    const found = benchmarks.find(b =>
+      b.name.toLowerCase().includes(name.toLowerCase()) ||
+      name.toLowerCase().includes(b.name.toLowerCase())
+    );
+    return found ?? { 
+      id: `pop-fb-${i}-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`, 
+      name, 
+      slug: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), 
+      _count: { rankings: 0, claims: 0 } 
+    };
+  }),
+[benchmarks]);
 
   // Recently added = first 8 from API
   const recentlyAdded = useMemo(() => benchmarks.slice(0, 8), [benchmarks]);
@@ -1073,7 +1078,7 @@ function BenchmarksContent() {
                     <div className="overflow-x-auto rounded-sm border border-gray-200 bg-white shadow-sm">
                       <table className="w-full text-sm">
                         <thead>
-                          <tr className="border-b border-gray-100 bg-gray-50/60 ${isComparing ? 'bg-orange-50/50' : ''}">
+                          <tr className="border-b border-gray-100 bg-gray-50/60">
                             <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide">Benchmark</th>
                             <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide hidden md:table-cell">Task</th>
                             <th className="text-left px-4 py-3 font-semibold text-gray-600 text-xs uppercase tracking-wide hidden lg:table-cell">Category</th>
