@@ -19,6 +19,154 @@ export function resolveHuggingFaceUrl(model: {
   return `https://huggingface.co/models?search=${encodeURIComponent(cleanName)}`;
 }
 
+export interface HardwareRequirements {
+  minVramFp16Gb: number;
+  minVramQuantizedGb: number;
+  hardwareTier: "consumer_6gb" | "consumer_16gb" | "workstation_48gb" | "cloud_cluster";
+  fitsOn6GbGpu: boolean;
+  recommendedGpu: string;
+  recommendedEngine: string;
+}
+
+export interface RunSnippets {
+  ollama: string;
+  vllm: string;
+  transformers: string;
+  curl: string;
+}
+
+export function calculateHardwareRequirements(model: {
+  parameterCount?: string | null;
+  architecture?: string | null;
+  name?: string;
+}): HardwareRequirements {
+  const rawParam = (model.parameterCount || "").toUpperCase().trim();
+  let billParams = 7; // default fallback 7B
+
+  // Parse MoE patterns like 8X7B or 16X12B
+  const moeMatch = rawParam.match(/(\d+)X(\d+(?:\.\d+)?)\s*B?/i);
+  if (moeMatch) {
+    const numExperts = parseInt(moeMatch[1], 10);
+    const expertSize = parseFloat(moeMatch[2]);
+    billParams = numExperts * expertSize * 0.75;
+  } else {
+    // Parse single parameter counts like 70B, 3.8B, 405B, 1.5B, 671B
+    const singleMatch = rawParam.match(/(\d+(?:\.\d+)?)\s*B/i);
+    if (singleMatch) {
+      billParams = parseFloat(singleMatch[1]);
+    } else {
+      const mMatch = rawParam.match(/(\d+(?:\.\d+)?)\s*M/i);
+      if (mMatch) {
+        billParams = parseFloat(mMatch[1]) / 1000;
+      }
+    }
+  }
+
+  // Full precision (FP16/BF16: 2 bytes per param + 20% overhead)
+  const fp16 = Math.round(billParams * 2 * 1.2 * 10) / 10;
+  // 4-bit quantized (GGUF Q4_K_M / AWQ: 0.55 bytes per param + 15% overhead)
+  const q4 = Math.round(billParams * 0.55 * 1.15 * 10) / 10;
+
+  let hardwareTier: HardwareRequirements["hardwareTier"] = "consumer_6gb";
+  let recommendedGpu = "NVIDIA RTX 4050 / RTX 3060 Laptop (6 GB VRAM)";
+  let recommendedEngine = "Ollama / llama.cpp (Local 4-bit Quantized)";
+  const fitsOn6GbGpu = q4 <= 6.0;
+
+  if (q4 <= 6.0) {
+    hardwareTier = "consumer_6gb";
+    recommendedGpu = "NVIDIA RTX 4050 / RTX 3060 Laptop (6 GB VRAM)";
+    recommendedEngine = "Ollama / llama.cpp (Local 4-bit Quantized)";
+  } else if (q4 <= 16.0) {
+    hardwareTier = "consumer_16gb";
+    recommendedGpu = "NVIDIA RTX 4080 (16 GB) / Apple Silicon M-Series (16-32 GB)";
+    recommendedEngine = "vLLM / Ollama (Q4 / FP16)";
+  } else if (q4 <= 48.0) {
+    hardwareTier = "workstation_48gb";
+    recommendedGpu = "2x NVIDIA RTX 4090 (48 GB) or 1x RTX 6000 Ada (48 GB)";
+    recommendedEngine = "vLLM / SGLang (Tensor Parallel)";
+  } else {
+    hardwareTier = "cloud_cluster";
+    recommendedGpu = "Cloud Enterprise Cluster (8x H100 80 GB) or Hosted API";
+    recommendedEngine = "Cloud Inference API (Groq, Together, DeepInfra)";
+  }
+
+  return {
+    minVramFp16Gb: fp16,
+    minVramQuantizedGb: q4,
+    hardwareTier,
+    fitsOn6GbGpu,
+    recommendedGpu,
+    recommendedEngine,
+  };
+}
+
+export function generateRunSnippets(model: {
+  name: string;
+  slug: string;
+  vendor?: string | null;
+  parameterCount?: string | null;
+  huggingFaceUrl?: string | null;
+  apiUrl?: string | null;
+}): RunSnippets {
+  const cleanSlug = model.slug.toLowerCase().replace(/[^a-z0-9-]/g, "");
+  const vendor = (model.vendor || "model").toLowerCase().replace(/[^a-z0-9]/g, "");
+
+  let hfId = `${vendor}/${model.name.replace(/\s+/g, "-")}`;
+  if (model.huggingFaceUrl && model.huggingFaceUrl.includes("huggingface.co/")) {
+    const parts = model.huggingFaceUrl.split("huggingface.co/")[1];
+    if (parts && !parts.startsWith("models?")) {
+      hfId = parts.split(/[?#]/)[0];
+    }
+  }
+
+  let ollamaTag = cleanSlug;
+  if (cleanSlug.includes("llama-3-3-70b")) ollamaTag = "llama3.3:70b";
+  else if (cleanSlug.includes("llama-3-2-3b")) ollamaTag = "llama3.2:3b";
+  else if (cleanSlug.includes("llama-3-2-1b")) ollamaTag = "llama3.2:1b";
+  else if (cleanSlug.includes("llama-3-1-8b")) ollamaTag = "llama3.1:8b";
+  else if (cleanSlug.includes("llama-3-1-70b")) ollamaTag = "llama3.1:70b";
+  else if (cleanSlug.includes("deepseek-r1")) ollamaTag = "deepseek-r1";
+  else if (cleanSlug.includes("deepseek-v3")) ollamaTag = "deepseek-v3";
+  else if (cleanSlug.includes("qwen-2-5-7b") || cleanSlug.includes("qwen2.5-7b")) ollamaTag = "qwen2.5:7b";
+  else if (cleanSlug.includes("qwen-2-5-3b") || cleanSlug.includes("qwen2.5-3b")) ollamaTag = "qwen2.5:3b";
+  else if (cleanSlug.includes("phi-3-5")) ollamaTag = "phi3.5";
+  else if (cleanSlug.includes("mistral-7b")) ollamaTag = "mistral";
+  else if (cleanSlug.includes("gemma-2-9b")) ollamaTag = "gemma2:9b";
+  else if (cleanSlug.includes("gemma-2-2b")) ollamaTag = "gemma2:2b";
+
+  const ollama = `ollama run ${ollamaTag}`;
+  const vllm = `vllm serve ${hfId} --port 8000 --trust-remote-code`;
+  const transformers = `from transformers import AutoModelForCausalLM, AutoTokenizer
+import torch
+
+model_id = "${hfId}"
+tokenizer = AutoTokenizer.from_pretrained(model_id)
+model = AutoModelForCausalLM.from_pretrained(
+    model_id,
+    torch_dtype=torch.bfloat16,
+    device_map="auto"
+)
+
+inputs = tokenizer("Explore the frontier of AI research:", return_tensors="pt").to(model.device)
+outputs = model.generate(**inputs, max_new_tokens=64)
+print(tokenizer.decode(outputs[0], skip_special_tokens=True))`;
+
+  const curl = `curl http://localhost:8000/v1/chat/completions \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "model": "${hfId}",
+    "messages": [{"role": "user", "content": "Explain the significance of this architecture."}],
+    "temperature": 0.7
+  }'`;
+
+  return {
+    ollama,
+    vllm,
+    transformers,
+    curl,
+  };
+}
+
 export const getModels = async (
   queryRouter: QueryRouter,
   limit: number = 50,
@@ -930,6 +1078,19 @@ export const getModelBySlug = async (
     repositoryUrl: baseModel.repositoryUrl ?? baseModel.repository_url,
     apiUrl: baseModel.apiUrl ?? baseModel.api_url,
     huggingFaceUrl: resolveHuggingFaceUrl(baseModel),
+    hardware: calculateHardwareRequirements({
+      parameterCount: baseModel.parameterCount,
+      architecture: baseModel.architecture,
+      name: baseModel.name,
+    }),
+    runSnippets: generateRunSnippets({
+      name: baseModel.name,
+      slug: baseModel.slug,
+      vendor: baseModel.vendor,
+      parameterCount: baseModel.parameterCount,
+      huggingFaceUrl: resolveHuggingFaceUrl(baseModel),
+      apiUrl: baseModel.apiUrl ?? baseModel.api_url,
+    }),
     createdAt: baseModel.createdAt,
     paperCount,
     citationCount,
@@ -1049,5 +1210,98 @@ export const getModelFacets = async (queryRouter: QueryRouter) => {
     modelFamilies: toFacetArray(modelFamilies),
     capabilities: toFacetArray(capabilities),
     researchAreas: toFacetArray(researchAreas),
+  };
+};
+
+export const compareModels = async (
+  queryRouter: QueryRouter,
+  slugs: string[],
+) => {
+  const cleanSlugs = slugs
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 0)
+    .slice(0, 4);
+
+  if (cleanSlugs.length < 2) {
+    throw new Error("At least 2 model slugs are required for comparison.");
+  }
+
+  const rawModels = await Promise.all(
+    cleanSlugs.map((slug) => getModelBySlug(queryRouter, slug)),
+  );
+  const models = rawModels.filter((m): m is NonNullable<typeof m> => m !== null);
+
+  if (models.length < 2) {
+    throw new Error("Could not find at least 2 valid models for comparison.");
+  }
+
+  const allBenchmarkNames = new Set<string>();
+  for (const m of models) {
+    if (m?.benchmarkScore && typeof m.benchmarkScore === "object") {
+      Object.keys(m.benchmarkScore).forEach((b) => allBenchmarkNames.add(b));
+    }
+    if (Array.isArray(m?.benchmarks)) {
+      m.benchmarks.forEach((b: any) => {
+        if (b?.name) allBenchmarkNames.add(b.name);
+      });
+    }
+  }
+
+  const benchmarkComparison = Array.from(allBenchmarkNames).map((benchmarkName) => {
+    const scores: Record<string, number | null> = {};
+    let highestScore = -Infinity;
+    let winnerSlug: string | null = null;
+
+    for (const m of models) {
+      let score: number | null = null;
+      if (m?.benchmarkScore && typeof m.benchmarkScore[benchmarkName] === "number") {
+        score = m.benchmarkScore[benchmarkName];
+      } else if (Array.isArray(m?.benchmarks)) {
+        const found = m.benchmarks.find(
+          (b: any) => b?.name?.toLowerCase() === benchmarkName.toLowerCase(),
+        );
+        if (found) {
+          score = typeof found.score === "number" ? found.score : parseFloat(found.scoreStr || found.score);
+        }
+      }
+
+      scores[m.slug] = isNaN(score as number) ? null : score;
+
+      if (score !== null && !isNaN(score) && score > highestScore) {
+        highestScore = score;
+        winnerSlug = m.slug;
+      }
+    }
+
+    return {
+      benchmark: benchmarkName,
+      scores,
+      winner: winnerSlug,
+    };
+  });
+
+  const specComparison = {
+    parameterCount: models.reduce((acc, m) => ({ ...acc, [m.slug]: m.parameterCount }), {}),
+    contextWindow: models.reduce((acc, m) => ({ ...acc, [m.slug]: m.contextWindow }), {}),
+    architecture: models.reduce((acc, m) => ({ ...acc, [m.slug]: m.architecture }), {}),
+    license: models.reduce((acc, m) => ({ ...acc, [m.slug]: m.license }), {}),
+    hardwareTier: models.reduce((acc, m) => ({ ...acc, [m.slug]: m.hardware?.hardwareTier }), {}),
+    fitsOn6GbGpu: models.reduce((acc, m) => ({ ...acc, [m.slug]: m.hardware?.fitsOn6GbGpu }), {}),
+    minVramQuantizedGb: models.reduce((acc, m) => ({ ...acc, [m.slug]: m.hardware?.minVramQuantizedGb }), {}),
+    minVramFp16Gb: models.reduce((acc, m) => ({ ...acc, [m.slug]: m.hardware?.minVramFp16Gb }), {}),
+  };
+
+  return {
+    models: models.map((m) => ({
+      id: m.id,
+      name: m.name,
+      slug: m.slug,
+      vendor: m.vendor,
+      vendorLogoUrl: m.vendorLogoUrl,
+      parameterCount: m.parameterCount,
+      hardware: m.hardware,
+    })),
+    benchmarkComparison,
+    specComparison,
   };
 };

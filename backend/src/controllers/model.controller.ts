@@ -236,3 +236,69 @@ export const getModelBySlug = async (c: Context) => {
     );
   }
 };
+
+export const compareModels = async (c: Context) => {
+  const queryRouter = c.var.queryRouter as QueryRouter;
+  const slugsParam = c.req.query('slugs') || '';
+  const slugs = slugsParam.split(',').map((s) => s.trim()).filter(Boolean);
+
+  if (slugs.length < 2) {
+    return c.json(
+      {
+        status: 'error',
+        message: 'Please provide at least two model slugs to compare, e.g. ?slugs=llama-3-1-8b,phi-3-5',
+      },
+      400,
+    );
+  }
+
+  const sortedKey = [...slugs].sort().join(',');
+  const cacheKey = `models:compare:${sortedKey}`;
+
+  try {
+    c.header('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    const memCached = getFromMemoryCache(cacheKey);
+    if (memCached) {
+      return c.json(memCached, 200);
+    }
+
+    const redis = redisManager.getClient();
+    let cached = null;
+    try {
+      cached = await redis.get(cacheKey);
+    } catch (err) {
+      console.error('Redis GET failed:', err);
+    }
+
+    if (cached) {
+      setToMemoryCache(cacheKey, cached);
+      return c.json(cached as any, 200);
+    }
+
+    const comparison = await modelService.compareModels(queryRouter, slugs);
+
+    const response = {
+      status: 'success',
+      data: comparison,
+    };
+
+    setToMemoryCache(cacheKey, response);
+
+    try {
+      await redis.set(cacheKey, response, { ex: 600 });
+    } catch (err) {
+      console.error('Redis SET failed:', err);
+    }
+
+    return c.json(response, 200);
+  } catch (error: any) {
+    console.error('Error in compareModels controller:', error);
+    return c.json(
+      {
+        status: 'error',
+        message: error.message || 'Failed to compare models',
+      },
+      500,
+    );
+  }
+};

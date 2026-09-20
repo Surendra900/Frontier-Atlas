@@ -34,6 +34,49 @@ export interface BackendModelItem {
   trendingScore: number;
 }
 
+export interface HardwareRequirements {
+  minVramFp16Gb: number;
+  minVramQuantizedGb: number;
+  hardwareTier: "consumer_6gb" | "consumer_16gb" | "workstation_48gb" | "cloud_cluster";
+  fitsOn6GbGpu: boolean;
+  recommendedGpu: string;
+  recommendedEngine: string;
+}
+
+export interface RunSnippets {
+  ollama: string;
+  vllm: string;
+  transformers: string;
+  curl: string;
+}
+
+export interface ModelComparisonResult {
+  models: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    vendor: string;
+    vendorLogoUrl?: string;
+    parameterCount: string | null;
+    hardware?: HardwareRequirements;
+  }>;
+  benchmarkComparison: Array<{
+    benchmark: string;
+    scores: Record<string, number | null>;
+    winner: string | null;
+  }>;
+  specComparison: {
+    parameterCount: Record<string, string | null>;
+    contextWindow: Record<string, string | null>;
+    architecture: Record<string, string | null>;
+    license: Record<string, string | null>;
+    hardwareTier: Record<string, string | null>;
+    fitsOn6GbGpu: Record<string, boolean | null>;
+    minVramQuantizedGb: Record<string, number | null>;
+    minVramFp16Gb: Record<string, number | null>;
+  };
+}
+
 export interface ModelTask {
   id: string;
   name: string;
@@ -49,6 +92,8 @@ export interface BackendModelDetail extends BackendModelItem {
   benchmarks: unknown[];
   relatedModels: { id: string; name: string; slug: string; paperCount: number }[];
   familyModels?: BackendModelItem[];
+  hardware?: HardwareRequirements;
+  runSnippets?: RunSnippets;
 }
 
 export interface ModelPaper {
@@ -127,6 +172,8 @@ export interface ModelDetail {
   tasks: ModelTask[];
   familyModels?: ModelItem[];
   benchmarks?: any[];
+  hardware?: HardwareRequirements;
+  runSnippets?: RunSnippets;
 }
 
 export interface FacetItem {
@@ -378,6 +425,8 @@ export async function getModelBySlug(slug: string): Promise<ModelDetail> {
         ? data.familyModels.map(mapModelItem)
         : [],
       benchmarks: Array.isArray(data.benchmarks) ? data.benchmarks : [],
+      hardware: data.hardware,
+      runSnippets: data.runSnippets,
     };
     saveCachedModelDetail(cleanSlug, detail);
     return detail;
@@ -385,6 +434,14 @@ export async function getModelBySlug(slug: string): Promise<ModelDetail> {
     if (cached) return cached;
     throw err;
   }
+}
+
+export async function compareModels(slugs: string[]): Promise<ModelComparisonResult> {
+  const cleanSlugs = slugs.map((s) => s.trim().toLowerCase()).filter(Boolean).join(',');
+  const response = await fetchApi<{ status: string; data: ModelComparisonResult }>(
+    `/api/v1/models/compare?slugs=${encodeURIComponent(cleanSlugs)}`
+  );
+  return response.data;
 }
 
 export function prefetchModelBySlug(slug: string) {

@@ -5,10 +5,14 @@ import Link from "next/link";
 import {
   ArrowLeft,
   BookOpen,
+  Check,
+  Copy,
+  Cpu,
   ExternalLink,
   Github,
   Layers3,
   Sparkles,
+  Terminal,
 } from "lucide-react";
 import {
   type ModelDetail,
@@ -252,6 +256,15 @@ export default function ModelDetailPage({
 const [initialPapers, setInitialPapers] = useState<GetPapersResult | null>(null);
 const [loading, setLoading] = useState<boolean>(() => !model);
 const [logoError, setLogoError] = useState(false);
+  const [snippetTab, setSnippetTab] = useState<"ollama" | "vllm" | "transformers" | "curl">("ollama");
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = (text: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
   const [paperSort, setPaperSort] = useState<"popular" | "latest" | "citations">("popular");
   const [period, setPeriod] = useState<string>("All time");
   const mappedPeriod = {
@@ -541,10 +554,80 @@ const [logoError, setLogoError] = useState(false);
                     </section>
                   )}
 
+                  {(model as ModelDetail).hardware && (
+                    <section className="rounded-[10px] border border-[#E5E5E0] bg-white p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Cpu size={16} className="text-[#FF5A1F]" />
+                        <h2 className="text-[14px] font-semibold text-[#111111]">
+                          Hardware & VRAM Sizing
+                        </h2>
+                      </div>
+                      <dl>
+                        <SidebarRow
+                          label="4-Bit (Local GGUF)"
+                          value={`${(model as ModelDetail).hardware!.minVramQuantizedGb} GB VRAM`}
+                        />
+                        <SidebarRow
+                          label="FP16 Full Precision"
+                          value={`${(model as ModelDetail).hardware!.minVramFp16Gb} GB VRAM`}
+                        />
+                        <SidebarRow
+                          label="Recommended Setup"
+                          value={(model as ModelDetail).hardware!.recommendedGpu}
+                        />
+                        <SidebarRow
+                          label="6GB GPU (RTX 4050)"
+                          value={(model as ModelDetail).hardware!.fitsOn6GbGpu ? "✅ Supported (Local Q4)" : "⚠️ Exceeds 6GB (Cloud/API)"}
+                        />
+                      </dl>
+                    </section>
+                  )}
+
                 </div>
               </div>
             </div>
           </section>
+
+          {/* 1-Click Run This Model Code Box */}
+          {(model as ModelDetail).runSnippets && (
+            <section className="rounded-[10px] border border-[#262626] bg-[#111111] text-white p-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#262626]">
+                <div className="flex items-center gap-2">
+                  <Terminal size={16} className="text-[#FF5A1F]" />
+                  <h2 className="text-[14px] font-semibold text-white tracking-tight">
+                    Run This Model
+                  </h2>
+                </div>
+                <div className="flex items-center gap-1 bg-[#1C1C1C] p-1 rounded-lg border border-[#2A2A2A]">
+                  {(["ollama", "vllm", "transformers", "curl"] as const).map((tab) => (
+                    <button
+                      key={tab}
+                      onClick={() => setSnippetTab(tab)}
+                      className={`px-3 py-1 text-[11px] font-semibold rounded-md transition-colors cursor-pointer ${
+                        snippetTab === tab
+                          ? "bg-[#FF5A1F] text-white shadow-xs"
+                          : "text-[#888888] hover:text-white"
+                      }`}
+                    >
+                      {tab === "transformers" ? "Python" : tab.toUpperCase()}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="relative mt-3">
+                <button
+                  onClick={() => handleCopy((model as ModelDetail).runSnippets![snippetTab])}
+                  className="absolute top-2.5 right-2.5 flex items-center gap-1.5 px-3 py-1 rounded-md bg-[#222222] hover:bg-[#333333] text-[11px] font-medium text-[#CCCCCC] transition-colors border border-[#333333] cursor-pointer"
+                >
+                  {copied ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                  <span>{copied ? "Copied!" : "Copy"}</span>
+                </button>
+                <pre className="text-[12px] font-mono text-[#E5E5E0] bg-[#0A0A0A] p-4 rounded-[8px] overflow-x-auto leading-relaxed border border-[#222222]">
+                  <code>{(model as ModelDetail).runSnippets![snippetTab]}</code>
+                </pre>
+              </div>
+            </section>
+          )}
  
           {/* Model Lineage & Evolution Tree */}
           <ModelLineageTree
