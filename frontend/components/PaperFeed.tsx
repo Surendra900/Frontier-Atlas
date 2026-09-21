@@ -17,9 +17,12 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  Quote,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useToast } from "@/components/ToastProvider";
+import { CitationModal } from "@/components/CitationModal";
 import {
   getPapers,
   getPapersSync,
@@ -124,9 +127,16 @@ const Pill = memo(
     const isGray = colorKey === "gray";
     const href = getTaxonomyHref(label, defaultType);
  
+    const handlePrefetch = useCallback(() => {
+      if (href && href !== "/") {
+        router.prefetch(href);
+      }
+    }, [href, router]);
+
     const handleClick = (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      handlePrefetch();
       router.push(href);
     };
  
@@ -134,6 +144,7 @@ const Pill = memo(
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
         e.stopPropagation();
+        handlePrefetch();
         router.push(href);
       }
     };
@@ -144,6 +155,9 @@ const Pill = memo(
         tabIndex={0}
         onClick={handleClick}
         onKeyDown={handleKeyDown}
+        onMouseEnter={handlePrefetch}
+        onTouchStart={handlePrefetch}
+        onFocus={handlePrefetch}
         className={`group h-[24px] inline-flex items-center px-2.5 rounded-[4px] text-[11px] cursor-pointer transition-all duration-200 hover:-translate-y-px hover:brightness-[0.96] hover:shadow-sm active:scale-95 select-none ${c.bg} ${c.text} ${c.border || ""} whitespace-nowrap`}
       >
         {!isGray && (
@@ -468,10 +482,10 @@ const Metric = memo(
 );
 Metric.displayName = "Metric";
  
-export const PaperCard = memo(({ paper }: { paper: Paper }) => {
-  console.log("PAPER DATA:", paper.title, paper);
+export const PaperCard = memo(({ paper, onOpenCite }: { paper: Paper; onOpenCite?: (paper: Paper) => void }) => {
   const upvotesNum = parseFloat(paper.upvotes) || 0;
   const router = useRouter();
+  const { toast } = useToast();
  
   const safeAuthors = paper.authors || [];
   const visibleAuthors = safeAuthors.slice(0, 3);
@@ -513,7 +527,7 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
             </Link>
           </h3>
  
-          {/* Authors + Date + Citations */}
+          {/* Authors + Date + Citations + Quick Cite */}
           <div className="flex flex-wrap items-center gap-x-2 text-[13px] text-[#666666] mb-3">
             <div className="flex flex-wrap items-center">
               {visibleAuthors.length > 0 ? (
@@ -537,7 +551,25 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
             <span className="text-[#CCCCCC]">•</span>
  
             <span>{paper.citations || 0} citations</span>
- 
+
+            {onOpenCite && (
+              <>
+                <span className="text-[#CCCCCC]">•</span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onOpenCite(paper);
+                  }}
+                  className="inline-flex items-center gap-1 text-[12px] font-semibold text-[#FF5A1F] hover:underline cursor-pointer bg-transparent border-0 p-0 transition-opacity hover:opacity-80"
+                  title="Quick BibTeX / Citation"
+                >
+                  <Quote size={11} />
+                  Cite
+                </button>
+              </>
+            )}
           </div>
  
  
@@ -652,7 +684,7 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                 if (hfUrl) {
                   window.open(hfUrl, "_blank");
                 } else {
-                  alert("Hugging Face model will be available soon.");
+                  toast.info("Hugging Face model checkpoint is not yet published for this paper.");
                 }
               }}
               className="relative overflow-hidden flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-0.5 min-[375px]:px-1 md:px-2 lg:px-4 xl:px-2 h-[24px] md:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#B7791F] border-[1.5px] border-[#eab308]/50 hover:border-[#eab308] hover:bg-[#eab308]/10 rounded-[6px] transition-all duration-300"
@@ -679,6 +711,7 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
             </button>
 
             <button
+              title={`${(paper.github_hourly_increase ?? 0) > 0 ? `+${paper.github_hourly_increase?.toFixed(2)}` : "0.00"} stars/hr momentum in the last 24h`}
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -688,6 +721,8 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                   (paper.repositories?.find((repo: any) => repo.url?.includes("github.com"))?.url);
                 if (ghUrl) {
                   window.open(ghUrl, "_blank");
+                } else {
+                  toast.info(`Star velocity: ${paper.github_hourly_increase?.toFixed(2) ?? "0.00"} stars/hr`);
                 }
               }}
               className="relative overflow-hidden flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-0.5 min-[375px]:px-1 md:px-2 lg:px-4 xl:px-2 h-[24px] md:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#24292f] border-[1.5px] border-[#24292f]/30 hover:border-[#24292f] hover:bg-[#24292f]/5 rounded-[6px] transition-all duration-300"
@@ -793,6 +828,7 @@ export default function PaperList({
   const [page, setPage] = useState(() => initialPapers?.page ?? 1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(initialError ?? null);
+  const [citingPaper, setCitingPaper] = useState<Paper | null>(null);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [totalPapers, setTotalPapers] = useState(() => initialPapers?.total ?? 0);
   const [displayCount, setDisplayCount] = useState(() => initialPapers?.papers?.length ?? 25);
@@ -1130,7 +1166,7 @@ const isInitialMount = useRef(true);
               <Fragment key={paper.slug}>
                 {idx > 0 && <div className="hidden xl:block h-px w-full bg-[#E5E5E0]" />}
                 <div ref={observeCard} data-paper-slug={paper.slug} className="animate-fade-in">
-                  <PaperCard paper={paper} />
+                  <PaperCard paper={paper} onOpenCite={setCitingPaper} />
                 </div>
               </Fragment>
             ))
@@ -1228,6 +1264,24 @@ const isInitialMount = useRef(true);
           </div>
         )}
       </div>
+
+      {citingPaper && (
+        <CitationModal
+          isOpen={Boolean(citingPaper)}
+          onClose={() => setCitingPaper(null)}
+          paper={{
+            title: citingPaper.title,
+            authors: (citingPaper.authors || []).map((a: any) =>
+              typeof a === "string" ? { name: a } : a
+            ),
+            publicationDate: citingPaper.date || (citingPaper as any).publicationDate,
+            arxivId: citingPaper.arxivId,
+            slug: citingPaper.slug,
+            paperUrl: citingPaper.paperUrl,
+            pdfUrl: citingPaper.pdfUrl,
+          }}
+        />
+      )}
     </Profiler>
   );
 }

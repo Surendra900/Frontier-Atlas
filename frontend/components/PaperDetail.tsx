@@ -16,6 +16,8 @@ import {
   GitBranch,
   MessageSquare,
   ArrowUpRight,
+  ShieldCheck,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -25,6 +27,8 @@ import type { PaperDetail as PaperDetailType, PaperRanking, PaperSotaClaim } fro
 import { getPapers, getArxivAbsUrl, getArxivPdfUrl, resolveHfModelUrl, type Paper } from "@/lib/paperApi";
 import { atlasUiFont } from "@/lib/fonts";
 import { fetchWithAuthRetry } from "@/lib/auth-client";
+import { useToast } from "@/components/ToastProvider";
+import { CitationModal } from "@/components/CitationModal";
 
 
 function ArxivIcon({ size }: { size: number }) {
@@ -718,7 +722,230 @@ export function RelatedPaperCard({ paper }: { paper: Paper }) {
   );
 }
 
+function ResearchArtifactsMatrix({
+  paper,
+  resolvedGithubUrl,
+  hfResolvedUrl,
+  pdfUrl,
+  arxivUrl,
+}: {
+  paper: PaperDetailType;
+  resolvedGithubUrl: string | null;
+  hfResolvedUrl: string | null;
+  pdfUrl: string | null;
+  arxivUrl: string | null;
+}) {
+  const rankingCount = (paper.rankings || []).length;
+  const sotaCount = (paper.sotaClaims || []).length;
+  const hasBenchmarks = rankingCount > 0 || sotaCount > 0;
+
+  return (
+    <div className="rounded-2xl border border-[#E5E2D9] bg-white p-4 sm:p-5 shadow-2xs">
+      <div className="flex items-center justify-between gap-3 pb-3.5 mb-3.5 border-b border-[#F0ECE1]">
+        <div className="flex items-center gap-2">
+          <ShieldCheck size={18} className="text-[#FF5A1F]" />
+          <h3 className="text-[12px] font-black uppercase tracking-[0.14em] text-[#171717] m-0">
+            Research Artifacts & Openness
+          </h3>
+        </div>
+        <span className="text-[11px] font-semibold text-[#8B8B8B] tracking-tight">
+          Verified Checklist
+        </span>
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Open Weights */}
+        <div
+          className={`p-3 rounded-xl border transition-all ${
+            hfResolvedUrl
+              ? "border-[#FDE4C8] bg-[#FFFBF5] hover:border-[#FF5A1F]/40"
+              : "border-[#ECEAE4] bg-[#FAF9F6] opacity-75"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-[#888888] uppercase tracking-wider">Model Weights</span>
+            {hfResolvedUrl ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#047857] bg-[#ECFDF5] px-1.5 py-0.5 rounded-full">
+                ● Open
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold text-[#999999] bg-[#EFEFEA] px-1.5 py-0.5 rounded-full">
+                Pending
+              </span>
+            )}
+          </div>
+          {hfResolvedUrl ? (
+            <a
+              href={hfResolvedUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[13px] font-bold text-[#171717] hover:text-[#FF5A1F] transition-colors flex items-center gap-1 truncate"
+            >
+              Hugging Face Hub
+              <ArrowUpRight size={13} className="shrink-0 text-[#FF5A1F]" />
+            </a>
+          ) : (
+            <span className="text-[13px] font-medium text-[#777777]">Not published</span>
+          )}
+        </div>
+
+        {/* Code & Repo */}
+        <div
+          className={`p-3 rounded-xl border transition-all ${
+            resolvedGithubUrl
+              ? "border-[#E2E8F0] bg-[#F8FAFC] hover:border-[#64748B]/40"
+              : "border-[#ECEAE4] bg-[#FAF9F6] opacity-75"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-[#888888] uppercase tracking-wider">Source Code</span>
+            {resolvedGithubUrl ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#047857] bg-[#ECFDF5] px-1.5 py-0.5 rounded-full">
+                ● Available
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold text-[#999999] bg-[#EFEFEA] px-1.5 py-0.5 rounded-full">
+                No Repo
+              </span>
+            )}
+          </div>
+          {resolvedGithubUrl ? (
+            <a
+              href={resolvedGithubUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[13px] font-bold text-[#171717] hover:text-[#FF5A1F] transition-colors flex items-center gap-1 truncate"
+            >
+              GitHub Repository
+              <ArrowUpRight size={13} className="shrink-0 text-[#24292F]" />
+            </a>
+          ) : (
+            <span className="text-[13px] font-medium text-[#777777]">In preparation</span>
+          )}
+        </div>
+
+        {/* Preprint / Paper */}
+        <div className="p-3 rounded-xl border border-[#E0E7FF] bg-[#F5F7FF] hover:border-[#6366F1]/40 transition-all">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-[#888888] uppercase tracking-wider">Preprint</span>
+            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#4338CA] bg-[#EEF2FF] px-1.5 py-0.5 rounded-full">
+              ● arXiv
+            </span>
+          </div>
+          <a
+            href={pdfUrl || arxivUrl || "https://arxiv.org"}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[13px] font-bold text-[#171717] hover:text-[#FF5A1F] transition-colors flex items-center gap-1 truncate"
+          >
+            {paper.arxivId ? `arXiv:${paper.arxivId}` : "Preprint PDF"}
+            <ArrowUpRight size={13} className="shrink-0 text-[#4338CA]" />
+          </a>
+        </div>
+
+        {/* Benchmarks & SOTA */}
+        <div
+          className={`p-3 rounded-xl border transition-all ${
+            hasBenchmarks
+              ? "border-[#FEF08A] bg-[#FEFCE8] hover:border-[#CA8A04]/40"
+              : "border-[#ECEAE4] bg-[#FAF9F6] opacity-75"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-[11px] font-bold text-[#888888] uppercase tracking-wider">Evaluation</span>
+            {hasBenchmarks ? (
+              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[#854D0E] bg-[#FEF9C3] px-1.5 py-0.5 rounded-full">
+                ● Evaluated
+              </span>
+            ) : (
+              <span className="text-[10px] font-semibold text-[#999999] bg-[#EFEFEA] px-1.5 py-0.5 rounded-full">
+                Empirical
+              </span>
+            )}
+          </div>
+          {hasBenchmarks ? (
+            <a
+              href="#benchmarks"
+              className="text-[13px] font-bold text-[#171717] hover:text-[#FF5A1F] transition-colors flex items-center gap-1 truncate"
+            >
+              {rankingCount} Podium {rankingCount === 1 ? "Rank" : "Ranks"}
+              <ArrowUpRight size={13} className="shrink-0 text-[#854D0E]" />
+            </a>
+          ) : (
+            <span className="text-[13px] font-medium text-[#777777]">Empirical study</span>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ExecutiveSummaryCard({ paper }: { paper: PaperDetailType }) {
+  const tasks = paper.tasks || [];
+  const methods = paper.methods || [];
+  const models = paper.models || [];
+
+  return (
+    <div className="rounded-2xl border border-[#EDE8DF] bg-gradient-to-br from-[#FFFDF9] to-[#FAF8F2] p-5 sm:p-6 shadow-2xs">
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <div className="flex items-center gap-2">
+          <Sparkles size={17} className="text-[#FF5A1F]" />
+          <h2 className="text-[12px] font-black uppercase tracking-[0.14em] text-[#171717] m-0">
+            Executive Summary & Research Takeaways
+          </h2>
+        </div>
+        <span className="text-[11px] font-bold text-[#FF5A1F] bg-[#FFF2EB] px-2 py-0.5 rounded-full border border-[#FED7AA]">
+          Frontier AI Intel
+        </span>
+      </div>
+
+      <p className="text-[14.5px] leading-relaxed text-[#333333] mb-4">
+        {paper.tlDr ||
+          (paper.abstract
+            ? paper.abstract.slice(0, 260) + (paper.abstract.length > 260 ? "..." : "")
+            : "Advanced research paper exploring modern frontier intelligence techniques.")}
+      </p>
+
+      {/* Key tags preview */}
+      <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-[#EDE8DF]/80">
+        <span className="text-[11px] font-bold text-[#8B8B8B] uppercase tracking-wider mr-1">
+          Key Focus:
+        </span>
+        {tasks.slice(0, 3).map((t) => (
+          <Link
+            key={t.id}
+            href={`/tasks/${t.slug}`}
+            className="inline-flex items-center gap-1 rounded-md border border-[#D4EDDA] bg-[#F1F9F2] px-2 py-0.5 text-[11.5px] font-semibold text-[#2D6A4F] hover:opacity-80 transition-opacity"
+          >
+            {t.name}
+          </Link>
+        ))}
+        {methods.slice(0, 3).map((m) => (
+          <Link
+            key={m.id}
+            href={`/methods/${m.slug}`}
+            className="inline-flex items-center gap-1 rounded-md border border-[#E2D5F0] bg-[#F5F0FA] px-2 py-0.5 text-[11.5px] font-semibold text-[#5B3A8C] hover:opacity-80 transition-opacity"
+          >
+            {m.name}
+          </Link>
+        ))}
+        {models.slice(0, 2).map((m, i) => (
+          <Link
+            key={m.id || i}
+            href={`/models/${m.slug}`}
+            className="inline-flex items-center gap-1 rounded-md border border-[#FDE4C8] bg-[#FFF8F0] px-2 py-0.5 text-[11.5px] font-semibold text-[#A45C00] hover:opacity-80 transition-opacity"
+          >
+            {m.name}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
+  const { toast } = useToast();
+  const [isCitationModalOpen, setIsCitationModalOpen] = useState(false);
   const [citationCopied, setCitationCopied] = useState<CitationFormat | null>(null);
   const [selectedCitationFormat, setSelectedCitationFormat] = useState<CitationFormat>("bibtex");
 
@@ -729,7 +956,6 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
   const router = useRouter();
   const [isSaved, setIsSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [shareToast, setShareToast] = useState(false);
   const defaultApiUrl = "https://frontieratlas-backend.morningsignal-india.workers.dev";
   const API_BASE = (process.env.NEXT_PUBLIC_API_URL || defaultApiUrl).replace(/\/$/, "");
 
@@ -762,13 +988,17 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
       if (response.ok) {
         const data = await response.json();
         setIsSaved(data.isSaved); // Toggles true/false from backend
+        toast.success(data.isSaved ? "Saved to your bookmarks" : "Removed from bookmarks");
       } else if (response.status === 401) {
+        toast.info("Please sign in to save research papers");
         const currentUrl = encodeURIComponent(window.location.pathname);
         router.push(`/login?redirect=${currentUrl}`);
       } else {
+        toast.error("Failed to save paper. Please try again.");
         console.error("Server error while saving, status:", response.status);
       }
     } catch (error) {
+      toast.error("Failed to connect to backend");
       console.error("Failed to connect to backend:", error);
     } finally {
       setIsSaving(false);
@@ -842,9 +1072,8 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
         // ignore
       }
     }
-    setShareToast(true);
-    setTimeout(() => setShareToast(false), 3000);
-  }, [paper.title]);
+    toast.copy("Paper link copied to clipboard!");
+  }, [paper.title, toast]);
 
   const handleCopyCitation = useCallback(
     async (format: CitationFormat) => {
@@ -1121,14 +1350,7 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => {
-                        const el = document.getElementById("citation-panel");
-                        if (el) {
-                          el.scrollIntoView({ behavior: "smooth", block: "center" });
-                          const copyBtn = el.querySelector("button");
-                          copyBtn?.focus();
-                        }
-                      }}
+                      onClick={() => setIsCitationModalOpen(true)}
                       className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-5 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
                     >
                       <Quote size={16} />
@@ -1225,17 +1447,17 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
               </div>
             </div>
 
-            {/* TL;DR */}
-            {paper.tlDr && (
-              <div className="border-l-[3px] border-[rgba(255,90,31,0.15)] pl-5">
-                <div className="mb-3 flex items-center gap-3">
-                  <span className="text-[12px] font-black uppercase tracking-[0.15em] text-[#171717]">TL;DR</span>
-                </div>
-                <p className="text-[15px] font-medium leading-[1.8] text-[#333333] m-0">
-                  {paper.tlDr}
-                </p>
-              </div>
-            )}
+            {/* RESEARCH ARTIFACTS & REPRODUCIBILITY MATRIX */}
+            <ResearchArtifactsMatrix
+              paper={paper}
+              resolvedGithubUrl={resolvedGithubUrl}
+              hfResolvedUrl={hfResolvedUrl}
+              pdfUrl={pdfUrl}
+              arxivUrl={arxivUrl}
+            />
+
+            {/* EXECUTIVE SUMMARY & KEY FINDINGS */}
+            <ExecutiveSummaryCard paper={paper} />
 
             {/* ===== MAIN CONTENT SECTIONS ===== */}
             <div className="flex flex-col gap-8">
@@ -1505,14 +1727,13 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
           </div>
         </div>
       </div>
-
-      {/* Floating Share Toast */}
-      {shareToast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 rounded-xl bg-[#171717] px-4 py-3 text-xs font-semibold text-white shadow-2xl animate-in fade-in slide-in-from-bottom-3 border border-[#333]">
-          <Check size={16} className="text-[#34D399]" />
-          <span>Paper link copied to clipboard!</span>
-        </div>
-      )}
+      
+      {/* Quick Citation Modal */}
+      <CitationModal
+        isOpen={isCitationModalOpen}
+        onClose={() => setIsCitationModalOpen(false)}
+        paper={paper}
+      />
     </div>
   );
 }

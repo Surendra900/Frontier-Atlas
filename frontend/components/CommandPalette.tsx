@@ -19,8 +19,19 @@ import {
   User,
   Database,
   Loader2,
+  History,
 } from "lucide-react";
 import { globalSearch, type SearchResults } from "@/lib/search";
+
+const CATEGORY_FILTERS = [
+  "All",
+  "Papers",
+  "Models",
+  "Benchmarks",
+  "Methods",
+  "Tasks",
+  "Authors",
+] as const;
 
 interface QuickAction {
   id: string;
@@ -123,9 +134,45 @@ export default function CommandPalette() {
   });
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [isMac, setIsMac] = useState(false);
+  const [activeCategory, setActiveCategory] = useState<string>("All");
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("frontier_recent_searches");
+      if (stored) {
+        setRecentSearches(JSON.parse(stored));
+      }
+    } catch {
+      // ignore
+    }
+  }, [isOpen]);
+
+  const saveRecentSearch = useCallback((term: string) => {
+    if (!term.trim()) return;
+    try {
+      const clean = term.trim();
+      setRecentSearches((prev) => {
+        const updated = [clean, ...prev.filter((s) => s.toLowerCase() !== clean.toLowerCase())].slice(0, 6);
+        localStorage.setItem("frontier_recent_searches", JSON.stringify(updated));
+        return updated;
+      });
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const clearRecentSearches = useCallback(() => {
+    setRecentSearches([]);
+    try {
+      localStorage.removeItem("frontier_recent_searches");
+    } catch {
+      // ignore
+    }
+  }, []);
 
   // Detect platform
   useEffect(() => {
@@ -305,15 +352,25 @@ export default function CommandPalette() {
       });
     });
 
+    if (activeCategory !== "All") {
+      return items.filter((item) => {
+        const grp = item.group?.toLowerCase() || item.type?.toLowerCase() || "";
+        return grp.includes(activeCategory.toLowerCase()) || activeCategory.toLowerCase().includes(grp);
+      });
+    }
+
     return items;
-  }, [query, results]);
+  }, [query, results, activeCategory]);
 
   const handleSelect = useCallback(
-    (href: string) => {
+    (href: string, title?: string) => {
+      if (title || query.trim()) {
+        saveRecentSearch(title || query.trim());
+      }
       setIsOpen(false);
       router.push(href);
     },
-    [router]
+    [router, query, saveRecentSearch]
   );
 
   // Handle keyboard arrows and Enter
@@ -389,11 +446,67 @@ export default function CommandPalette() {
           </div>
         </div>
 
+        {/* Category Filter Pills */}
+        <div className="flex items-center gap-1.5 px-4 py-2 border-b border-[#EFECE6] bg-[#FCFBF8] overflow-x-auto hide-scroll">
+          {CATEGORY_FILTERS.map((cat) => {
+            const active = activeCategory === cat;
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => {
+                  setActiveCategory(cat);
+                  setSelectedIndex(0);
+                }}
+                className={`px-2.5 py-1 rounded-full text-[11.5px] font-semibold transition-all cursor-pointer whitespace-nowrap select-none ${
+                  active
+                    ? "bg-[#171717] text-white shadow-2xs"
+                    : "bg-white text-[#666666] border border-[#E5E5E0] hover:border-[#FF5A1F]/40 hover:text-[#171717]"
+                }`}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Results / Navigation Scrollable Area */}
         <div ref={listRef} className="flex-1 overflow-y-auto p-2 scrollbar-thin">
           {!query.trim() ? (
             /* Default: Quick Actions & Suggestions */
             <div className="space-y-4 p-2">
+              {/* Recent Searches */}
+              {recentSearches.length > 0 && (
+                <div>
+                  <div className="flex items-center justify-between px-2 mb-2">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-[#888888] flex items-center gap-1.5">
+                      <History size={13} className="text-[#FF5A1F]" />
+                      Recent Searches
+                    </span>
+                    <button
+                      type="button"
+                      onClick={clearRecentSearches}
+                      className="text-[11px] font-medium text-[#888888] hover:text-[#171717] transition-colors cursor-pointer"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 px-2">
+                    {recentSearches.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setQuery(s)}
+                        className="text-[12px] font-medium px-2.5 py-1 rounded-full bg-white hover:bg-[#FFF3EC] hover:text-[#FF5A1F] border border-[#E5E5E0] hover:border-[#FF5A1F]/30 text-[#333333] transition-all cursor-pointer flex items-center gap-1.5"
+                      >
+                        <Clock size={11} className="text-gray-400" />
+                        {s}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Suggested Search Chips */}
               <div>
                 <span className="text-[11px] font-bold uppercase tracking-wider text-[#888888] px-2 block mb-2">
@@ -489,7 +602,7 @@ export default function CommandPalette() {
                   <button
                     key={item.id}
                     data-index={idx}
-                    onClick={() => handleSelect(item.href)}
+                    onClick={() => handleSelect(item.href, item.title)}
                     onMouseEnter={() => setSelectedIndex(idx)}
                     className={`w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-left transition-all cursor-pointer ${
                       isSelected
@@ -533,7 +646,7 @@ export default function CommandPalette() {
 
               {/* View all search results option */}
               <button
-                onClick={() => handleSelect(`/search?q=${encodeURIComponent(query.trim())}`)}
+                onClick={() => handleSelect(`/search?q=${encodeURIComponent(query.trim())}`, query.trim())}
                 className="w-full mt-2 pt-2 border-t border-[#F0EFEA] flex items-center justify-between px-3 py-2 text-[12px] font-semibold text-[#FF5A1F] hover:bg-[#FFF6F2] rounded-md transition-colors cursor-pointer"
               >
                 <span>Full catalog search for &ldquo;{query}&rdquo;</span>

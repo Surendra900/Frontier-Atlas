@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import FooterWrapper from "@/components/FooterWrapper";
 import CommandPalette from "@/components/CommandPalette";
+import { ToastProvider } from "@/components/ToastProvider";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -84,9 +85,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} antialiased`} suppressHydrationWarning>
-        {children}
-        <FooterWrapper />
-        <CommandPalette />
+        <ToastProvider>
+          {children}
+          <FooterWrapper />
+          <CommandPalette />
+        </ToastProvider>
       </body>
     </html>
   );
