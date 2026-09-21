@@ -84,13 +84,18 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [models, setModels] = useState<ModelItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [papersLoading, setPapersLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"models" | "papers">("models");
   const [paperSort, setPaperSort] = useState<"latest" | "citations" | "stars">("latest");
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+
     Promise.all([getModelFacets(), getModels()])
       .then(([facets, allModels]) => {
+        if (cancelled) return;
+
         const organization = facets.vendors.find((vendor) => toSlug(vendor.name) === slug);
         const organizationName = organization?.name ?? slug.replace(/-/g, " ");
         setName(organizationName);
@@ -110,15 +115,41 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
         if (vendorModels.length === 0) {
           setActiveTab("papers");
         }
+      })
+      .catch((error) => {
+        if (!cancelled) console.error("Unable to load organization data:", error);
+      });
 
-        return getPapers({ organization: organizationName, limit: 100, sort: "latest" });
-      })
-      .then((result) => {
-        setPapers(result.papers || []);
-      })
-      .catch((error) => console.error("Unable to load organization data:", error))
-      .finally(() => setLoading(false));
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
+
+  useEffect(() => {
+    if (!name) return;
+    let cancelled = false;
+    setPapersLoading(true);
+
+    getPapers({ organization: name, limit: 100, sort: paperSort })
+      .then((result) => {
+        if (!cancelled) {
+          setPapers(result.papers || []);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) console.error("Unable to load organization papers:", error);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPapersLoading(false);
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [name, paperSort]);
 
   // Aggregate Impact Metrics
   const metrics = useMemo(() => {
@@ -154,18 +185,8 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
     };
   }, [papers, models]);
 
-  // Sort papers
-  const displayedPapers = useMemo(() => {
-    return [...papers].sort((a, b) => {
-      if (paperSort === "citations") return (b.citations || 0) - (a.citations || 0);
-      if (paperSort === "stars") {
-        const starsA = parseFloat(a.upvotes) || (a as any).githubStars || 0;
-        const starsB = parseFloat(b.upvotes) || (b as any).githubStars || 0;
-        return starsB - starsA;
-      }
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
-  }, [papers, paperSort]);
+  // Papers are sorted directly by the backend database query
+  const displayedPapers = papers;
 
   const displayName = name.replace(/\b\w/g, (letter) => letter.toUpperCase());
   const website = ORGANIZATION_WEBSITES[name] || ORGANIZATION_WEBSITES[displayName];
@@ -468,7 +489,16 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
         ) : (
           /* Papers Tab View */
           <div className="space-y-4">
-            {displayedPapers.length === 0 ? (
+            {papersLoading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="h-44 animate-pulse rounded-xl border border-[#E7E4DD] bg-white"
+                  />
+                ))}
+              </div>
+            ) : displayedPapers.length === 0 ? (
               <div className="rounded-xl border border-dashed border-[#D9D5CB] bg-white p-12 text-center text-[#6B665F]">
                 No papers have been associated with this organization yet.
               </div>

@@ -5,6 +5,8 @@ import { QueryRouter } from "../../src/routing/index.js";
 
 function createMockQueryRouter() {
   let capturedFindManyWhere: any = null;
+  let capturedFindManyOrderBy: any = null;
+  let capturedFindManyArgs: any = null;
   let findManyCallCount = 0;
   let mockPapersToReturn: any[] = [];
 
@@ -15,6 +17,8 @@ function createMockQueryRouter() {
       }),
       findMany: async (args: any) => {
         capturedFindManyWhere = args.where;
+        capturedFindManyOrderBy = args.orderBy;
+        capturedFindManyArgs = args;
         findManyCallCount++;
         return mockPapersToReturn;
       },
@@ -28,6 +32,8 @@ function createMockQueryRouter() {
   return {
     router,
     getCapturedWhere: () => capturedFindManyWhere,
+    getCapturedOrderBy: () => capturedFindManyOrderBy,
+    getCapturedArgs: () => capturedFindManyArgs,
     getFindManyCallCount: () => findManyCallCount,
     setMockPapers: (papers: any[]) => {
       mockPapersToReturn = papers;
@@ -273,4 +279,163 @@ test("Case 12: Bug 2 behavior preserved - total equals pagePapers.length", async
   assert.strictEqual(result.total, 2);
   assert.strictEqual(result.papers.length, 2);
   assert.strictEqual(result.hasMore, false);
+});
+
+test("Case 13: Bug 4 - sort citations orders by citationCount desc, githubStars desc, publicationDate desc, slug asc", async () => {
+  const { router, getCapturedOrderBy, setMockPapers } = createMockQueryRouter();
+  setMockPapers([samplePaper]);
+
+  await getPapers(router, { sort: "citations" });
+  const orderBy = getCapturedOrderBy();
+
+  assert.deepStrictEqual(orderBy, [
+    { citationCount: "desc" },
+    { githubStars: "desc" },
+    { publicationDate: "desc" },
+    { slug: "asc" },
+  ]);
+});
+
+test("Case 14: Bug 4 - sort stars orders by githubStars desc, citationCount desc, publicationDate desc, slug asc", async () => {
+  const { router, getCapturedOrderBy, setMockPapers } = createMockQueryRouter();
+  setMockPapers([samplePaper]);
+
+  await getPapers(router, { sort: "stars" });
+  const orderBy = getCapturedOrderBy();
+
+  assert.deepStrictEqual(orderBy, [
+    { githubStars: "desc" },
+    { citationCount: "desc" },
+    { publicationDate: "desc" },
+    { slug: "asc" },
+  ]);
+});
+
+test("Case 15: Bug 4 - sort latest orders by publicationDate desc, githubStars desc, slug asc", async () => {
+  const { router, getCapturedOrderBy, setMockPapers } = createMockQueryRouter();
+  setMockPapers([samplePaper]);
+
+  await getPapers(router, { sort: "latest" });
+  const orderBy = getCapturedOrderBy();
+
+  assert.deepStrictEqual(orderBy, [
+    { publicationDate: "desc" },
+    { githubStars: "desc" },
+    { slug: "asc" },
+  ]);
+});
+
+test("Case 16: Bug 4 - organization filter with citation sort preserves org WHERE and applies citation orderBy", async () => {
+  const { router, getCapturedWhere, getCapturedOrderBy, setMockPapers } = createMockQueryRouter();
+  setMockPapers([samplePaper]);
+
+  await getPapers(router, { organization: "Google", sort: "citations" });
+  const where = getCapturedWhere();
+  const orderBy = getCapturedOrderBy();
+
+  // Verify WHERE contains organization condition
+  assert.ok(Array.isArray(where.AND));
+  assert.strictEqual(where.AND.length, 1);
+  assert.strictEqual(where.AND[0].OR[0].organization.equals, "Google");
+
+  // Verify orderBy is citationCount descending
+  assert.deepStrictEqual(orderBy, [
+    { citationCount: "desc" },
+    { githubStars: "desc" },
+    { publicationDate: "desc" },
+    { slug: "asc" },
+  ]);
+});
+
+test("Case 17: Bug 4 - organization filter with stars sort preserves org WHERE and applies stars orderBy", async () => {
+  const { router, getCapturedWhere, getCapturedOrderBy, setMockPapers } = createMockQueryRouter();
+  setMockPapers([samplePaper]);
+
+  await getPapers(router, { organization: "DeepMind", sort: "stars" });
+  const where = getCapturedWhere();
+  const orderBy = getCapturedOrderBy();
+
+  // Verify WHERE contains organization condition
+  assert.ok(Array.isArray(where.AND));
+  assert.strictEqual(where.AND.length, 1);
+  assert.strictEqual(where.AND[0].OR[0].organization.equals, "DeepMind");
+
+  // Verify orderBy is githubStars descending
+  assert.deepStrictEqual(orderBy, [
+    { githubStars: "desc" },
+    { citationCount: "desc" },
+    { publicationDate: "desc" },
+    { slug: "asc" },
+  ]);
+});
+
+test("Case 18: Bug 4 - pagination is preserved with sorting", async () => {
+  const { router, getCapturedArgs, setMockPapers } = createMockQueryRouter();
+  setMockPapers([samplePaper]);
+
+  const result = await getPapers(router, {
+    organization: "Google",
+    sort: "citations",
+    page: 2,
+    limit: 10,
+  });
+  const args = getCapturedArgs();
+
+  // skip = (page - 1) * limit = 10
+  assert.strictEqual(args.skip, 10);
+  // take = limit + 1 = 11 (to compute hasMore)
+  assert.strictEqual(args.take, 11);
+  assert.strictEqual(result.page, 2);
+  assert.strictEqual(result.hasMore, false);
+});
+
+test("Case 19: Bug 4 - combined filters (organization + task + method) preserved with sorting", async () => {
+  const { router, getCapturedWhere, getCapturedOrderBy, setMockPapers } = createMockQueryRouter();
+  setMockPapers([samplePaper]);
+
+  await getPapers(router, {
+    organization: "Google",
+    task: "reasoning",
+    method: "lora",
+    sort: "citations",
+  });
+  const where = getCapturedWhere();
+  const orderBy = getCapturedOrderBy();
+
+  // Bug 3 requirement: all 3 filters combined in AND
+  assert.ok(Array.isArray(where.AND));
+  assert.strictEqual(where.AND.length, 3);
+
+  // Bug 4 requirement: citation orderBy applied
+  assert.deepStrictEqual(orderBy, [
+    { citationCount: "desc" },
+    { githubStars: "desc" },
+    { publicationDate: "desc" },
+    { slug: "asc" },
+  ]);
+});
+
+test("Case 20: Bug 4 - sorting works across complete matching dataset without frontend truncation", async () => {
+  const { router, getCapturedWhere, getCapturedOrderBy, setMockPapers } = createMockQueryRouter();
+  // Simulate returning 25 papers from database matching the sort
+  const papers = Array.from({ length: 25 }, (_, i) => ({
+    ...samplePaper,
+    id: `paper-${i}`,
+    slug: `paper-${i}`,
+    citationCount: 1000 - i * 10,
+  }));
+  setMockPapers(papers);
+
+  const result = await getPapers(router, {
+    organization: "Meta",
+    sort: "citations",
+    limit: 25,
+  });
+  const orderBy = getCapturedOrderBy();
+
+  assert.deepStrictEqual(orderBy[0], { citationCount: "desc" });
+  assert.strictEqual(result.papers.length, 25);
+  // Verify top paper has the highest citations as determined by backend
+  assert.strictEqual(result.papers[0].citationCount, 1000);
+  assert.strictEqual(result.papers[24].citationCount, 760);
 });

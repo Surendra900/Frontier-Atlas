@@ -57,7 +57,7 @@ export interface GetPapersParams {
   method?: string;
   model?: string;
   organization?: string;
-  sort?: 'trending' | 'latest' | string;
+  sort?: 'trending' | 'latest' | 'citations' | 'stars' | string;
   period?: 'today' | 'week' | 'month' | 'all' | string;
   limit?: number;
 }
