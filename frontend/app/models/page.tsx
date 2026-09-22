@@ -58,6 +58,7 @@ import {
 } from "@/lib/models";
 
 import Navbar from "@/components/Navbar";
+import ModelComparisonModal from "@/components/domain/models/ModelComparisonModal";
 
 // Top models will be loaded from backend
 // Capabilities will be loaded from backend facets
@@ -392,6 +393,23 @@ function ModelsContent() {
     useState<string | null>(null);
   const MODELS_PER_PAGE = 20;
   const [currentPage, setCurrentPage] = useState(1);
+
+  // Model comparison states
+  const [compareSlugs, setCompareSlugs] = useState<string[]>([]);
+  const [isCompareModalOpen, setIsCompareModalOpen] = useState(false);
+
+  const toggleCompareSlug = (slug: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCompareSlugs((prev) => {
+      if (prev.includes(slug)) {
+        return prev.filter((s) => s !== slug);
+      }
+      if (prev.length >= 3) {
+        return [...prev.slice(1), slug];
+      }
+      return [...prev, slug];
+    });
+  };
 
 
   // Per-section "See all / Show less" toggle states
@@ -1729,33 +1747,48 @@ useEffect(() => {
                             }}
                             className="bg-white rounded-md border border-[#ECECEC] p-3.5 min-h-[155px] flex flex-col hover:shadow-md transition-shadow duration-200 group no-underline cursor-pointer"
                           >
-                            <div className="flex items-start gap-4">
-                              <div className="flex items-center justify-center transition-transform duration-200 group-hover:scale-125 w-[30px] h-[30px]">
-                                {modelLogoUrl(
-                                  m.vendorLogoUrl
-                                ) ? (
-                                  <img
-                                    src={modelLogoUrl(
-                                      m.vendorLogoUrl
-                                    )}
-                                    alt={m.vendor}
-                                    className="w-full h-full object-contain"
-                                  />
-                                ) : (
-                                  <SkeletalIcon
-                                    size={22}
-                                    strokeWidth={2.2}
-                                    style={{
-                                      color:
-                                        strokeColor,
-                                    }}
-                                  />
-                                )}
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 min-w-0">
+                                <div className="flex items-center justify-center transition-transform duration-200 group-hover:scale-125 w-[30px] h-[30px] shrink-0">
+                                  {modelLogoUrl(
+                                    m.vendorLogoUrl
+                                  ) ? (
+                                    <img
+                                      src={modelLogoUrl(
+                                        m.vendorLogoUrl
+                                      )}
+                                      alt={m.vendor}
+                                      className="w-full h-full object-contain"
+                                    />
+                                  ) : (
+                                    <SkeletalIcon
+                                      size={22}
+                                      strokeWidth={2.2}
+                                      style={{
+                                        color:
+                                          strokeColor,
+                                      }}
+                                    />
+                                  )}
+                                </div>
+
+                                <h3 className="text-[#111111] text-[15px] font-medium leading-5 truncate">
+                                  {m.name}
+                                </h3>
                               </div>
 
-                              <h3 className="text-[#111111] text-[15px] font-medium leading-5">
-                                {m.name}
-                              </h3>
+                              <button
+                                type="button"
+                                onClick={(e) => toggleCompareSlug(m.slug || m.id, e)}
+                                className={`text-[10px] font-bold px-2 py-0.5 rounded transition-all shrink-0 ${
+                                  compareSlugs.includes(m.slug || m.id)
+                                    ? "bg-[#FF5A1F] text-white"
+                                    : "bg-[#F3F4F6] text-[#666] hover:bg-[#E5E7EB] hover:text-[#111]"
+                                }`}
+                                title="Add to comparison"
+                              >
+                                {compareSlugs.includes(m.slug || m.id) ? "✓ Added" : "+ Compare"}
+                              </button>
                             </div>
 
                             <p className="mt-2 text-[13px] leading-5 text-[#666] line-clamp-3">
@@ -2347,6 +2380,48 @@ useEffect(() => {
                                     "middle",
                                 }}
                               >
+                                <button
+                                  type="button"
+                                  onClick={(e) =>
+                                    toggleCompareSlug(
+                                      model.slug || model.id,
+                                      e
+                                    )
+                                  }
+                                  style={{
+                                    fontSize: "11px",
+                                    fontWeight: 500,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "0.4px",
+                                    padding: "5px 8px",
+                                    borderRadius: "2px",
+                                    background: compareSlugs.includes(
+                                      model.slug || model.id
+                                    )
+                                      ? "#FF5A1F"
+                                      : "transparent",
+                                    color: compareSlugs.includes(
+                                      model.slug || model.id
+                                    )
+                                      ? "#FFFFFF"
+                                      : "#555555",
+                                    border: compareSlugs.includes(
+                                      model.slug || model.id
+                                    )
+                                      ? "1px solid #FF5A1F"
+                                      : "1px solid #E5E5E0",
+                                    whiteSpace: "nowrap",
+                                    cursor: "pointer",
+                                    marginRight: "6px",
+                                  }}
+                                  title="Add to side-by-side comparison"
+                                >
+                                  {compareSlugs.includes(
+                                    model.slug || model.id
+                                  )
+                                    ? "✓ Added"
+                                    : "+ Compare"}
+                                </button>
                                 <button
                                   onClick={(
                                     e
@@ -3413,6 +3488,37 @@ useEffect(() => {
               </div>
             )}
           </div>
+      {/* Floating Model Comparison Dock */}
+      {compareSlugs.length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-3.5 bg-[#171717] text-white px-5 py-3 rounded-full shadow-2xl border border-white/10 animate-in slide-in-from-bottom duration-200">
+          <span className="text-[13px] font-medium text-white/90">
+            <strong className="text-white font-bold">{compareSlugs.length}</strong>{" "}
+            {compareSlugs.length === 1 ? "model" : "models"} selected
+          </span>
+          <button
+            type="button"
+            onClick={() => setIsCompareModalOpen(true)}
+            disabled={compareSlugs.length < 2}
+            className="px-4 py-1.5 rounded-full bg-[#FF5A1F] hover:bg-[#FF6C37] text-white text-[13px] font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+          >
+            {compareSlugs.length < 2 ? "Select 1 more" : "Compare Side-by-Side"}
+          </button>
+          <button
+            type="button"
+            onClick={() => setCompareSlugs([])}
+            className="text-[12px] text-white/60 hover:text-white px-2 py-1 transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
+      {/* Model Comparison Matrix Modal */}
+      <ModelComparisonModal
+        isOpen={isCompareModalOpen}
+        onClose={() => setIsCompareModalOpen(false)}
+        slugs={compareSlugs}
+      />
         </div>
       </div>
     </div>

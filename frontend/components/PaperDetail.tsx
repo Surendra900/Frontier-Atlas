@@ -22,13 +22,14 @@ import {
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useState, useCallback, useEffect, type ReactNode } from "react";
+import { useState, useCallback, useEffect, useMemo, type ReactNode } from "react";
 import type { PaperDetail as PaperDetailType, PaperRanking, PaperSotaClaim } from "@/lib/papers";
 import { getPapers, getArxivAbsUrl, getArxivPdfUrl, resolveHfModelUrl, type Paper } from "@/lib/paperApi";
 import { atlasUiFont } from "@/lib/fonts";
 import { fetchWithAuthRetry } from "@/lib/auth-client";
 import { useToast } from "@/components/ToastProvider";
 import { CitationModal } from "@/components/CitationModal";
+import { PdfViewerModal } from "@/components/PdfViewerModal";
 
 
 function ArxivIcon({ size }: { size: number }) {
@@ -943,11 +944,70 @@ function ExecutiveSummaryCard({ paper }: { paper: PaperDetailType }) {
   );
 }
 
+function detectLabBadge(paper: PaperDetailType): string | null {
+  const text = `${paper.title || ""} ${paper.abstract || ""} ${(paper.authors || []).map((a) => a.name).join(" ")}`.toLowerCase();
+  if (text.includes("deepmind") || text.includes("google research")) return "Google DeepMind";
+  if (text.includes("anthropic")) return "Anthropic";
+  if (text.includes("openai")) return "OpenAI";
+  if (text.includes("meta ai") || text.includes("fair")) return "Meta AI";
+  if (text.includes("deepseek")) return "DeepSeek";
+  if (text.includes("nvidia")) return "NVIDIA";
+  if (text.includes("microsoft research")) return "Microsoft";
+  if (text.includes("stanford")) return "Stanford University";
+  if (text.includes("berkeley")) return "UC Berkeley";
+  if (text.includes("mit ") || text.includes("massachusetts institute")) return "MIT CSAIL";
+  if (text.includes("alibaba")) return "Alibaba Cloud";
+  if (text.includes("mistral")) return "Mistral AI";
+  return null;
+}
+
+function generateMarkdownNote(
+  paper: PaperDetailType,
+  arxivUrl: string | null,
+  pdfUrl: string | null,
+  resolvedGithubUrl: string | null,
+  hfResolvedUrl: string | null,
+): string {
+  const authors = (paper.authors || []).map((a) => a.name).join(", ") || "Unknown Authors";
+  const pubDate = formatDate(paper.publicationDate);
+  const tasks = (paper.tasks || []).map((t) => t.name).join(", ");
+  const methods = (paper.methods || []).map((m) => m.name).join(", ");
+  const benchmarks = (paper.rankings || [])
+    .map((r) => `#${r.rank} on ${r.benchmark?.name || "Benchmark"}`)
+    .join("; ");
+
+  return `# ${paper.title}
+
+- **Authors**: ${authors}
+- **Published**: ${pubDate || "N/A"}
+${arxivUrl ? `- **arXiv**: ${arxivUrl}` : ""}
+${pdfUrl ? `- **PDF**: ${pdfUrl}` : ""}
+${resolvedGithubUrl ? `- **Code**: ${resolvedGithubUrl} (⭐ ${paper.githubStars ?? 0})` : ""}
+${hfResolvedUrl ? `- **Hugging Face**: ${hfResolvedUrl}` : ""}
+${tasks ? `- **Tasks**: ${tasks}` : ""}
+${methods ? `- **Methods**: ${methods}` : ""}
+${benchmarks ? `- **SOTA Rankings**: ${benchmarks}` : ""}
+
+---
+
+## Executive Summary
+> ${paper.tlDr || (paper.abstract ? paper.abstract.slice(0, 300) + "..." : "No executive summary provided.")}
+
+## Abstract
+${paper.abstract || "No abstract provided."}
+
+---
+*Exported from [Frontier Atlas](https://frontieratlas.co/papers/${paper.slug || paper.id})*
+`;
+}
+
 export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
   const { toast } = useToast();
   const [isCitationModalOpen, setIsCitationModalOpen] = useState(false);
   const [citationCopied, setCitationCopied] = useState<CitationFormat | null>(null);
   const [selectedCitationFormat, setSelectedCitationFormat] = useState<CitationFormat>("bibtex");
+  const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
+  const [isExportingNote, setIsExportingNote] = useState(false);
 
   const [relatedPapers, setRelatedPapers] = useState<Paper[]>([]);
   const [relatedLoading, setRelatedLoading] = useState(true);
@@ -1089,6 +1149,38 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
     [paper]
   );
 
+  const labBadge = useMemo(() => detectLabBadge(paper), [paper]);
+
+  const handleExportMarkdownNote = useCallback(async () => {
+    setIsExportingNote(true);
+    const md = generateMarkdownNote(
+      paper,
+      arxivUrl,
+      pdfUrl,
+      resolvedGithubUrl,
+      hfResolvedUrl
+    );
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(md);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = md;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      toast.copy("Copied Markdown research note for Obsidian / Notion!");
+    } catch {
+      toast.error("Failed to copy note to clipboard");
+    } finally {
+      setTimeout(() => setIsExportingNote(false), 1500);
+    }
+  }, [paper, arxivUrl, pdfUrl, resolvedGithubUrl, hfResolvedUrl, toast]);
+
   useEffect(() => {
     async function loadRelated() {
       const taskSlugs = [...new Set((paper.tasks || []).map((t) => t.slug))];
@@ -1225,8 +1317,13 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
               <div className="flex-1 space-y-4">
 
                 {/* Badge row */}
-                <div className="flex flex-wrap items-center gap-3">
-
+                <div className="flex flex-wrap items-center gap-2.5">
+                  {labBadge && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#F3F4F6] border border-[#E5E7EB] text-[#374151] text-[11.5px] font-bold tracking-tight shadow-2xs">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#FF5A1F]" />
+                      {labBadge}
+                    </span>
+                  )}
                   {(paper.conferences || []).slice(0, 2).map((c) => (
                     <span key={c.id} className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#EFF6FF] border border-[#BFDBFE] text-[#1E40AF] text-[11px] font-bold uppercase tracking-wide">
                       {c.name}
@@ -1284,16 +1381,27 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
                 </div>
 
                 {/* Action buttons */}
-                <div className="flex flex-wrap items-center gap-3 pt-2">
+                <div className="flex flex-wrap items-center gap-2.5 pt-2">
+                  {pdfUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setIsPdfViewerOpen(true)}
+                      className="ds-button inline-flex items-center justify-center gap-2 rounded-full bg-[#FF5A1F] px-5 py-2.5 text-[14px] font-semibold text-white no-underline transition-all hover:bg-[#FF6C37] active:scale-[0.97] shadow-xs"
+                      title="Read preprint PDF inside Frontier Atlas"
+                    >
+                      <BookOpen size={17} />
+                      Read Paper
+                    </button>
+                  )}
                   {(pdfUrl || arxivUrl) && (
                     <a
                       href={pdfUrl || arxivUrl!}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ds-button inline-flex items-center justify-center gap-2 rounded-full bg-[#FF5A1F] px-6 py-2.5 text-[14px] font-semibold text-white no-underline transition-all hover:bg-[#FF6C37] active:scale-[0.97]"
+                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-4 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
                     >
-                      <FileText size={18} />
-                      View PDF
+                      <FileText size={16} />
+                      PDF
                     </a>
                   )}
                   {arxivUrl && (
@@ -1301,9 +1409,9 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
                       href={arxivUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-5 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
+                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-4 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
                     >
-                      <ArxivIcon size={18} />
+                      <ArxivIcon size={16} />
                       arXiv
                     </a>
                   )}
@@ -1312,9 +1420,9 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
                       href={resolvedGithubUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-5 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
+                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-4 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
                     >
-                      <Github size={18} />
+                      <Github size={16} />
                       Code
                       {paper.githubStars != null && paper.githubStars > 0 && (
                         <span className="text-[#8B8B8B] font-bold">{formatCompactNumber(paper.githubStars)}</span>
@@ -1326,10 +1434,10 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
                       href={hfResolvedUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-5 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
+                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-4 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="https://cdn.simpleicons.org/huggingface" alt="Hugging Face" className="w-[16px] h-[16px]" />
+                      <img src="https://cdn.simpleicons.org/huggingface" alt="Hugging Face" className="w-[15px] h-[15px]" />
                       Hugging Face
                       {paper.hfUpvotes != null && paper.hfUpvotes > 0 && (
                         <span className="text-[#8B8B8B] font-bold">{formatCompactNumber(paper.hfUpvotes)}</span>
@@ -1341,9 +1449,9 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
                       href={projectPageUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-5 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
+                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-4 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
                     >
-                      <ExternalLink size={18} />
+                      <ExternalLink size={16} />
                       Project Page
                     </a>
                   )}
@@ -1351,32 +1459,44 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
                     <button
                       type="button"
                       onClick={() => setIsCitationModalOpen(true)}
-                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-5 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
+                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-4 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
                     >
-                      <Quote size={16} />
+                      <Quote size={15} />
                       Cite
                     </button>
                     <button
                       type="button"
+                      onClick={handleExportMarkdownNote}
+                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-4 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
+                      title="Copy formatted Markdown research note for Notion or Obsidian"
+                    >
+                      {isExportingNote ? (
+                        <Check size={15} className="text-[#059669]" />
+                      ) : (
+                        <Copy size={15} />
+                      )}
+                      {isExportingNote ? "Copied Note!" : "Export Note"}
+                    </button>
+                    <button
+                      type="button"
                       onClick={handleShare}
-                      className="ds-button-ghost !p-0 w-11 h-11 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent inline-flex items-center justify-center transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
+                      className="ds-button-ghost !p-0 w-10 h-10 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent inline-flex items-center justify-center transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
                       title="Share paper"
                     >
-                      <Share2 size={18} />
+                      <Share2 size={16} />
                     </button>
-                  <button
-                  type="button"
-                  onClick={handleSaveClick}
-                  disabled={isSaving}
-                  className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-5 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97] disabled:opacity-50"
-                >
-                  <Bookmark 
-                    size={18} 
-                    className={isSaved ? "fill-[#FF5A1F] text-[#FF5A1F]" : ""} 
-                  />
-                  {isSaved ? "Saved" : "Save"}
-                </button>
-
+                    <button
+                      type="button"
+                      onClick={handleSaveClick}
+                      disabled={isSaving}
+                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-4 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97] disabled:opacity-50"
+                    >
+                      <Bookmark 
+                        size={16} 
+                        className={isSaved ? "fill-[#FF5A1F] text-[#FF5A1F]" : ""} 
+                      />
+                      {isSaved ? "Saved" : "Save"}
+                    </button>
                   </div>
                 </div>
 
@@ -1734,6 +1854,17 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
         onClose={() => setIsCitationModalOpen(false)}
         paper={paper}
       />
+
+      {/* Inline arXiv PDF Reader Modal */}
+      {pdfUrl && (
+        <PdfViewerModal
+          isOpen={isPdfViewerOpen}
+          onClose={() => setIsPdfViewerOpen(false)}
+          pdfUrl={pdfUrl}
+          title={paper.title}
+          arxivId={paper.arxivId}
+        />
+      )}
     </div>
   );
 }
