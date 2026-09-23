@@ -24,8 +24,9 @@ function getTagColorKey(task: ModelTask): string {
   }
   const colors = ["purple", "blue", "green", "cyan"];
   let hash = 0;
-  for (let i = 0; i < task.name.length; i++) {
-    hash = task.name.charCodeAt(i) + ((hash << 5) - hash);
+  const taskName = task.name || "";
+  for (let i = 0; i < taskName.length; i++) {
+    hash = taskName.charCodeAt(i) + ((hash << 5) - hash);
   }
   return colors[Math.abs(hash) % colors.length];
 }
@@ -46,27 +47,33 @@ function getInitial(name: string) {
   return (name || "M").trim().charAt(0).toUpperCase();
 }
 
-function formatCompact(value: number) {
+function formatCompact(value: number | undefined | null) {
+  const safeVal = typeof value === "number" && !isNaN(value) ? value : 0;
   return new Intl.NumberFormat("en-US", {
-    notation: value >= 1000 ? "compact" : "standard",
-    maximumFractionDigits: value >= 1000 ? 1 : 0,
-  }).format(value);
+    notation: safeVal >= 1000 ? "compact" : "standard",
+    maximumFractionDigits: safeVal >= 1000 ? 1 : 0,
+  }).format(safeVal);
+}
+
+function formatPaperDate(dateString: string | null | undefined): string {
+  if (!dateString) return "No papers available yet";
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "No papers available yet";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 export default function ModelCard({ model, rank: _rank }: { model: ModelItem; rank?: number }) {
-  const latestPaperDate = model.latestPaperDate ? new Date(model.latestPaperDate) : null;
-  const latestPaperLabel = latestPaperDate
-    ? latestPaperDate.toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      })
-    : "No papers available yet";
+  const latestPaperLabel = formatPaperDate(model.latestPaperDate);
+  const tasksList = Array.isArray(model.tasks) ? model.tasks : [];
 
   return (
     <Link
-      href={`/models/${model.slug}`}
-      onMouseEnter={() => prefetchModelBySlug(model.slug)}
+      href={`/models/${encodeURIComponent(model.slug || "")}`}
+      onMouseEnter={() => model.slug && prefetchModelBySlug(model.slug)}
       data-rank={_rank}
       className="ds-card p-4 md:p-5 flex flex-col gap-4 hover:shadow-soft transition-shadow duration-200 group no-underline h-full rounded-[24px]"
     >
@@ -103,10 +110,10 @@ export default function ModelCard({ model, rank: _rank }: { model: ModelItem; ra
         <p className="text-[12px] text-[#8B8B8B]">{latestPaperLabel}</p>
       </div>
 
-      {model.tasks.length > 0 && (
+      {tasksList.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
-          {model.tasks.map((task) => (
-            <TaskTag key={task.id} task={task} />
+          {tasksList.map((task, idx) => (
+            <TaskTag key={task.id || task.slug || idx} task={task} />
           ))}
         </div>
       )}
