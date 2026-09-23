@@ -4,8 +4,6 @@ import { redisManager } from '../lib/redis.js';
 
 // ---------------------------------------------------------------------------
 // Version-counter helpers for method list cache
-// Same pattern as papers — INCR the version on any mutation so versioned list
-// keys are silently superseded without any wildcard scan.
 // ---------------------------------------------------------------------------
 
 const getMethodsVersion = async (): Promise<string> => {
@@ -27,19 +25,41 @@ const bumpMethodsVersion = async (): Promise<void> => {
   }
 };
 
-const localMethodCache = new Map<string, { data: any; expiresAt: number }>();
+interface CacheEntry<T = unknown> {
+  data: T;
+  expiresAt: number;
+}
+
+const localMethodCache = new Map<string, CacheEntry>();
 const LOCAL_METHOD_TTL = 15 * 60 * 1000; // 15 minutes
+const MAX_LOCAL_CACHE_ENTRIES = 500;
+
+function setLocalCache<T>(key: string, data: T, ttlMs: number = LOCAL_METHOD_TTL): void {
+  localMethodCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+  if (localMethodCache.size > MAX_LOCAL_CACHE_ENTRIES) {
+    const oldestKey = localMethodCache.keys().next().value;
+    if (oldestKey) localMethodCache.delete(oldestKey);
+  }
+}
+
+function invalidateLocalCacheKey(key: string): void {
+  localMethodCache.delete(key);
+}
+
+function clearAllLocalCache(): void {
+  localMethodCache.clear();
+}
 
 // ---------------------------------------------------------------------------
 // Read handlers
 // ---------------------------------------------------------------------------
 
 export const getMethods = async (c: Context) => {
-  const queryRouter = c.var.queryRouter as any;
+  const queryRouter = c.var.queryRouter;
   const sort = c.req.query('sort') || 'name';
   const search = c.req.query('search') || '';
-  const page = Number(c.req.query('page')) || 1;
-  const limit = Number(c.req.query('limit')) || 20;
+  const page = Math.max(1, Number(c.req.query('page')) || 1);
+  const limit = Math.min(100, Math.max(1, Number(c.req.query('limit')) || 20));
 
   try {
     const version = await getMethodsVersion();
@@ -61,8 +81,8 @@ export const getMethods = async (c: Context) => {
     }
 
     if (cached) {
-      localMethodCache.set(cacheKey, { data: cached, expiresAt: Date.now() + LOCAL_METHOD_TTL });
-      return c.json(cached as any, 200);
+      setLocalCache(cacheKey, cached);
+      return c.json(cached, 200);
     }
 
     const result = await methodService.getMethods(queryRouter, {
@@ -78,7 +98,7 @@ export const getMethods = async (c: Context) => {
       data: result,
     };
 
-    localMethodCache.set(cacheKey, { data: response, expiresAt: Date.now() + LOCAL_METHOD_TTL });
+    setLocalCache(cacheKey, response);
 
     try {
       await redis.set(cacheKey, response, { ex: 900 }); // 15 minutes
@@ -87,13 +107,14 @@ export const getMethods = async (c: Context) => {
     }
 
     return c.json(response, 200);
-  } catch (error: any) {
-    return c.json({ status: 'error', detail: error.message }, 500);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Internal server error';
+    return c.json({ status: 'error', detail }, 500);
   }
 };
 
 export const getGroupedMethods = async (c: Context) => {
-  const queryRouter = c.var.queryRouter as any;
+  const queryRouter = c.var.queryRouter;
   const cacheKey = 'methods:grouped';
 
   try {
@@ -112,8 +133,8 @@ export const getGroupedMethods = async (c: Context) => {
     }
 
     if (cached) {
-      localMethodCache.set(cacheKey, { data: cached, expiresAt: Date.now() + LOCAL_METHOD_TTL });
-      return c.json(cached as any, 200);
+      setLocalCache(cacheKey, cached);
+      return c.json(cached, 200);
     }
 
     const grouped = await methodService.getGroupedMethods(queryRouter);
@@ -122,7 +143,7 @@ export const getGroupedMethods = async (c: Context) => {
       data: grouped,
     };
 
-    localMethodCache.set(cacheKey, { data: response, expiresAt: Date.now() + LOCAL_METHOD_TTL });
+    setLocalCache(cacheKey, response);
 
     try {
       await redis.set(cacheKey, response, { ex: 1800 });
@@ -131,14 +152,20 @@ export const getGroupedMethods = async (c: Context) => {
     }
 
     return c.json(response, 200);
-  } catch (error: any) {
-    return c.json({ status: 'error', detail: error.message }, 500);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Internal server error';
+    return c.json({ status: 'error', detail }, 500);
   }
 };
 
 export const getMethodBySlug = async (c: Context) => {
-  const queryRouter = c.var.queryRouter as any;
-  const slug = c.req.param('slug') as string;
+  const queryRouter = c.var.queryRouter;
+  const rawSlug = c.req.param('slug');
+  if (!rawSlug || typeof rawSlug !== 'string' || rawSlug.trim().length === 0) {
+    return c.json({ status: 'error', message: 'Slug parameter is required' }, 400);
+  }
+
+  const slug = rawSlug.trim();
   const cacheKey = `method:${slug}`;
 
   try {
@@ -157,8 +184,8 @@ export const getMethodBySlug = async (c: Context) => {
     }
 
     if (cached) {
-      localMethodCache.set(cacheKey, { data: cached, expiresAt: Date.now() + LOCAL_METHOD_TTL });
-      return c.json(cached as any, 200);
+      setLocalCache(cacheKey, cached);
+      return c.json(cached, 200);
     }
 
     const method = await methodService.getMethodBySlug(queryRouter, slug);
@@ -166,7 +193,7 @@ export const getMethodBySlug = async (c: Context) => {
 
     const response = { status: 'success', data: method };
 
-    localMethodCache.set(cacheKey, { data: response, expiresAt: Date.now() + LOCAL_METHOD_TTL });
+    setLocalCache(cacheKey, response);
 
     try {
       await redis.set(cacheKey, response, { ex: 600 });
@@ -175,8 +202,9 @@ export const getMethodBySlug = async (c: Context) => {
     }
 
     return c.json(response, 200);
-  } catch (error: any) {
-    return c.json({ status: 'error', detail: error.message }, 500);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'Internal server error';
+    return c.json({ status: 'error', detail }, 500);
   }
 };
 
@@ -204,7 +232,7 @@ export const seedCategories = async (c: Context) => {
     "Evaluation": ["pass-1", "llm-as-a-judge", "human-eval", "perplexity", "f1-score", "exact-match", "auc", "meteor"],
     "Embeddings": ["word2vec", "glove", "elmo", "bert-embedding", "sentence-transformer", "openai-embedding", "cohere-embedding", "embedding-models", "dense-embedding", "embedding", "embeddings"]
   };
-  
+
   let updatedCount = 0;
   for (const [category, slugs] of Object.entries(CATEGORY_MAP)) {
     for (const slug of slugs) {
@@ -214,11 +242,14 @@ export const seedCategories = async (c: Context) => {
           await prisma.method.update({ where: { slug }, data: { category } });
           updatedCount++;
         }
-      } catch (e) {}
+      } catch {
+        // Ignore single item update errors during seed
+      }
     }
   }
 
-  // Seed operation touches all methods — invalidate fully
+  // Seed operation touches all methods — invalidate local & Redis fully
+  clearAllLocalCache();
   await bumpMethodsVersion();
   try {
     const redis = redisManager.getClient();
@@ -226,22 +257,29 @@ export const seedCategories = async (c: Context) => {
   } catch (err) {
     console.error('Cache invalidation failed after seed:', err);
   }
-  
+
   return c.json({ status: 'success', updated: updatedCount });
 };
 
 export const createMethod = async (c: Context) => {
-  const queryRouter = c.var.queryRouter as any;
-  const body = await c.req.json();
+  const queryRouter = c.var.queryRouter;
+  let body: { name?: string };
 
-  if (!body.name || typeof body.name !== 'string' || body.name.trim().length === 0) {
-    return c.json({ status: 'error', message: 'Name is required' }, 400);
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ status: 'error', message: 'Invalid JSON request body' }, 400);
+  }
+
+  if (!body || !body.name || typeof body.name !== 'string' || body.name.trim().length === 0) {
+    return c.json({ status: 'error', message: 'Name is required and must be a non-empty string' }, 400);
   }
 
   try {
     const method = await methodService.createMethod(queryRouter, { name: body.name.trim() });
 
-    // Invalidate list cache (bump version) + grouped cache
+    // Invalidate list cache (bump version) + local & Redis grouped cache
+    clearAllLocalCache();
     await bumpMethodsVersion();
     try {
       const redis = redisManager.getClient();
@@ -251,62 +289,91 @@ export const createMethod = async (c: Context) => {
     }
 
     return c.json({ status: 'success', data: method }, 201);
-  } catch (error: any) {
-    if (error.code === 'P2002') {
+  } catch (error: unknown) {
+    const errObj = error as { code?: string; message?: string };
+    if (errObj.code === 'P2002') {
       return c.json({ status: 'error', message: 'A method with this name already exists' }, 409);
     }
-    return c.json({ status: 'error', detail: error.message }, 500);
+    const detail = errObj.message || 'Internal server error';
+    return c.json({ status: 'error', detail }, 500);
   }
 };
 
 export const updateMethod = async (c: Context) => {
-  const queryRouter = c.var.queryRouter as any;
-  const slug = c.req.param('slug') as string;
-  const body = await c.req.json();
+  const queryRouter = c.var.queryRouter;
+  const rawSlug = c.req.param('slug');
 
-  if (body.name !== undefined && (typeof body.name !== 'string' || body.name.trim().length === 0)) {
+  if (!rawSlug || typeof rawSlug !== 'string' || rawSlug.trim().length === 0) {
+    return c.json({ status: 'error', message: 'Slug parameter is required' }, 400);
+  }
+
+  const slug = rawSlug.trim();
+
+  let body: { name?: string };
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ status: 'error', message: 'Invalid JSON request body' }, 400);
+  }
+
+  if (body && body.name !== undefined && (typeof body.name !== 'string' || body.name.trim().length === 0)) {
     return c.json({ status: 'error', message: 'Name must be a non-empty string' }, 400);
   }
 
   try {
     const method = await methodService.updateMethod(queryRouter, slug, {
-      name: body.name ? body.name.trim() : undefined,
+      name: body?.name ? body.name.trim() : undefined,
     });
 
-    // Invalidate: list version + grouped + this specific slug detail
+    // Invalidate local memory cache
+    invalidateLocalCacheKey(`method:${slug}`);
+    invalidateLocalCacheKey('methods:grouped');
+    if (method && (method as { slug?: string }).slug) {
+      invalidateLocalCacheKey(`method:${(method as { slug: string }).slug}`);
+    }
+
     await bumpMethodsVersion();
     try {
       const redis = redisManager.getClient();
       await redis.del('methods:grouped');
       await redis.del(`method:${slug}`);
-      // If name changed, the slug may have changed too — delete both
-      if (method && (method as any).slug && (method as any).slug !== slug) {
-        await redis.del(`method:${(method as any).slug}`);
+      if (method && (method as { slug?: string }).slug && (method as { slug: string }).slug !== slug) {
+        await redis.del(`method:${(method as { slug: string }).slug}`);
       }
     } catch (err) {
       console.error('Cache invalidation failed:', err);
     }
 
     return c.json({ status: 'success', data: method }, 200);
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error: unknown) {
+    const errObj = error as { code?: string; message?: string };
+    if (errObj.code === 'P2025') {
       return c.json({ status: 'error', message: 'Method not found' }, 404);
     }
-    if (error.code === 'P2002') {
+    if (errObj.code === 'P2002') {
       return c.json({ status: 'error', message: 'A method with this name already exists' }, 409);
     }
-    return c.json({ status: 'error', detail: error.message }, 500);
+    const detail = errObj.message || 'Internal server error';
+    return c.json({ status: 'error', detail }, 500);
   }
 };
 
 export const deleteMethod = async (c: Context) => {
-  const queryRouter = c.var.queryRouter as any;
-  const slug = c.req.param('slug') as string;
+  const queryRouter = c.var.queryRouter;
+  const rawSlug = c.req.param('slug');
+
+  if (!rawSlug || typeof rawSlug !== 'string' || rawSlug.trim().length === 0) {
+    return c.json({ status: 'error', message: 'Slug parameter is required' }, 400);
+  }
+
+  const slug = rawSlug.trim();
 
   try {
     await methodService.deleteMethod(queryRouter, slug);
 
-    // Invalidate: list version + grouped + this specific slug detail
+    invalidateLocalCacheKey(`method:${slug}`);
+    invalidateLocalCacheKey('methods:grouped');
+
     await bumpMethodsVersion();
     try {
       const redis = redisManager.getClient();
@@ -317,10 +384,12 @@ export const deleteMethod = async (c: Context) => {
     }
 
     return c.json({ status: 'success', message: 'Method deleted' }, 200);
-  } catch (error: any) {
-    if (error.code === 'P2025') {
+  } catch (error: unknown) {
+    const errObj = error as { code?: string; message?: string };
+    if (errObj.code === 'P2025') {
       return c.json({ status: 'error', message: 'Method not found' }, 404);
     }
-    return c.json({ status: 'error', detail: error.message }, 500);
+    const detail = errObj.message || 'Internal server error';
+    return c.json({ status: 'error', detail }, 500);
   }
 };
