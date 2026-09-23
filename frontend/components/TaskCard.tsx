@@ -10,10 +10,12 @@ const TAG_COLORS: Record<string, { bg: string; text: string; dot: string }> = {
   orange: { bg: "bg-[#FFEDD5]", text: "text-[#C2410C]", dot: "bg-[#EA580C]" },
   red: { bg: "bg-[#FEE2E2]", text: "text-[#B91C1C]", dot: "bg-[#EF4444]" },
   pink: { bg: "bg-[#FCE7F3]", text: "text-[#9D174D]", dot: "bg-[#EC4899]" },
-  gray: { bg: "bg-white", text: "text-[#111111]", dot: "" },
+  gray: { bg: "bg-white", text: "text-[#111111]", dot: "bg-gray-400" },
 };
 
 function getTagColorKey(color: string | null): string {
+  if (!color) return "gray";
+  const hex = color.toUpperCase().trim();
   const map: Record<string, string> = {
     "#9333EA": "purple",
     "#0284C7": "blue",
@@ -22,7 +24,7 @@ function getTagColorKey(color: string | null): string {
     "#EF4444": "red",
     "#EC4899": "pink",
   };
-  return (color && map[color]) || "gray";
+  return map[hex] || "gray";
 }
 
 function ColorDot({ color }: { color: string | null }) {
@@ -33,22 +35,36 @@ function ColorDot({ color }: { color: string | null }) {
 }
 
 export default function TaskCard({ task }: { task: TaskItem }) {
+  if (!task || typeof task !== "object") {
+    return null;
+  }
+
+  const name = task.name || "Untitled Task";
+  const rawSlug = task.slug || "";
+  const safeSlug = rawSlug ? encodeURIComponent(rawSlug) : "#";
+  const paperCount = typeof task.paperCount === "number" && !isNaN(task.paperCount) ? task.paperCount : 0;
+
   return (
     <Link
-      href={`/tasks/${task.slug}`}
+      href={`/tasks/${safeSlug}`}
       className="ds-card p-5 flex flex-col gap-3 hover:shadow-soft transition-shadow duration-200 group no-underline"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2 min-w-0">
           <ColorDot color={task.color} />
           <h3 className="text-[16px] font-semibold text-[#111111] group-hover:text-[#F55036] transition-colors leading-snug truncate">
-            {task.name}
+            {name}
           </h3>
         </div>
         <span className="ds-text-muted text-[11px] shrink-0 mt-0.5">
-          {task.slug}
+          {rawSlug}
         </span>
       </div>
+      {paperCount > 0 && (
+        <div className="text-[12px] text-gray-500">
+          {paperCount.toLocaleString()} {paperCount === 1 ? "paper" : "papers"}
+        </div>
+      )}
     </Link>
   );
 }

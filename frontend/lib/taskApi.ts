@@ -38,13 +38,18 @@ export async function getTasks(): Promise<TaskItem[]> {
     const response = await fetchApi<TasksResponse>('/api/v1/tasks');
     const tasks = Array.isArray(response?.data) ? response.data : [];
 
-    return tasks.map((t) => ({
-      id: t.id,
-      label: t.name,
-      icon: ICON_MAP[t.slug] || "bot",
-    }));
+    return tasks
+      .filter((t): t is BackendTask => Boolean(t && typeof t === 'object' && t.id))
+      .map((t) => {
+        const slugKey = (t.slug || '').toLowerCase().trim();
+        return {
+          id: t.id,
+          label: t.name || 'Untitled Task',
+          icon: ICON_MAP[slugKey] || "bot",
+        };
+      });
   } catch (error) {
-    console.error('Failed to fetch tasks:', error);
-    throw error;
+    console.error('Failed to fetch tasks in taskApi:', error);
+    return [];
   }
 }

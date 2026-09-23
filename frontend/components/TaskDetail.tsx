@@ -18,25 +18,32 @@ function PaperCard({
 }: {
   paper: TaskDetailType["papers"][number];
 }) {
+  if (!paper || typeof paper !== "object") return null;
+
+  const title = paper.title || "Untitled Paper";
+  const rawSlug = paper.slug || "";
+  const safeSlug = rawSlug ? encodeURIComponent(rawSlug) : "#";
+  const citations = typeof paper.citationCount === "number" && !isNaN(paper.citationCount) ? paper.citationCount : 0;
+
   return (
     <div className="ds-card p-5 flex flex-col gap-3">
       <Link
-        href={`/papers/${paper.slug}`}
+        href={`/papers/${safeSlug}`}
         className="text-[16px] font-semibold text-[#111111] hover:text-[#F55036] transition-colors leading-snug no-underline"
       >
-        {paper.title}
+        {title}
       </Link>
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-[#555555]">
         <span className="flex items-center gap-1.5">
           <Quote size={14} className="text-[#8B8B8B]" />
-          {paper.citationCount} citation{paper.citationCount !== 1 ? "s" : ""}
+          {citations.toLocaleString()} citation{citations !== 1 ? "s" : ""}
         </span>
       </div>
 
       <div className="pt-1">
         <Link
-          href={`/papers/${paper.slug}`}
+          href={`/papers/${safeSlug}`}
           className="inline-flex items-center gap-1.5 ds-button-ghost text-[12px] px-3 py-1.5 no-underline"
         >
           <ExternalLink size={13} />
@@ -57,6 +64,8 @@ const TAG_COLORS: Record<string, { dot: string }> = {
 };
 
 function getTagColorKey(color: string | null): string {
+  if (!color) return "";
+  const hex = color.toUpperCase().trim();
   const map: Record<string, string> = {
     "#9333EA": "purple",
     "#0284C7": "blue",
@@ -65,7 +74,7 @@ function getTagColorKey(color: string | null): string {
     "#EF4444": "red",
     "#EC4899": "pink",
   };
-  return (color && map[color]) || "";
+  return map[hex] || "";
 }
 
 export default function TaskDetail({
@@ -74,23 +83,36 @@ export default function TaskDetail({
   task: TaskDetailType;
 }) {
   const [copied, setCopied] = useState(false);
+
+  if (!task || typeof task !== "object") {
+    return null;
+  }
+
+  const name = task.name || "Untitled Task";
+  const slug = task.slug || "";
+  const paperCount = typeof task.paperCount === "number" && !isNaN(task.paperCount) ? task.paperCount : 0;
+  const papers = Array.isArray(task.papers) ? task.papers : [];
   const colorKey = getTagColorKey(task.color);
 
   const handleCopyLink = async () => {
+    if (typeof window === "undefined") return;
     try {
-      await navigator.clipboard.writeText(window.location.href);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(window.location.href);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
     } catch {
       // ignore
     }
   };
 
   const handleShare = async () => {
+    if (typeof window === "undefined") return;
     if (navigator.share) {
       try {
         await navigator.share({
-          title: task.name,
+          title: name,
           url: window.location.href,
         });
       } catch {
@@ -114,7 +136,7 @@ export default function TaskDetail({
           </Link>
           <span>/</span>
           <span className="text-[#555555] font-medium truncate max-w-[200px]">
-            {task.name}
+            {name}
           </span>
         </nav>
 
@@ -128,19 +150,19 @@ export default function TaskDetail({
                   />
                 )}
                 <h1 className="text-[28px] md:text-[32px] font-bold tracking-tight">
-                  {task.name}
+                  {name}
                 </h1>
               </div>
               <span className="inline-block ds-chip text-[11px] mb-3">
-                {task.slug}
+                {slug}
               </span>
               <div className="flex items-center gap-2 text-[14px] text-[#555555]">
                 <FileText size={16} className="text-[#8B8B8B]" />
                 <span>
                   <strong className="font-semibold text-[#111111]">
-                    {task.paperCount}
+                    {paperCount.toLocaleString()}
                   </strong>{" "}
-                  {task.paperCount === 1 ? "paper" : "papers"}
+                  {paperCount === 1 ? "paper" : "papers"}
                 </span>
               </div>
             </div>
@@ -166,20 +188,20 @@ export default function TaskDetail({
           </div>
         </div>
 
-        {task.papers.length > 0 && (
+        {papers.length > 0 && (
           <section className="mb-10">
             <h2 className="text-[20px] font-bold tracking-tight mb-4">
-              Papers ({task.paperCount})
+              Papers ({paperCount.toLocaleString()})
             </h2>
             <div className="flex flex-col gap-4">
-              {task.papers.map((paper) => (
-                <PaperCard key={paper.id} paper={paper} />
+              {papers.map((paper) => (
+                <PaperCard key={paper.id || paper.slug} paper={paper} />
               ))}
             </div>
           </section>
         )}
 
-        {task.papers.length === 0 && (
+        {papers.length === 0 && (
           <section className="mb-10">
             <h2 className="text-[20px] font-bold tracking-tight mb-4">Papers</h2>
             <div className="flex flex-col items-center justify-center py-16 gap-3 ds-card">
