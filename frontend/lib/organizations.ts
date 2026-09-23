@@ -1,5 +1,4 @@
 import { getModelFacets, getModels, type ModelFacets, type ModelItem } from "@/lib/models";
-import { getPapers } from "@/lib/paperApi";
 
 export type OrganizationDirectoryData = {
   models: ModelItem[];
@@ -13,29 +12,25 @@ let catalogPromise: Promise<OrganizationCatalogData> | null = null;
 let directoryPromise: Promise<OrganizationDirectoryData> | null = null;
 let facetsPromise: Promise<ModelFacets> | null = null;
 
-async function mapWithConcurrency<T, R>(
-  values: T[],
-  concurrency: number,
-  worker: (value: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(values.length);
-  let nextIndex = 0;
-
-  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, async () => {
-    while (nextIndex < values.length) {
-      const index = nextIndex++;
-      results[index] = await worker(values[index]);
-    }
-  }));
-
-  return results;
-}
+const DEFAULT_FACETS: ModelFacets = {
+  totalModels: 0,
+  vendors: [],
+  modalities: [],
+  accessTypes: [],
+  opennessTypes: [],
+  modelFamilies: [],
+  capabilities: [],
+  researchAreas: [],
+};
 
 /** The small, fast data set needed to render every organization card. */
 export function getOrganizationCatalog(): Promise<OrganizationCatalogData> {
   if (!catalogPromise) {
     catalogPromise = Promise.all([getModels(), getOrganizationFacets()])
-      .then(([models, facets]) => ({ models, facets }))
+      .then(([models, facets]) => ({
+        models: Array.isArray(models) ? models : [],
+        facets: facets || DEFAULT_FACETS,
+      }))
       .catch((error) => {
         catalogPromise = null;
         throw error;
@@ -45,46 +40,57 @@ export function getOrganizationCatalog(): Promise<OrganizationCatalogData> {
   return catalogPromise;
 }
 
-/** The compact endpoint that supplies all 60 organization names immediately. */
+/** The compact endpoint that supplies organization facets immediately. */
 export function getOrganizationFacets(): Promise<ModelFacets> {
   if (!facetsPromise) {
-    facetsPromise = getModelFacets().catch((error) => {
-      facetsPromise = null;
-      throw error;
-    });
+    facetsPromise = getModelFacets()
+      .then((facets) => facets || DEFAULT_FACETS)
+      .catch((error) => {
+        facetsPromise = null;
+        throw error;
+      });
   }
 
   return facetsPromise;
 }
 
 /**
- * Warms counts and paper lists after the catalog is available. The paper
- * requests also warm paperApi's cache for organization profile pages.
+ * Warms counts and paper lists after the catalog is available.
  */
 export function getOrganizationDirectory(): Promise<OrganizationDirectoryData> {
   if (!directoryPromise) {
     directoryPromise = (async () => {
       const [facets, models] = await Promise.all([
-        getOrganizationFacets().catch(() => ({ totalModels: 0, vendors: [], modalities: [], accessTypes: [], opennessTypes: [], modelFamilies: [], capabilities: [], researchAreas: [] })),
+        getOrganizationFacets().catch(() => DEFAULT_FACETS),
         getModels().catch(() => []),
       ]);
 
-      // Derive paper counts directly from models for instant, zero-latency rendering
+      const safeModels = Array.isArray(models) ? models : [];
+      const safeVendors = Array.isArray(facets?.vendors) ? facets.vendors : [];
+
+      // Derive paper counts directly from models for instant rendering
       const initialCounts: Record<string, number> = {};
-      models.forEach((m) => {
-        if (m.vendor) {
-          initialCounts[m.vendor] = (initialCounts[m.vendor] || 0) + (m.paperCount || 1);
+
+      safeModels.forEach((m) => {
+        if (m && typeof m.vendor === "string" && m.vendor.trim()) {
+          const key = m.vendor.trim();
+          const count = typeof m.paperCount === "number" && m.paperCount > 0 ? m.paperCount : 1;
+          initialCounts[key] = (initialCounts[key] || 0) + count;
         }
       });
-      facets.vendors.forEach((v) => {
-        if (!initialCounts[v.name]) {
-          initialCounts[v.name] = v.count;
+
+      safeVendors.forEach((v) => {
+        if (v && typeof v.name === "string" && v.name.trim()) {
+          const key = v.name.trim();
+          if (!initialCounts[key]) {
+            initialCounts[key] = typeof v.count === "number" ? v.count : 0;
+          }
         }
       });
 
       return {
-        models,
-        facets,
+        models: safeModels,
+        facets: facets || DEFAULT_FACETS,
         paperCounts: initialCounts,
       };
     })().catch((error) => {

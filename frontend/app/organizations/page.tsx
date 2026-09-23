@@ -7,7 +7,6 @@ import Navbar from "@/components/Navbar";
 import {
   getCachedModelFacets,
   getCachedModels,
-  getModels,
   type ModelFacets,
   type ModelItem,
 } from "@/lib/models";
@@ -23,11 +22,13 @@ const descriptions = [
 ];
 
 function organizationDescription(name: string) {
+  if (!name) return descriptions[0];
   const hash = [...name].reduce((total, character) => total + character.charCodeAt(0), 0);
   return descriptions[hash % descriptions.length];
 }
 
 function organizationSlug(name: string) {
+  if (!name) return "";
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
 }
 
@@ -49,7 +50,6 @@ function organizationLogoUrl(logo?: string) {
 
 function OrganizationCard({
   name,
-  count,
   rank,
   logo,
   featuredModel,
@@ -62,15 +62,24 @@ function OrganizationCard({
   featuredModel?: ModelItem;
   paperCount: number;
 }) {
+  const [imageError, setImageError] = useState(false);
+  const targetSlug = organizationSlug(name);
+  const href = targetSlug ? `/organizations/${encodeURIComponent(targetSlug)}` : "/organizations";
+
   return (
     <Link
-      href={`/organizations/${organizationSlug(name)}`}
+      href={href}
       className="group flex h-[224px] flex-col overflow-hidden rounded-md border border-[#E7E4DD] bg-white no-underline shadow-[0_2px_12px_rgba(24,24,20,0.035)] transition-all duration-200 hover:-translate-y-1 hover:border-[#FFB098] hover:shadow-[0_12px_30px_rgba(255,90,31,0.1)]"
     >
       <div className="flex items-start gap-2.5 border-b border-[#EEECE6] bg-[#FBFAF7] p-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#E2DED5] bg-gradient-to-br from-white to-[#FFF8F4] p-1.5 shadow-[0_2px_5px_rgba(24,24,20,0.07)] ring-1 ring-white transition-all duration-200 group-hover:scale-105 group-hover:border-[#FFB098] group-hover:shadow-[0_4px_10px_rgba(255,90,31,0.14)]">
-          {logo ? (
-            <img src={logo} alt={`${name} logo`} className="h-full w-full object-contain" />
+          {logo && !imageError ? (
+            <img
+              src={logo}
+              alt={`${name} logo`}
+              className="h-full w-full object-contain"
+              onError={() => setImageError(true)}
+            />
           ) : (
             <Building2 size={20} className="text-[#FF5A1F]" />
           )}
@@ -117,9 +126,9 @@ export default function OrganizationsPage() {
     getOrganizationDirectory()
       .then((directory) => {
         if (cancelled) return;
-        setModels(directory.models);
-        setFacets(directory.facets);
-        setPaperCounts(directory.paperCounts);
+        setModels(Array.isArray(directory?.models) ? directory.models : []);
+        setFacets(directory?.facets || null);
+        setPaperCounts(directory?.paperCounts || {});
       })
       .catch((error) => console.error("Unable to load organizations", error))
       .finally(() => {
@@ -134,25 +143,37 @@ export default function OrganizationsPage() {
   const organizations = useMemo(() => {
     const grouped = new Map<string, ModelItem[]>();
     models.forEach((model) => {
-      if (!model.vendor) return;
-      const previous = grouped.get(model.vendor) ?? [];
+      if (!model || typeof model.vendor !== "string" || !model.vendor.trim()) return;
+      const vendorName = model.vendor.trim();
+      const previous = grouped.get(vendorName) ?? [];
       previous.push(model);
-      grouped.set(model.vendor, previous);
+      grouped.set(vendorName, previous);
     });
 
     const source = facets?.vendors?.length
-      ? facets.vendors.map((vendor) => ({ name: vendor.name, count: vendor.count }))
+      ? facets.vendors
+          .filter((v) => v && typeof v.name === "string")
+          .map((vendor) => ({ name: vendor.name, count: typeof vendor.count === "number" ? vendor.count : 0 }))
       : [...grouped.entries()].map(([name, entries]) => ({ name, count: entries.length }));
 
     return source
       .map((organization) => {
         const organizationModels = grouped.get(organization.name) ?? [];
+        const sortedByTrending = [...organizationModels].sort((a, b) => {
+          const scoreA = typeof a.trendingScore === "number" ? a.trendingScore : 0;
+          const scoreB = typeof b.trendingScore === "number" ? b.trendingScore : 0;
+          return scoreB - scoreA;
+        });
+
         return {
           ...organization,
-          logo: organizationLogoUrl(organizationModels.find((model) => model.vendorLogoUrl)?.vendorLogoUrl),
-          featuredModel: [...organizationModels].sort((a, b) => b.trendingScore - a.trendingScore)[0],
+          logo: organizationLogoUrl(organizationModels.find((model) => model && model.vendorLogoUrl)?.vendorLogoUrl),
+          featuredModel: sortedByTrending[0],
           paperCount: paperCounts[organization.name] ?? 0,
-          momentum: organizationModels.reduce((total, model) => total + (model.trendingScore || 0), 0),
+          momentum: organizationModels.reduce((total, model) => {
+            const score = typeof model.trendingScore === "number" ? model.trendingScore : 0;
+            return total + score;
+          }, 0),
         };
       })
       .sort((a, b) => {
@@ -183,12 +204,31 @@ export default function OrganizationsPage() {
           <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8C877E]">Model ecosystem</p>
-              <h2 id="organizations-heading" className="mt-2 text-[25px] font-semibold tracking-[-0.03em]">{facets?.vendors?.length ?? organizations.length} organizations</h2>
+              <h2 id="organizations-heading" className="mt-2 text-[25px] font-semibold tracking-[-0.03em]">
+                {facets?.vendors?.length ?? organizations.length} organizations
+              </h2>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="flex rounded-md border border-[#DDD9D0] bg-white p-1">
-                {([['trending', 'Trending'], ['models', 'Most models'], ['az', 'A–Z']] as const).map(([value, label]) => (
-                  <button key={value} onClick={() => setSort(value)} className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition ${sort === value ? "bg-[#171717] text-white" : "text-[#6B665F] hover:bg-[#F4F1EB]"}`}>{label}</button>
+              <div className="flex rounded-md border border-[#DDD9D0] bg-white p-1" role="radiogroup" aria-label="Sort organizations">
+                {(
+                  [
+                    ["trending", "Trending"],
+                    ["models", "Most models"],
+                    ["az", "A–Z"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    role="radio"
+                    aria-checked={sort === value}
+                    onClick={() => setSort(value)}
+                    className={`rounded-md px-3 py-1.5 text-[12px] font-medium transition ${
+                      sort === value ? "bg-[#171717] text-white" : "text-[#6B665F] hover:bg-[#F4F1EB]"
+                    }`}
+                  >
+                    {label}
+                  </button>
                 ))}
               </div>
             </div>
@@ -196,11 +236,15 @@ export default function OrganizationsPage() {
 
           {loading ? (
             <div className="mt-6 grid max-w-[1140px] grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-              {Array.from({ length: 8 }).map((_, index) => <div key={index} className="h-[224px] animate-pulse rounded-md border border-[#E7E4DD] bg-white" />)}
+              {Array.from({ length: 8 }).map((_, index) => (
+                <div key={index} className="h-[224px] animate-pulse rounded-md border border-[#E7E4DD] bg-white" />
+              ))}
             </div>
           ) : organizations.length ? (
             <div className="mt-6 grid max-w-[1140px] grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
-              {organizations.map((organization, index) => <OrganizationCard key={organization.name} {...organization} rank={index + 1} />)}
+              {organizations.map((organization, index) => (
+                <OrganizationCard key={organization.name} {...organization} rank={index + 1} />
+              ))}
             </div>
           ) : null}
         </section>
