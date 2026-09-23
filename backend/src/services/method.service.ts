@@ -1,4 +1,3 @@
-import { PrismaClient } from '../generated/prisma/client';
 import { QueryRouter } from '../routing/index.js';
 import { QueryIntent, QueryType } from '../routing/types.js';
 import { staticTaxonomy } from '../constants/taxonomy.js';
@@ -10,6 +9,19 @@ type GetMethodsQuery = {
   limit?: number | string;
   skip?: number | string;
 };
+
+interface MethodCountSelect {
+  id: string;
+  name: string;
+  slug: string;
+  _count: { papers: number };
+}
+
+interface AuthorItem {
+  id?: string;
+  name: string;
+  slug?: string;
+}
 
 export const getMethods = async (
   queryRouter: QueryRouter,
@@ -27,7 +39,7 @@ export const getMethods = async (
   const sort = query.sort || 'name';
   const search = query.search || '';
 
-  const where: any = {};
+  const where: Record<string, unknown> = {};
   if (search) {
     where.name = { contains: search, mode: 'insensitive' };
   }
@@ -64,28 +76,35 @@ export const getMethods = async (
     ]);
   });
 
-  const allMethods: any[] = [];
+  const allMethods: MethodCountSelect[] = [];
   const seenIds = new Set<string>();
   let total = 0;
 
   for (const result of routingResult.results) {
-    for (const method of result[0]) {
+    if (!result || !Array.isArray(result[0])) continue;
+    const [methodsList, countVal] = result;
+
+    for (const method of methodsList) {
       if (!seenIds.has(method.id)) {
         seenIds.add(method.id);
-        allMethods.push(method);
+        allMethods.push({
+          id: method.id,
+          name: method.name,
+          slug: method.slug,
+          _count: { papers: method._count?.papers || 0 },
+        });
       } else {
-        // If the method already exists, add the paper count
         const existing = allMethods.find(m => m.id === method.id);
-        if (existing) {
-          existing._count.papers += method._count.papers;
+        if (existing && existing._count && method._count) {
+          existing._count.papers += method._count.papers || 0;
         }
       }
     }
-    total += result[1]; // Note: Total count won't be perfectly deduplicated without complex merging
+    total += Number(countVal) || 0;
   }
 
   if (sort === 'papers') {
-    allMethods.sort((a, b) => b._count.papers - a._count.papers);
+    allMethods.sort((a, b) => (b._count?.papers || 0) - (a._count?.papers || 0));
   } else {
     allMethods.sort((a, b) => a.name.localeCompare(b.name));
   }
@@ -93,31 +112,12 @@ export const getMethods = async (
   return {
     methods: allMethods.slice(0, limit).map(({ _count, ...rest }) => ({
       ...rest,
-      paperCount: _count.papers,
+      paperCount: _count?.papers || 0,
     })),
     total,
     page,
     hasMore: skip + allMethods.length < total,
   };
-};
-
-const ICON_MAP: Record<string, string> = {
-  "General": "Settings",
-  "Language": "MessageSquare",
-  "Vision": "Eye",
-  "Audio & Speech": "Mic",
-  "Agents": "Bot",
-  "Reasoning": "Brain",
-  "Training": "Activity",
-  "Optimization": "TrendingUp",
-  "Inference": "Zap",
-  "Retrieval": "Search",
-  "Reinforcement Learning": "Target",
-  "Diffusion & Generation": "Sparkles",
-  "Multimodal": "Layers",
-  "Architectures": "Box",
-  "Evaluation": "CheckSquare",
-  "Embeddings": "Hash"
 };
 
 export const getGroupedMethods = async (queryRouter: QueryRouter) => {
@@ -138,9 +138,12 @@ export const getGroupedMethods = async (queryRouter: QueryRouter) => {
 
   const dbCounts: Record<string, number> = {};
   for (const result of routingResult.results) {
+    if (!Array.isArray(result)) continue;
     for (const method of result) {
-      if (!dbCounts[method.slug]) dbCounts[method.slug] = 0;
-      dbCounts[method.slug] += method._count.papers;
+      if (method && method.slug) {
+        if (!dbCounts[method.slug]) dbCounts[method.slug] = 0;
+        dbCounts[method.slug] += method._count?.papers || 0;
+      }
     }
   }
 
@@ -210,8 +213,8 @@ export const getMethodBySlug = async (queryRouter: QueryRouter, slug: string) =>
     });
   });
 
-  let baseMethod: any = null;
-  const allPapers: any[] = [];
+  let baseMethod: Record<string, unknown> | null = null;
+  const allPapers: Array<{ paper: Record<string, unknown> }> = [];
   let totalPaperCount = 0;
 
   for (const result of routingResult.results) {
@@ -220,16 +223,18 @@ export const getMethodBySlug = async (queryRouter: QueryRouter, slug: string) =>
         const { _count, papers, ...rest } = result;
         baseMethod = { ...rest };
       }
-      totalPaperCount += result._count.papers;
-      allPapers.push(...result.papers);
+      totalPaperCount += result._count?.papers || 0;
+      if (Array.isArray(result.papers)) {
+        allPapers.push(...result.papers);
+      }
     }
   }
 
-  if (!baseMethod || totalPaperCount === 0 || allPapers.length === 0) {
+  if (!baseMethod) {
     let staticMethod = null;
     let staticCategory = null;
     for (const cat of staticTaxonomy) {
-      const m = cat.methods.find(m => (m.slug || m.id) === slug);
+      const m = cat.methods.find(item => (item.slug || item.id) === slug);
       if (m) {
         staticMethod = m;
         staticCategory = cat;
@@ -253,26 +258,47 @@ export const getMethodBySlug = async (queryRouter: QueryRouter, slug: string) =>
 
   // Deduplicate papers across shards
   const seenPaperIds = new Set<string>();
-  const dedupPapers = [];
+  const dedupPapers: Array<{ paper: Record<string, unknown> }> = [];
   for (const p of allPapers) {
-    if (!seenPaperIds.has(p.paper.id)) {
-      seenPaperIds.add(p.paper.id);
+    const paperObj = p.paper as { id?: string; githubStars?: number };
+    if (paperObj && paperObj.id && !seenPaperIds.has(paperObj.id)) {
+      seenPaperIds.add(paperObj.id);
       dedupPapers.push(p);
     }
   }
 
   // Sort by githubStars and take 100
-  dedupPapers.sort((a, b) => (b.paper.githubStars || 0) - (a.paper.githubStars || 0));
+  dedupPapers.sort((a, b) => {
+    const starsA = Number((a.paper as { githubStars?: number }).githubStars) || 0;
+    const starsB = Number((b.paper as { githubStars?: number }).githubStars) || 0;
+    return starsB - starsA;
+  });
   const topPapers = dedupPapers.slice(0, 100);
 
   return {
     ...baseMethod,
     paperCount: totalPaperCount,
-    papers: topPapers.map(({ paper }) => ({
-      ...paper,
-      authors: paper.authors && typeof paper.authors === 'string' ? paper.authors.split(',').map((name: string) => { const t = name.trim(); return { id: t, name: t, slug: t.toLowerCase().replace(/[^a-z0-9]+/g, '-') }; }) : [],
-      sotaClaims: paper.sotaClaims?.map((c: any) => c.benchmark) || [],
-    })),
+    papers: topPapers.map(({ paper }) => {
+      const p = paper as Record<string, unknown>;
+      let authorsList: AuthorItem[] = [];
+
+      if (Array.isArray(p.authors)) {
+        authorsList = p.authors as AuthorItem[];
+      } else if (typeof p.authors === 'string') {
+        authorsList = p.authors.split(',').map((name: string) => {
+          const t = name.trim();
+          return { id: t, name: t, slug: t.toLowerCase().replace(/[^a-z0-9]+/g, '-') };
+        });
+      }
+
+      const sotaClaimsRaw = Array.isArray(p.sotaClaims) ? p.sotaClaims : [];
+
+      return {
+        ...p,
+        authors: authorsList,
+        sotaClaims: sotaClaimsRaw.map((c: unknown) => (c as { benchmark?: unknown })?.benchmark).filter(Boolean),
+      };
+    }),
   };
 };
 
@@ -306,12 +332,17 @@ export const createMethod = async (queryRouter: QueryRouter, data: { name: strin
     });
   });
 
-  const { _count, ...rest } = routingResult.results[0];
-  return { ...rest, paperCount: _count.papers };
+  const firstResult = routingResult.results[0];
+  if (!firstResult) {
+    throw new Error('Failed to create method on database shard');
+  }
+
+  const { _count, ...rest } = firstResult;
+  return { ...rest, paperCount: _count?.papers || 0 };
 };
 
 export const updateMethod = async (queryRouter: QueryRouter, slug: string, data: { name?: string }) => {
-  const updateData: any = {};
+  const updateData: Record<string, unknown> = {};
 
   if (data.name) {
     updateData.name = data.name;
@@ -344,8 +375,13 @@ export const updateMethod = async (queryRouter: QueryRouter, slug: string, data:
     });
   });
 
-  const { _count, ...rest } = routingResult.results[0];
-  return { ...rest, paperCount: _count.papers };
+  const firstResult = routingResult.results[0];
+  if (!firstResult) {
+    throw new Error('Failed to update method or method not found');
+  }
+
+  const { _count, ...rest } = firstResult;
+  return { ...rest, paperCount: _count?.papers || 0 };
 };
 
 export const deleteMethod = async (queryRouter: QueryRouter, slug: string) => {
@@ -362,5 +398,10 @@ export const deleteMethod = async (queryRouter: QueryRouter, slug: string) => {
     });
   });
 
-  return routingResult.results[0];
+  const firstResult = routingResult.results[0];
+  if (!firstResult) {
+    throw new Error('Failed to delete method or method not found');
+  }
+
+  return firstResult;
 };
