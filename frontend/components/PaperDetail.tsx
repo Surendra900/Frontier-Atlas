@@ -1008,6 +1008,7 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
   const [selectedCitationFormat, setSelectedCitationFormat] = useState<CitationFormat>("bibtex");
   const [isPdfViewerOpen, setIsPdfViewerOpen] = useState(false);
   const [isExportingNote, setIsExportingNote] = useState(false);
+  const [isCopiedBibtex, setIsCopiedBibtex] = useState(false);
 
   const [relatedPapers, setRelatedPapers] = useState<Paper[]>([]);
   const [relatedLoading, setRelatedLoading] = useState(true);
@@ -1181,6 +1182,36 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
     }
   }, [paper, arxivUrl, pdfUrl, resolvedGithubUrl, hfResolvedUrl, toast]);
 
+  const estimatedReadingTime = useMemo(() => {
+    const words = (paper.abstract || "").split(/\s+/).filter(Boolean).length;
+    const estMins = Math.max(6, Math.min(25, Math.round(words / 18)));
+    return `~${estMins} min read`;
+  }, [paper.abstract]);
+
+  const handleQuickBibtexCopy = useCallback(async () => {
+    const bibtex = generateCitation(paper, "bibtex");
+    try {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(bibtex);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = bibtex;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setIsCopiedBibtex(true);
+      toast.copy("Copied BibTeX citation entry!");
+    } catch {
+      toast.error("Failed to copy BibTeX to clipboard");
+    } finally {
+      setTimeout(() => setIsCopiedBibtex(false), 2000);
+    }
+  }, [paper, toast]);
+
   useEffect(() => {
     async function loadRelated() {
       const taskSlugs = [...new Set((paper.tasks || []).map((t) => t.slug))];
@@ -1188,7 +1219,17 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
       const modelSlugs = [...new Set((paper.models || []).map((m) => m.slug))];
 
       if (taskSlugs.length === 0 && methodSlugs.length === 0 && modelSlugs.length === 0) {
-        setRelatedLoading(false);
+        try {
+          const fallback = await getPapers({ page: 1, sort: "popular", limit: 6 });
+          const papersToSet = (fallback.papers || [])
+            .filter((p) => String(p.id) !== String(paper.id) && p.slug !== paper.slug)
+            .slice(0, 4);
+          setRelatedPapers(papersToSet);
+        } catch {
+          // ignore
+        } finally {
+          setRelatedLoading(false);
+        }
         return;
       }
 
@@ -1223,7 +1264,7 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
         for (const result of results) {
           for (const p of result.papers) {
             const id = String(p.id);
-            if (id === currentId) continue;
+            if (id === currentId || p.slug === paper.slug) continue;
             const existing = score.get(id);
             if (existing) {
               existing.count++;
@@ -1233,12 +1274,20 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
           }
         }
 
-        setRelatedPapers(
-          [...score.entries()]
+        let papersToSet: Paper[] = [];
+        if (score.size > 0) {
+          papersToSet = [...score.entries()]
             .sort((a, b) => b[1].count - a[1].count)
             .slice(0, 4)
-            .map(([, v]) => v.paper)
-        );
+            .map(([, v]) => v.paper);
+        } else {
+          const fallback = await getPapers({ page: 1, sort: "popular", limit: 6 });
+          papersToSet = (fallback.papers || [])
+            .filter((p) => String(p.id) !== currentId && p.slug !== paper.slug)
+            .slice(0, 4);
+        }
+
+        setRelatedPapers(papersToSet);
       } catch {
         // ignore
       }
@@ -1247,7 +1296,7 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
     }
 
     loadRelated();
-  }, [paper.id, paper.tasks, paper.methods, paper.models]);
+  }, [paper.id, paper.slug, paper.tasks, paper.methods, paper.models]);
 
   // Defer non-critical sections until after first paint
   useEffect(() => {
@@ -1378,6 +1427,20 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
                       </span>
                     </div>
                   )}
+                  <div className="flex items-center gap-1.5 text-[13px] text-[#666]">
+                    <span className="text-[#B0B0B0]">•</span>
+                    <span className="font-medium text-[#444]">
+                      {estimatedReadingTime}
+                    </span>
+                    {paper.arxivId && (
+                      <>
+                        <span className="text-[#B0B0B0]">•</span>
+                        <span className="font-mono text-[12px] text-[#888]">
+                          arXiv:{paper.arxivId}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {/* Action buttons */}
@@ -1463,6 +1526,19 @@ export default function PaperDetail({ paper }: { paper: PaperDetailType }) {
                     >
                       <Quote size={15} />
                       Cite
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleQuickBibtexCopy}
+                      className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-4 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
+                      title="Copy BibTeX entry for LaTeX citations"
+                    >
+                      {isCopiedBibtex ? (
+                        <Check size={15} className="text-[#059669]" />
+                      ) : (
+                        <span className="font-mono font-bold text-[12px]">@</span>
+                      )}
+                      {isCopiedBibtex ? "Copied BibTeX!" : "BibTeX"}
                     </button>
                     <button
                       type="button"

@@ -503,6 +503,8 @@ function ModelsContent() {
   };
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [filter6GbOnly, setFilter6GbOnly] = useState(false);
+  const [filterOpenWeightsOnly, setFilterOpenWeightsOnly] = useState(false);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -542,6 +544,8 @@ function ModelsContent() {
     setSelectedFamily(null);
     setSelectedCollection(null);
     setSearchQuery("");
+    setFilter6GbOnly(false);
+    setFilterOpenWeightsOnly(false);
 
     router.push("/models", {
       scroll: false,
@@ -823,6 +827,24 @@ function ModelsContent() {
         }
       }
 
+      if (filter6GbOnly) {
+        const fits =
+          (m as any).hardware?.fitsOn6GbGpu === true ||
+          (m.parameterCount && /([1-8]b|[1-7]\.[0-9]b)/i.test(m.parameterCount)) ||
+          (m.name && /(8b|7b|3b|1b|mini|nano|flash)/i.test(m.name));
+        if (!fits) return false;
+      }
+
+      if (filterOpenWeightsOnly) {
+        const isOpen =
+          m.opennessType === "open_weights" ||
+          m.opennessType === "open_source" ||
+          (m.license && !/proprietary|closed|commercial only/i.test(m.license)) ||
+          Boolean(m.repositoryUrl) ||
+          Boolean(m.huggingFaceUrl);
+        if (!isOpen) return false;
+      }
+
       return true;
     });
   }, [
@@ -833,6 +855,8 @@ function ModelsContent() {
     selectedFamily,
     selectedCollection,
     searchQuery,
+    filter6GbOnly,
+    filterOpenWeightsOnly,
   ]);
 
   const topModelForSelection = useMemo(() => {
@@ -2702,6 +2726,38 @@ useEffect(() => {
                       Release Velocity
                     </span>
                   </div>
+                </div>
+
+                {/* Hardware & Openness Quick Filter Bar */}
+                <div className="flex items-center gap-2 mb-6 flex-wrap">
+                  <span className="text-[12px] font-semibold text-[#888888] mr-1">Quick Filters:</span>
+                  <button
+                    type="button"
+                    onClick={() => setFilter6GbOnly((prev) => !prev)}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-bold transition-all cursor-pointer border ${
+                      filter6GbOnly
+                        ? "bg-[#10B981] text-white border-[#10B981] shadow-xs"
+                        : "bg-white text-[#444444] border-[#E5E2D9] hover:border-[#10B981]/50 hover:bg-[#F0FDF4]"
+                    }`}
+                  >
+                    <Cpu size={13} className={filter6GbOnly ? "text-white" : "text-[#10B981]"} />
+                    <span>Runs on 6GB GPU (Consumer RTX)</span>
+                    {filter6GbOnly && <Check size={12} className="ml-0.5" />}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFilterOpenWeightsOnly((prev) => !prev)}
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[12px] font-bold transition-all cursor-pointer border ${
+                      filterOpenWeightsOnly
+                        ? "bg-[#FF5A1F] text-white border-[#FF5A1F] shadow-xs"
+                        : "bg-white text-[#444444] border-[#E5E2D9] hover:border-[#FF5A1F]/50 hover:bg-[#FFF6F3]"
+                    }`}
+                  >
+                    <Sparkles size={13} className={filterOpenWeightsOnly ? "text-white" : "text-[#FF5A1F]"} />
+                    <span>Open Weights &amp; Code</span>
+                    {filterOpenWeightsOnly && <Check size={12} className="ml-0.5" />}
+                  </button>
                 </div>
 
                 {/* TOP MODEL */}
