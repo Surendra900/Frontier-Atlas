@@ -1,18 +1,26 @@
 "use client";
 
 import { TrendingUp, Clock3, Star } from "lucide-react";
+
 interface Props {
   selectedSort: "popular" | "latest" | "citations";
-
-onSortChange: (
-  sort: "popular" | "latest" | "citations"
-) => void;
+  onSortChange: (sort: "popular" | "latest" | "citations") => void;
 }
 
 export default function TaskFilterBar({
-  selectedSort,
+  selectedSort = "popular",
   onSortChange,
 }: Props) {
+  const currentSort = ["popular", "latest", "citations"].includes(selectedSort)
+    ? selectedSort
+    : "popular";
+
+  const handleSort = (sort: "popular" | "latest" | "citations") => {
+    if (typeof onSortChange === "function") {
+      onSortChange(sort);
+    }
+  };
+
   return (
     <div className="w-full flex flex-wrap items-center bg-white rounded-xl border border-gray-200 p-2 sm:px-5 sm:py-3 mb-4 sm:mb-5 max-w-full overflow-x-auto">
       {/* SORT */}
@@ -21,11 +29,20 @@ export default function TaskFilterBar({
           Sort
         </span>
 
-        <div className="flex rounded-lg bg-gray-100 p-0.5 shrink-0">
+        <div
+          role="radiogroup"
+          aria-label="Sort options"
+          className="flex rounded-lg bg-gray-100 p-0.5 shrink-0"
+        >
           <button
-            onClick={() => onSortChange("popular")}
+            type="button"
+            role="radio"
+            aria-checked={currentSort === "popular"}
+            onClick={() => handleSort("popular")}
             className={`flex items-center gap-1.5 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-[13px] font-medium transition-all ${
-              selectedSort === "popular" ? "bg-white text-gray-900 shadow-xs font-semibold" : "text-gray-600 hover:text-gray-900"
+              currentSort === "popular"
+                ? "bg-white text-gray-900 shadow-xs font-semibold"
+                : "text-gray-600 hover:text-gray-900"
             }`}
           >
             <TrendingUp size={13} />
@@ -33,9 +50,14 @@ export default function TaskFilterBar({
           </button>
 
           <button
-            onClick={() => onSortChange("latest")}
+            type="button"
+            role="radio"
+            aria-checked={currentSort === "latest"}
+            onClick={() => handleSort("latest")}
             className={`flex items-center gap-1.5 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-[13px] font-medium transition-all ${
-              selectedSort === "latest" ? "bg-white text-gray-900 shadow-xs font-semibold" : "text-gray-600 hover:text-gray-900"
+              currentSort === "latest"
+                ? "bg-white text-gray-900 shadow-xs font-semibold"
+                : "text-gray-600 hover:text-gray-900"
             }`}
           >
             <Clock3 size={13} />
@@ -43,9 +65,14 @@ export default function TaskFilterBar({
           </button>
 
           <button
-            onClick={() => onSortChange("citations")}
+            type="button"
+            role="radio"
+            aria-checked={currentSort === "citations"}
+            onClick={() => handleSort("citations")}
             className={`flex items-center gap-1.5 px-2.5 sm:px-4 py-1 sm:py-1.5 rounded-full text-[11px] sm:text-[13px] font-medium transition-all ${
-              selectedSort === "citations" ? "bg-white text-gray-900 shadow-xs font-semibold" : "text-gray-600 hover:text-gray-900"
+              currentSort === "citations"
+                ? "bg-white text-gray-900 shadow-xs font-semibold"
+                : "text-gray-600 hover:text-gray-900"
             }`}
           >
             <Star size={13} />

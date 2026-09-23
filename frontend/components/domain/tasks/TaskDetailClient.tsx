@@ -11,19 +11,19 @@ interface Props {
   initialPapers?: GetPapersResult | null;
 }
 
-export default function TaskDetailClient({ slug, initialPapers }: Props) {
-  const [sort, setSort] = useState<
-    "popular" | "latest" | "citations"
-  >("popular");
+const PERIOD_MAP: Record<string, string> = {
+  Today: "today",
+  "This Week": "week",
+  "This Month": "month",
+  "All time": "all",
+};
 
+export default function TaskDetailClient({ slug, initialPapers }: Props) {
+  const [sort, setSort] = useState<"popular" | "latest" | "citations">("popular");
   const [period, setPeriod] = useState<string>("All time");
 
-  const mappedPeriod = {
-    Today: "today",
-    "This Week": "week",
-    "This Month": "month",
-    "All time": "all",
-  }[period] || "all";
+  const safeSlug = (slug || "").trim();
+  const mappedPeriod = PERIOD_MAP[period] || "all";
 
   return (
     <>
@@ -35,11 +35,11 @@ export default function TaskDetailClient({ slug, initialPapers }: Props) {
 
       <PaperList
         filterParams={{
-          task: slug,
+          task: safeSlug,
           sort,
         }}
         period={mappedPeriod}
-        initialPapers={sort === "popular" && period === "All time" ? initialPapers : null}
+        initialPapers={sort === "popular" && period === "All time" ? initialPapers ?? null : null}
       />
     </>
   );
