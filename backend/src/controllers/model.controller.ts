@@ -3,20 +3,25 @@ import * as modelService from '../services/model.service.js';
 import { QueryRouter } from '../routing/index.js';
 import { redisManager } from '../lib/redis.js';
 
-const memoryCache = new Map<string, { data: any; timestamp: number }>();
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const memoryCache = new Map<string, CacheEntry<unknown>>();
 const MEMORY_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes TTL
 
-function getFromMemoryCache(key: string): any | null {
+function getFromMemoryCache<T>(key: string): T | null {
   const item = memoryCache.get(key);
   if (!item) return null;
   if (Date.now() - item.timestamp > MEMORY_CACHE_TTL_MS) {
     memoryCache.delete(key);
     return null;
   }
-  return item.data;
+  return item.data as T;
 }
 
-function setToMemoryCache(key: string, data: any) {
+function setToMemoryCache<T>(key: string, data: T): void {
   memoryCache.set(key, { data, timestamp: Date.now() });
   if (memoryCache.size > 3000) {
     const firstKey = memoryCache.keys().next().value;
@@ -24,11 +29,26 @@ function setToMemoryCache(key: string, data: any) {
   }
 }
 
+function parseRedisCachedData<T>(cached: unknown): T | null {
+  if (!cached) return null;
+  if (typeof cached === 'string') {
+    try {
+      return JSON.parse(cached) as T;
+    } catch {
+      return null;
+    }
+  }
+  return cached as T;
+}
+
 export const getModels = async (c: Context) => {
   const queryRouter = c.var.queryRouter as QueryRouter;
 
-  const limit = Number(c.req.query('limit')) || 50;
-  const skip = Number(c.req.query('skip')) || 0;
+  const rawLimit = Number(c.req.query('limit'));
+  const rawSkip = Number(c.req.query('skip'));
+
+  const limit = !isNaN(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 10000) : 50;
+  const skip = !isNaN(rawSkip) && rawSkip >= 0 ? rawSkip : 0;
   const sort = c.req.query('sort') || 'name';
 
   const vendor = c.req.query('vendor');
@@ -62,17 +82,18 @@ export const getModels = async (c: Context) => {
     }
 
     const redis = redisManager.getClient();
-    let cached = null;
+    let redisRaw = null;
 
     try {
-      cached = await redis.get(cacheKey);
+      redisRaw = await redis.get(cacheKey);
     } catch (err) {
       console.error('Redis GET failed:', err);
     }
 
-    if (cached) {
-      setToMemoryCache(cacheKey, cached);
-      return c.json(cached as any, 200);
+    const parsedRedis = parseRedisCachedData(redisRaw);
+    if (parsedRedis) {
+      setToMemoryCache(cacheKey, parsedRedis);
+      return c.json(parsedRedis, 200);
     }
 
     const models = await modelService.getModels(
@@ -87,7 +108,7 @@ export const getModels = async (c: Context) => {
       modelFamily,
       category,
       capability,
-      researchArea,
+      researchArea
     );
 
     const response = {
@@ -105,15 +126,16 @@ export const getModels = async (c: Context) => {
     }
 
     return c.json(response, 200);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     console.error('Error in getModels controller:', error);
 
     return c.json(
       {
         status: 'error',
-        detail: error.message,
+        detail: errorMessage,
       },
-      500,
+      500
     );
   }
 };
@@ -129,17 +151,18 @@ export const getModelFacets = async (c: Context) => {
     }
 
     const redis = redisManager.getClient();
-    let cached = null;
+    let redisRaw = null;
 
     try {
-      cached = await redis.get(cacheKey);
+      redisRaw = await redis.get(cacheKey);
     } catch (err) {
       console.error('Redis GET failed:', err);
     }
 
-    if (cached) {
-      setToMemoryCache(cacheKey, cached);
-      return c.json(cached as any, 200);
+    const parsedRedis = parseRedisCachedData(redisRaw);
+    if (parsedRedis) {
+      setToMemoryCache(cacheKey, parsedRedis);
+      return c.json(parsedRedis, 200);
     }
 
     const facets = await modelService.getModelFacets(queryRouter);
@@ -158,22 +181,34 @@ export const getModelFacets = async (c: Context) => {
     }
 
     return c.json(response, 200);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     console.error('Error in getModelFacets controller:', error);
 
     return c.json(
       {
         status: 'error',
-        detail: error.message,
+        detail: errorMessage,
       },
-      500,
+      500
     );
   }
 };
 
 export const getModelBySlug = async (c: Context) => {
   const queryRouter = c.var.queryRouter as QueryRouter;
-  const slug = c.req.param('slug') as string;
+  const rawSlug = c.req.param('slug') as string;
+  const slug = rawSlug ? decodeURIComponent(rawSlug).toLowerCase().trim() : '';
+
+  if (!slug) {
+    return c.json(
+      {
+        status: 'error',
+        message: 'Invalid or missing slug parameter',
+      },
+      400
+    );
+  }
 
   const cacheKey = `model:${slug}`;
 
@@ -184,17 +219,18 @@ export const getModelBySlug = async (c: Context) => {
     }
 
     const redis = redisManager.getClient();
-    let cached = null;
+    let redisRaw = null;
 
     try {
-      cached = await redis.get(cacheKey);
+      redisRaw = await redis.get(cacheKey);
     } catch (err) {
       console.error('Redis GET failed:', err);
     }
 
-    if (cached) {
-      setToMemoryCache(cacheKey, cached);
-      return c.json(cached as any, 200);
+    const parsedRedis = parseRedisCachedData(redisRaw);
+    if (parsedRedis) {
+      setToMemoryCache(cacheKey, parsedRedis);
+      return c.json(parsedRedis, 200);
     }
 
     const model = await modelService.getModelBySlug(queryRouter, slug);
@@ -205,7 +241,7 @@ export const getModelBySlug = async (c: Context) => {
           status: 'error',
           message: 'Model not found',
         },
-        404,
+        404
       );
     }
 
@@ -223,13 +259,16 @@ export const getModelBySlug = async (c: Context) => {
     }
 
     return c.json(response, 200);
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    console.error('Error in getModelBySlug controller:', error);
+
     return c.json(
       {
         status: 'error',
-        detail: error.message,
+        detail: errorMessage,
       },
-      500,
+      500
     );
   }
 };
