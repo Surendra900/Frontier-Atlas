@@ -9,19 +9,23 @@ export interface ModelData {
   comments: string;
 }
 
-export interface ModelsResponse {
-  status?: string;
-  data: {
-    models: ModelData[];
-  };
+export interface GetDiscussionsResponse {
+  status: string;
+  count?: number;
+  data: ModelData[];
 }
 
 export async function getModels(): Promise<ModelData[]> {
-  const response = await fetchApi<{
-  status: string;
-  count: number;
-  data: ModelData[];
-}>("/api/v1/discussions");
-
-  return response.data;
+  try {
+    const response = await fetchApi<GetDiscussionsResponse>('/api/v1/discussions');
+    
+    if (Array.isArray(response?.data)) {
+      return response.data;
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Failed to fetch model discussions:', error);
+    return [];
+  }
 }

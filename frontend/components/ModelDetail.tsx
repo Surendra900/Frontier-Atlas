@@ -12,12 +12,23 @@ import Link from "next/link";
 import { useState, type ReactNode } from "react";
 import type { ModelDetail as ModelDetailType } from "@/lib/models";
 
-
-function formatCompact(value: number) {
+function formatCompact(value: number | undefined | null) {
+  const safeVal = typeof value === "number" && !isNaN(value) ? value : 0;
   return new Intl.NumberFormat("en-US", {
-    notation: value >= 1000 ? "compact" : "standard",
-    maximumFractionDigits: value >= 1000 ? 1 : 0,
-  }).format(value);
+    notation: safeVal >= 1000 ? "compact" : "standard",
+    maximumFractionDigits: safeVal >= 1000 ? 1 : 0,
+  }).format(safeVal);
+}
+
+function formatDate(dateString: string | null | undefined): string {
+  if (!dateString) return "N/A";
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return "N/A";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 }
 
 export default function ModelDetail({
@@ -28,27 +39,30 @@ export default function ModelDetail({
   children?: ReactNode;
 }) {
   const [copied, setCopied] = useState(false);
-  const createdDate = new Date(model.createdAt);
+  const createdDateLabel = formatDate(model?.createdAt);
+  const paperCount = model?.paperCount ?? 0;
 
   const handleCopyLink = async () => {
+    if (typeof window === "undefined") return;
     try {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // ignore
+      // Ignore copy errors gracefully
     }
   };
 
   const handleShare = async () => {
+    if (typeof window === "undefined") return;
     if (navigator.share) {
       try {
         await navigator.share({
-          title: model.name,
+          title: model?.name || "Model Detail",
           url: window.location.href,
         });
       } catch {
-        // ignore
+        // Ignore share errors gracefully
       }
     } else {
       handleCopyLink();
@@ -68,7 +82,7 @@ export default function ModelDetail({
           </Link>
           <span>/</span>
           <span className="text-[#555555] font-medium truncate max-w-[200px]">
-            {model.name}
+            {model?.name || "Detail"}
           </span>
         </nav>
 
@@ -77,29 +91,27 @@ export default function ModelDetail({
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-[28px] md:text-[32px] font-bold tracking-tight">
-                  {model.name}
+                  {model?.name || "Unnamed Model"}
                 </h1>
               </div>
-              <span className="inline-block ds-chip text-[11px] mb-3">
-                {model.slug}
-              </span>
+              {model?.slug && (
+                <span className="inline-block ds-chip text-[11px] mb-3">
+                  {model.slug}
+                </span>
+              )}
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[14px] text-[#555555]">
                 <span className="flex items-center gap-2">
                   <FileText size={16} className="text-[#8B8B8B]" />
                   <span>
                     <strong className="font-semibold text-[#111111]">
-                      {model.paperCount}
+                      {paperCount}
                     </strong>{" "}
-                    {model.paperCount === 1 ? "paper" : "papers"}
+                    {paperCount === 1 ? "paper" : "papers"}
                   </span>
                 </span>
                 <span className="flex items-center gap-1.5">
                   <Calendar size={16} className="text-[#8B8B8B]" />
-                  {createdDate.toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "numeric",
-                    year: "numeric",
-                  })}
+                  {createdDateLabel}
                 </span>
               </div>
 
@@ -109,7 +121,7 @@ export default function ModelDetail({
                     Linked Papers
                   </div>
                   <div className="text-[18px] font-semibold text-[#111111] leading-none">
-                    {formatCompact(model.paperCount)}
+                    {formatCompact(paperCount)}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-[#EAE6DE] bg-white px-4 py-3">
@@ -117,7 +129,7 @@ export default function ModelDetail({
                     Citations
                   </div>
                   <div className="text-[18px] font-semibold text-[#111111] leading-none">
-                    {formatCompact(model.citationCount)}
+                    {formatCompact(model?.citationCount)}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-[#EAE6DE] bg-white px-4 py-3">
@@ -125,7 +137,7 @@ export default function ModelDetail({
                     GitHub Stars
                   </div>
                   <div className="text-[18px] font-semibold text-[#111111] leading-none">
-                    {formatCompact(model.githubStars)}
+                    {formatCompact(model?.githubStars)}
                   </div>
                 </div>
               </div>
