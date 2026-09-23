@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback } from "react";
+import type { LucideIcon } from "lucide-react";
 import { Mic } from "lucide-react";
 import {
   SlidersHorizontal,
@@ -95,15 +96,14 @@ import { fetchMethodCached } from "@/lib/methodCache";
 
 export interface MethodCardData {
   id: string;
-  name: string;
+  name?: string;
   slug?: string;
   description?: string;
   paperCount?: number;
   year?: number;
 }
 
-
-const iconMap: Record<string, any> = {
+const iconMap: Record<string, LucideIcon> = {
   // Core AI
   general: Brain,
   language: Languages,
@@ -145,16 +145,16 @@ const iconMap: Record<string, any> = {
   "diffusion architectures": Sparkles,
 
   // Neural Components
-attention: BrainCircuit,
-embeddings: Database,
-"positional encoding": Activity,
-"feedforward networks": Network,
-"activation functions": Zap,
-normalization: CircleDot,
-"residual connections": GitBranch,
-pooling: Boxes,
-convolution: Scan,
-tokenization: FileText,
+  attention: BrainCircuit,
+  embeddings: Database,
+  "positional encoding": Activity,
+  "feedforward networks": Network,
+  "activation functions": Zap,
+  normalization: CircleDot,
+  "residual connections": GitBranch,
+  pooling: Boxes,
+  convolution: Scan,
+  tokenization: FileText,
 
   // Training
   "pre-training": BookOpen,
@@ -205,12 +205,12 @@ tokenization: FileText,
   "knowledge graphs": Network,
 
   // Adaptation
-lora: SlidersHorizontal,
-qlora: SlidersHorizontal,
-peft: Wrench,
-"prompt tuning": MessageSquare,
-"prefix tuning": Pilcrow,
-"adapter tuning": Plug,
+  lora: SlidersHorizontal,
+  qlora: SlidersHorizontal,
+  peft: Wrench,
+  "prompt tuning": MessageSquare,
+  "prefix tuning": Pilcrow,
+  "adapter tuning": Plug,
 
   // Optimization
   optimizers: TrendingUp,
@@ -236,23 +236,23 @@ peft: Wrench,
   "inference optimization": TrendingUp,
 
   // Reinforcement Learning
-"value-based rl": Trophy,
-"policy optimization": Target,
-"model-based rl": Map,
-"offline rl": Archive,
-"online rl": Wifi,
+  "value-based rl": Trophy,
+  "policy optimization": Target,
+  "model-based rl": Map,
+  "offline rl": Archive,
+  "online rl": Wifi,
 
-// Representation Learning
-"contrastive learning": GitCompareArrows,
-"metric learning": Ruler,
-"embedding learning": Database,
-"feature learning": ScanSearch,
+  // Representation Learning
+  "contrastive learning": GitCompareArrows,
+  "metric learning": Ruler,
+  "embedding learning": Database,
+  "feature learning": ScanSearch,
 
-// Diffusion
-"diffusion models": Wind,
-"flow matching": Waves,
-"score-based models": Sigma,
-"consistency models": Rocket,
+  // Diffusion
+  "diffusion models": Wind,
+  "flow matching": Waves,
+  "score-based models": Sigma,
+  "consistency models": Rocket,
 
   // Vision
   "object detection": Target,
@@ -264,12 +264,12 @@ peft: Wrench,
   "3d vision": Cuboid,
 
   // Language
-"language modeling": BrainCircuit,
-"machine translation": Languages,
-"text generation": PenTool,
-summarization: FileText,
-"question answering": MessageCircleQuestion,
-"information extraction": ScanSearch,
+  "language modeling": BrainCircuit,
+  "machine translation": Languages,
+  "text generation": PenTool,
+  summarization: FileText,
+  "question answering": MessageCircleQuestion,
+  "information extraction": ScanSearch,
 
   // Audio
   "speech recognition": Volume2,
@@ -279,42 +279,42 @@ summarization: FileText,
   "music generation": Activity,
 
   // Video
-"video understanding": Video,
-"video generation": Clapperboard,
-"video segmentation": Scissors,
-"video retrieval": SearchCheck,
+  "video understanding": Video,
+  "video generation": Clapperboard,
+  "video segmentation": Scissors,
+  "video retrieval": SearchCheck,
 
-// Robotics
-"motion planning": Route,
-manipulation: Hand,
-navigation: Compass,
-"policy learning": Bot,
+  // Robotics
+  "motion planning": Route,
+  manipulation: Hand,
+  navigation: Compass,
+  "policy learning": Bot,
 
-// 3D
-nerf: Cuboid,
-"gaussian splatting": Sparkles,
-slam: MapPinned,
-"point clouds": Dot,
+  // 3D
+  nerf: Cuboid,
+  "gaussian splatting": Sparkles,
+  slam: MapPinned,
+  "point clouds": Dot,
 
-// Mathematics
-"optimization theory": Sigma,
-probability: Dice5,
-statistics: BarChart3,
-"loss functions": Target,
-"linear algebra": Grid2x2,
+  // Mathematics
+  "optimization theory": Sigma,
+  probability: Dice5,
+  statistics: BarChart3,
+  "loss functions": Target,
+  "linear algebra": Grid2x2,
 
-// Evaluation
-metrics: BarChart3,
-"human evaluation": Users,
-"llm-as-a-judge": Scale,
-"preference evaluation": HeartHandshake,
-benchmarking: Gauge,
+  // Evaluation
+  metrics: BarChart3,
+  "human evaluation": Users,
+  "llm-as-a-judge": Scale,
+  "preference evaluation": HeartHandshake,
+  benchmarking: Gauge,
 
-// Interpretability
-"mechanistic interpretability": BrainCircuit,
-attribution: Fingerprint,
-probing: Microscope,
-explainability: Lightbulb,
+  // Interpretability
+  "mechanistic interpretability": BrainCircuit,
+  attribution: Fingerprint,
+  probing: Microscope,
+  explainability: Lightbulb,
 
   // Safety
   hallucination: Brain,
@@ -338,12 +338,12 @@ explainability: Lightbulb,
   accelerators: Zap,
 
   // Research Concepts
-"scaling laws": TrendingUp,
-emergence: Sparkles,
-"in-context learning": BookOpen,
-"test-time compute": Cpu,
-"context engineering": Workflow,
-"foundation models": Layers3,
+  "scaling laws": TrendingUp,
+  emergence: Sparkles,
+  "in-context learning": BookOpen,
+  "test-time compute": Cpu,
+  "context engineering": Workflow,
+  "foundation models": Layers3,
 };
 
 const colorMap: Record<string, string> = {
@@ -388,16 +388,16 @@ const colorMap: Record<string, string> = {
   "diffusion architectures": "#EC4899",
 
   // Neural Components
-attention: "#7C3AED",
-embeddings: "#0891B2",
-"positional encoding": "#6366F1",
-"feedforward networks": "#2563EB",
-"activation functions": "#F97316",
-normalization: "#14B8A6",
-"residual connections": "#EC4899",
-pooling: "#0EA5E9",
-convolution: "#16A34A",
-tokenization: "#DC2626",
+  attention: "#7C3AED",
+  embeddings: "#0891B2",
+  "positional encoding": "#6366F1",
+  "feedforward networks": "#2563EB",
+  "activation functions": "#F97316",
+  normalization: "#14B8A6",
+  "residual connections": "#EC4899",
+  pooling: "#0EA5E9",
+  convolution: "#16A34A",
+  tokenization: "#DC2626",
 
   // Training
   "pre-training": "#0F766E",
@@ -448,12 +448,12 @@ tokenization: "#DC2626",
   "knowledge graphs": "#6366F1",
 
   // Adaptation
-lora: "#8B5CF6",            // Violet
-qlora: "#3B82F6",           // Blue
-peft: "#0EA5E9",            // Sky
-"prompt tuning": "#F97316", // Orange
-"prefix tuning": "#14B8A6", // Teal
-"adapter tuning": "#EC4899", // Pink
+  lora: "#8B5CF6",
+  qlora: "#3B82F6",
+  peft: "#0EA5E9",
+  "prompt tuning": "#F97316",
+  "prefix tuning": "#14B8A6",
+  "adapter tuning": "#EC4899",
 
   // Optimization
   optimizers: "#F97316",
@@ -478,100 +478,101 @@ peft: "#0EA5E9",            // Sky
   "music generation": "#8B5CF6",
 
   // Video
-"video understanding": "#2563EB", // Blue
-"video generation": "#EC4899",    // Pink
-"video segmentation": "#F97316",  // Orange
-"video retrieval": "#16A34A",     // Green
+  "video understanding": "#2563EB",
+  "video generation": "#EC4899",
+  "video segmentation": "#F97316",
+  "video retrieval": "#16A34A",
 
-// Robotics
-"motion planning": "#2563EB",  // Blue
-manipulation: "#F97316",       // Orange
-navigation: "#16A34A",         // Green
-"policy learning": "#8B5CF6",  // Purple
+  // Robotics
+  "motion planning": "#2563EB",
+  manipulation: "#F97316",
+  navigation: "#16A34A",
+  "policy learning": "#8B5CF6",
 
-// 3D
-nerf: "#6366F1",                // Indigo
-"gaussian splatting": "#EC4899",// Pink
-slam: "#2563EB",                // Blue
-"point clouds": "#84CC16",      // Lime
-// Mathematics
-"optimization theory": "#2563EB", // Blue
-probability: "#16A34A",           // Green
-statistics: "#F97316",            // Orange
-"loss functions": "#EC4899",      // Pink
-"linear algebra": "#7C3AED",      // Purple
+  // 3D
+  nerf: "#6366F1",
+  "gaussian splatting": "#EC4899",
+  slam: "#2563EB",
+  "point clouds": "#84CC16",
 
-// Evaluation
-metrics: "#2563EB",               // Blue
-"human evaluation": "#F97316",    // Orange
-"llm-as-a-judge": "#8B5CF6",       // Violet
-"preference evaluation": "#EC4899",// Pink
-benchmarking: "#16A34A",          // Green
+  // Mathematics
+  "optimization theory": "#2563EB",
+  probability: "#16A34A",
+  statistics: "#F97316",
+  "loss functions": "#EC4899",
+  "linear algebra": "#7C3AED",
 
-// Interpretability
-"mechanistic interpretability": "#7C3AED", // Purple
-attribution: "#F97316",                   // Orange
-probing: "#2563EB",                       // Blue
-explainability: "#F59E0B",                // Amber
+  // Evaluation
+  metrics: "#2563EB",
+  "human evaluation": "#F97316",
+  "llm-as-a-judge": "#8B5CF6",
+  "preference evaluation": "#EC4899",
+  benchmarking: "#16A34A",
+
+  // Interpretability
+  "mechanistic interpretability": "#7C3AED",
+  attribution: "#F97316",
+  probing: "#2563EB",
+  explainability: "#F59E0B",
 
   // Efficiency
-quantization: "#2563EB",           // Blue
-pruning: "#F97316",                // Orange
-sparsity: "#7C3AED",               // Purple
-"speculative decoding": "#EC4899", // Pink
-"kv cache": "#16A34A",             // Green
-pagedattention: "#0891B2",         // Cyan
-"flashattention 2": "#EAB308",     // Amber
-"model compression": "#9333EA",    // Violet
-"inference optimization": "#DC2626", // Red
+  quantization: "#2563EB",
+  pruning: "#F97316",
+  sparsity: "#7C3AED",
+  "speculative decoding": "#EC4899",
+  "kv cache": "#16A34A",
+  pagedattention: "#0891B2",
+  "flashattention 2": "#EAB308",
+  "model compression": "#9333EA",
+  "inference optimization": "#DC2626",
 
-// Reinforcement Learning
-"value-based rl": "#2563EB",      // Blue
-"policy optimization": "#F97316", // Orange
-"model-based rl": "#16A34A",      // Green
-"offline rl": "#7C3AED",          // Purple
-"online rl": "#EC4899",           // Pink
+  // Reinforcement Learning
+  "value-based rl": "#2563EB",
+  "policy optimization": "#F97316",
+  "model-based rl": "#16A34A",
+  "offline rl": "#7C3AED",
+  "online rl": "#EC4899",
 
-// Representation Learning
-"contrastive learning": "#2563EB", // Blue
-"metric learning": "#F97316",      // Orange
-"embedding learning": "#14B8A6",   // Teal
-"feature learning": "#7C3AED",     // Purple
+  // Representation Learning
+  "contrastive learning": "#2563EB",
+  "metric learning": "#F97316",
+  "embedding learning": "#14B8A6",
+  "feature learning": "#7C3AED",
 
-// Diffusion
-"diffusion models": "#EC4899",   // Pink
-"flow matching": "#06B6D4",      // Cyan
-"score-based models": "#8B5CF6", // Violet
-"consistency models": "#F59E0B", // Amber
+  // Diffusion
+  "diffusion models": "#EC4899",
+  "flow matching": "#06B6D4",
+  "score-based models": "#8B5CF6",
+  "consistency models": "#F59E0B",
 
-// Safety
-hallucination: "#EF4444",         // Red
-watermarking: "#0EA5E9",          // Sky
-"alignment safety": "#8B5CF6",    // Violet
-"jailbreak defense": "#F97316",   // Orange
-robustness: "#16A34A",            // Green
-privacy: "#EC4899",               // Pink
+  // Safety
+  hallucination: "#EF4444",
+  watermarking: "#0EA5E9",
+  "alignment safety": "#8B5CF6",
+  "jailbreak defense": "#F97316",
+  robustness: "#16A34A",
+  privacy: "#EC4899",
 
-// Systems
-"distributed training": "#2563EB", // Blue
-parallelism: "#14B8A6",            // Teal
-serving: "#F97316",                // Orange
-"inference systems": "#8B5CF6",    // Violet
-"memory optimization": "#16A34A",  // Green
+  // Systems
+  "distributed training": "#2563EB",
+  parallelism: "#14B8A6",
+  serving: "#F97316",
+  "inference systems": "#8B5CF6",
+  "memory optimization": "#16A34A",
 
-// Hardware
-gpus: "#16A34A",                  // Green
-tpus: "#2563EB",                  // Blue
-npus: "#8B5CF6",                  // Violet
-accelerators: "#F97316",          // Orange
+  // Hardware
+  gpus: "#16A34A",
+  tpus: "#2563EB",
+  npus: "#8B5CF6",
+  accelerators: "#F97316",
 
-// Research Concepts
-"scaling laws": "#2563EB",        // Blue
-emergence: "#EC4899",             // Pink
-"in-context learning": "#16A34A", // Green
-"test-time compute": "#F97316",   // Orange
-"context engineering": "#14B8A6", // Teal       
-"foundation models": "#DC2626",   // Red
+  // Research Concepts
+  "scaling laws": "#2563EB",
+  emergence: "#EC4899",
+  "in-context learning": "#16A34A",
+  "test-time compute": "#F97316",
+  "context engineering": "#14B8A6",
+  "foundation models": "#DC2626",
 };
 
 export default function MethodCard({
@@ -582,59 +583,64 @@ export default function MethodCard({
   accentColor?: string;
 }) {
   const router = useRouter();
-  const paperCount = method.paperCount || 0;
+  const rawPaperCount = Number(method.paperCount);
+  const paperCount = !isNaN(rawPaperCount) && rawPaperCount > 0 ? rawPaperCount : 0;
   const slug = method.slug ?? method.id;
 
   const handlePrefetch = useCallback(() => {
     if (slug) {
-      router.prefetch(`/methods/${slug}`);
+      const encodedSlug = encodeURIComponent(slug);
+      router.prefetch(`/methods/${encodedSlug}`);
       fetchMethodCached(slug).catch(() => {});
     }
   }, [router, slug]);
 
-  const Icon =
-    iconMap[method.name.toLowerCase()] ||
-    iconMap[method.slug?.replace(/-/g, " ").toLowerCase() || ""] ||
-    Brain;
+  const methodName = method.name ?? "Unnamed Method";
+  const nameKey = methodName.toLowerCase();
+  const slugKey = (method.slug || "").replace(/-/g, " ").toLowerCase();
+
+  const Icon = iconMap[nameKey] || iconMap[slugKey] || Brain;
   const iconColor =
-    colorMap[method.name.toLowerCase()] ||
-    colorMap[method.slug?.replace(/-/g, " ").toLowerCase() || ""] ||
+    colorMap[nameKey] ||
+    colorMap[slugKey] ||
     accentColor ||
     "#2563EB";
+
+  const href = `/methods/${encodeURIComponent(slug)}`;
+
   return (
     <Link
-      href={`/methods/${slug}`}
+      href={href}
       onMouseEnter={handlePrefetch}
       onTouchStart={handlePrefetch}
       onFocus={handlePrefetch}
       className="bg-white rounded-md border border-[#ECECEC] p-5 min-h-[150px] flex flex-col hover:shadow-md transition-shadow duration-200 group no-underline"
     >
-    <div className="flex items-start gap-4">
-      <div className="flex items-center justify-center transition-transform duration-200 group-hover:scale-125">
-  <Icon
-    size={22}
-    strokeWidth={2.2}
-    style={{ color: iconColor }}
-  />
-</div>
+      <div className="flex items-start gap-4">
+        <div className="flex items-center justify-center transition-transform duration-200 group-hover:scale-125">
+          <Icon
+            size={22}
+            strokeWidth={2.2}
+            style={{ color: iconColor }}
+          />
+        </div>
 
-      <h3 className="text-[#111111] text-[15px] font-medium leading-5">
-        {method.name}
-      </h3>
-    </div>
+        <h3 className="text-[#111111] text-[15px] font-medium leading-5">
+          {methodName}
+        </h3>
+      </div>
 
-    <p className="mt-3 text-[13px] leading-5 text-[#666] line-clamp-3">
-  {method.description}
-</p>
+      <p className="mt-3 text-[13px] leading-5 text-[#666] line-clamp-3">
+        {method.description || ""}
+      </p>
 
-    <div className="mt-auto pt-5">
-  {paperCount > 0 && (
-    <span className="inline-flex items-center rounded-full border border-[#D9D9D9] bg-white px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#666666]">
-  {paperCount.toLocaleString()} papers
-</span>
-  )}
-</div>
-  </Link>
-  
-);
+      <div className="mt-auto pt-5">
+        {paperCount > 0 && (
+          <span className="inline-flex items-center rounded-full border border-[#D9D9D9] bg-white px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-[#666666]">
+            {paperCount.toLocaleString()} papers
+          </span>
+        )}
+      </div>
+    </Link>
+  );
 }

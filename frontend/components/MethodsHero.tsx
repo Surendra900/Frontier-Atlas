@@ -2,24 +2,35 @@
 
 import * as React from "react";
 
-export function MethodsHero({ taxonomy = [] }: { taxonomy?: any[] }) {
-  const totalMethods = taxonomy.reduce(
-    (sum, category) => sum + category.methods.length,
-    0
-  );
+export interface TaxonomyCategory {
+  name?: string;
+  methods?: Array<{
+    id?: string;
+    name?: string;
+    slug?: string;
+    paperCount?: number;
+  }>;
+}
 
-  const totalCategories = taxonomy.length;
+export function MethodsHero({ taxonomy = [] }: { taxonomy?: TaxonomyCategory[] }) {
+  const safeTaxonomy = Array.isArray(taxonomy) ? taxonomy : [];
 
-  const totalPapers = taxonomy.reduce(
-    (sum, category) =>
-      sum +
-      category.methods.reduce(
-        (methodSum: number, method: any) =>
-          methodSum + (method.paperCount || 0),
-        0
-      ),
-    0
-  );
+  const totalCategories = safeTaxonomy.length;
+
+  const totalMethods = safeTaxonomy.reduce((sum, category) => {
+    const methods = Array.isArray(category?.methods) ? category.methods : [];
+    return sum + methods.length;
+  }, 0);
+
+  const totalPapers = safeTaxonomy.reduce((sum, category) => {
+    const methods = Array.isArray(category?.methods) ? category.methods : [];
+    const categoryPaperSum = methods.reduce((methodSum, method) => {
+      const rawCount = Number(method?.paperCount);
+      const count = !isNaN(rawCount) && rawCount > 0 ? rawCount : 0;
+      return methodSum + count;
+    }, 0);
+    return sum + categoryPaperSum;
+  }, 0);
 
   return (
     <section className="mb-12">
@@ -36,7 +47,7 @@ export function MethodsHero({ taxonomy = [] }: { taxonomy?: any[] }) {
         <div className="flex items-start gap-10 mt-5">
           <div>
             <div className="text-[20px] font-bold text-[#111111]">
-              {totalCategories}
+              {totalCategories.toLocaleString()}
             </div>
             <div className="mt-1 text-[14px] text-[#6B7280]">
               Categories
@@ -45,7 +56,7 @@ export function MethodsHero({ taxonomy = [] }: { taxonomy?: any[] }) {
 
           <div>
             <div className="text-[20px] font-bold text-[#111111]">
-              {totalMethods}
+              {totalMethods.toLocaleString()}
             </div>
             <div className="mt-1 text-[14px] text-[#6B7280]">
               Methods
