@@ -1,6 +1,55 @@
 import { QueryRouter } from "../routing/index.js";
 import { QueryIntent, QueryType } from "../routing/types.js";
 
+interface PaperRef {
+  id: string;
+  citationCount: number;
+  githubStars: number;
+}
+
+interface RelationItem {
+  paper: PaperRef;
+}
+
+interface ModelRecord {
+  id: string;
+  name: string;
+  slug: string;
+  vendor: string;
+  vendor_logo_url?: string | null;
+  releaseDate?: Date | string | null;
+  parameterCount?: string | null;
+  modality?: string | null;
+  accessType?: string | null;
+  opennessType?: string | null;
+  description?: string | null;
+  benchmark_score?: Record<string, unknown> | null;
+  modelFamily?: string | null;
+  model_family?: string | null;
+  category?: string | null;
+  capabilities?: string[] | null;
+  researchAreas?: string[] | null;
+  research_areas?: string[] | null;
+  architecture?: string | null;
+  contextWindow?: string | null;
+  context_window?: string | null;
+  license?: string | null;
+  modelVersions?: string[] | null;
+  model_versions?: string[] | null;
+  releaseNotes?: string | null;
+  release_notes?: string | null;
+  paperUrl?: string | null;
+  paper_url?: string | null;
+  repositoryUrl?: string | null;
+  repository_url?: string | null;
+  apiUrl?: string | null;
+  api_url?: string | null;
+  trendingScore?: number | null;
+  createdAt: Date | string;
+  _count: { papers: number };
+  papers?: RelationItem[];
+}
+
 export const getModels = async (
   queryRouter: QueryRouter,
   limit: number = 50,
@@ -13,7 +62,7 @@ export const getModels = async (
   modelFamily?: string,
   category?: string,
   capability?: string,
-  researchArea?: string,
+  researchArea?: string
 ) => {
   const intent: QueryIntent = {
     type: QueryType.READ,
@@ -22,85 +71,83 @@ export const getModels = async (
   };
 
   const isTrending = sort === "trending";
-  const needsFullSort =
-    isTrending || sort === "benchmark" || sort === "papers";
+  const needsFullSort = isTrending || sort === "benchmark" || sort === "papers";
 
   const routingResult = await queryRouter.routeQuery(intent, async (prisma) => {
     return prisma.model.findMany({
       where: {
         ...(vendor
           ? {
-            vendor: {
-              equals: vendor,
-              mode: "insensitive",
-            },
-          }
+              vendor: {
+                equals: vendor,
+                mode: "insensitive",
+              },
+            }
           : {}),
         ...(modality
           ? {
-            modality: {
-              equals: modality,
-              mode: "insensitive",
-            },
-          }
+              modality: {
+                equals: modality,
+                mode: "insensitive",
+              },
+            }
           : {}),
         ...(accessType
           ? {
-            accessType: {
-              equals: accessType,
-              mode: "insensitive",
-            },
-          }
+              accessType: {
+                equals: accessType,
+                mode: "insensitive",
+              },
+            }
           : {}),
         ...(opennessType
           ? {
-            opennessType: {
-              equals: opennessType,
-              mode: "insensitive",
-            },
-          }
+              opennessType: {
+                equals: opennessType,
+                mode: "insensitive",
+              },
+            }
           : {}),
         ...(modelFamily
           ? {
-            OR: [
-              {
-                modelFamily: {
-                  equals: modelFamily,
-                  mode: "insensitive",
+              OR: [
+                {
+                  modelFamily: {
+                    equals: modelFamily,
+                    mode: "insensitive",
+                  },
                 },
-              },
-              {
-                model_family: {
-                  equals: modelFamily,
-                  mode: "insensitive",
+                {
+                  model_family: {
+                    equals: modelFamily,
+                    mode: "insensitive",
+                  },
                 },
-              },
-            ],
-          }
+              ],
+            }
           : {}),
         ...(category
           ? {
-            category: {
-              equals: category,
-              mode: "insensitive",
-            },
-          }
+              category: {
+                equals: category,
+                mode: "insensitive",
+              },
+            }
           : {}),
         ...(capability
           ? {
-            capabilities: {
-              array_contains: [capability],
-            },
-          }
+              capabilities: {
+                array_contains: [capability],
+              },
+            }
           : {}),
         ...(researchArea
           ? {
-            researchAreas: {
-              array_contains: [researchArea],
-            },
-          }
+              researchAreas: {
+                array_contains: [researchArea],
+              },
+            }
           : {}),
-
       },
       take: needsFullSort ? 200 : limit,
       skip: needsFullSort ? 0 : skip,
@@ -150,33 +197,33 @@ export const getModels = async (
         },
         papers: isTrending
           ? {
-            take: 100,
-            select: {
-              paper: {
-                select: {
-                  id: true,
-                  citationCount: true,
-                  githubStars: true,
+              take: 100,
+              select: {
+                paper: {
+                  select: {
+                    id: true,
+                    citationCount: true,
+                    githubStars: true,
+                  },
                 },
               },
-            },
-          }
+            }
           : false,
       },
     });
   });
 
-  const modelsById = new Map<string, any>();
+  const modelsById = new Map<string, ModelRecord>();
 
   for (const result of routingResult.results) {
-    for (const model of result) {
+    if (!Array.isArray(result)) continue;
+    for (const model of result as ModelRecord[]) {
       if (!modelsById.has(model.id)) {
         modelsById.set(model.id, model);
       } else {
         const existing = modelsById.get(model.id);
-
-        if (existing) {
-          existing._count.papers += model._count.papers;
+        if (existing && existing._count) {
+          existing._count.papers += model._count?.papers || 0;
         }
       }
     }
@@ -186,14 +233,14 @@ export const getModels = async (
     let citationCount = 0;
     let githubStars = 0;
 
-    if (isTrending && model.papers) {
+    if (isTrending && Array.isArray(model.papers)) {
       const seenPaperIds = new Set<string>();
 
       for (const paperRelation of model.papers) {
-        const paper = paperRelation.paper;
+        const paper = paperRelation?.paper;
+        if (!paper || !paper.id) continue;
 
         if (seenPaperIds.has(paper.id)) continue;
-
         seenPaperIds.add(paper.id);
 
         citationCount += paper.citationCount || 0;
@@ -229,8 +276,8 @@ export const getModels = async (
       repositoryUrl: model.repositoryUrl ?? model.repository_url,
       apiUrl: model.apiUrl ?? model.api_url,
       createdAt: model.createdAt,
-      trendingScore: model.trendingScore,
-      paperCount: model._count.papers,
+      trendingScore: model.trendingScore ?? trendingScore,
+      paperCount: model._count?.papers || 0,
       citationCount: isTrending ? citationCount : undefined,
       githubStars: isTrending ? githubStars : undefined,
     };
@@ -238,14 +285,8 @@ export const getModels = async (
 
   models.sort((a, b) => {
     if (sort === "recent") {
-      const dateA = a.releaseDate
-        ? new Date(a.releaseDate).getTime()
-        : 0;
-
-      const dateB = b.releaseDate
-        ? new Date(b.releaseDate).getTime()
-        : 0;
-
+      const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+      const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
       return dateB - dateA;
     }
 
@@ -262,16 +303,10 @@ export const getModels = async (
     }
 
     if (sort === "benchmark") {
-      const scoreA =
-        typeof a.benchmarkScore?.mmlu === "number"
-          ? a.benchmarkScore.mmlu
-          : 0;
-
-      const scoreB =
-        typeof b.benchmarkScore?.mmlu === "number"
-          ? b.benchmarkScore.mmlu
-          : 0;
-
+      const benchmarkA = a.benchmarkScore as Record<string, number> | null;
+      const benchmarkB = b.benchmarkScore as Record<string, number> | null;
+      const scoreA = typeof benchmarkA?.mmlu === "number" ? benchmarkA.mmlu : 0;
+      const scoreB = typeof benchmarkB?.mmlu === "number" ? benchmarkB.mmlu : 0;
       return scoreB - scoreA;
     }
 
@@ -285,7 +320,7 @@ export const getModels = async (
 
 export const getModelBySlug = async (
   queryRouter: QueryRouter,
-  slug: string,
+  slug: string
 ) => {
   const intent: QueryIntent = {
     type: QueryType.READ,
@@ -450,33 +485,48 @@ export const getModelBySlug = async (
     ]);
   });
 
-  let baseModel: any = null;
+  let baseModel: ModelRecord | null = null;
   let paperCount = 0;
 
-  const allPapers: any[] = [];
-  const allModelPapers: any[] = [];
+  const allPapers: RelationItem[] = [];
+  const allModelPapers: Array<{
+    id: string;
+    citationCount: number;
+    githubStars: number;
+    tasks?: Array<{ task: { id: string; name: string; slug: string; color: string | null } }>;
+    methods?: Array<{ method: { id: string; name: string; slug: string; category: string } }>;
+    datasets?: Array<{ dataset: { id: string; name: string; slug: string } }>;
+    rankings?: Array<{ rank: number; benchmark: { id: string; name: string; slug: string } }>;
+  }> = [];
 
-  const relatedModelsById = new Map<string, any>();
+  const relatedModelsById = new Map<string, { id: string; name: string; slug: string; _count: { papers: number } }>();
 
   for (const result of routingResult.results) {
+    if (!Array.isArray(result)) continue;
     const [model, modelPapers, relatedModels] = result;
 
     if (model) {
-      paperCount += model._count.papers;
+      paperCount += model._count?.papers || 0;
 
       if (!baseModel) {
-        const { papers, ...rest } = model;
-        baseModel = { ...rest };
+        const { papers: _p, ...rest } = model;
+        baseModel = { ...rest, _count: model._count };
       }
 
-      allPapers.push(...model.papers);
+      if (Array.isArray(model.papers)) {
+        allPapers.push(...model.papers);
+      }
     }
 
-    allModelPapers.push(...modelPapers);
+    if (Array.isArray(modelPapers)) {
+      allModelPapers.push(...modelPapers);
+    }
 
-    for (const relatedModel of relatedModels) {
-      if (!relatedModelsById.has(relatedModel.id)) {
-        relatedModelsById.set(relatedModel.id, relatedModel);
+    if (Array.isArray(relatedModels)) {
+      for (const relatedModel of relatedModels) {
+        if (relatedModel && !relatedModelsById.has(relatedModel.id)) {
+          relatedModelsById.set(relatedModel.id, relatedModel);
+        }
       }
     }
   }
@@ -484,80 +534,83 @@ export const getModelBySlug = async (
   if (!baseModel) return null;
 
   const seenPaperIds = new Set<string>();
-  const dedupPapers = [];
+  const dedupPapers: RelationItem[] = [];
 
   for (const paperRelation of allPapers) {
-    if (!seenPaperIds.has(paperRelation.paper.id)) {
-      seenPaperIds.add(paperRelation.paper.id);
+    const paperId = paperRelation?.paper?.id;
+    if (paperId && !seenPaperIds.has(paperId)) {
+      seenPaperIds.add(paperId);
       dedupPapers.push(paperRelation);
     }
   }
 
   const seenModelPaperIds = new Set<string>();
 
-  const tasksBySlug = new Map<string, any>();
-  const methodsBySlug = new Map<string, any>();
-  const datasetsBySlug = new Map<string, any>();
-  const benchmarksBySlug = new Map<string, any>();
+  const tasksBySlug = new Map<string, unknown>();
+  const methodsBySlug = new Map<string, unknown>();
+  const datasetsBySlug = new Map<string, unknown>();
+  const benchmarksBySlug = new Map<string, unknown>();
 
   let citationCount = 0;
   let githubStars = 0;
 
   for (const paper of allModelPapers) {
-    if (seenModelPaperIds.has(paper.id)) continue;
+    if (!paper || !paper.id || seenModelPaperIds.has(paper.id)) continue;
 
     seenModelPaperIds.add(paper.id);
 
     citationCount += paper.citationCount || 0;
     githubStars += paper.githubStars || 0;
 
-    for (const taskRelation of paper.tasks) {
-      const task = taskRelation.task;
-
-      if (!tasksBySlug.has(task.slug)) {
-        tasksBySlug.set(task.slug, task);
+    if (Array.isArray(paper.tasks)) {
+      for (const taskRelation of paper.tasks) {
+        const task = taskRelation?.task;
+        if (task && task.slug && !tasksBySlug.has(task.slug)) {
+          tasksBySlug.set(task.slug, task);
+        }
       }
     }
 
-    for (const methodRelation of paper.methods) {
-      const method = methodRelation.method;
-
-      if (!methodsBySlug.has(method.slug)) {
-        methodsBySlug.set(method.slug, method);
+    if (Array.isArray(paper.methods)) {
+      for (const methodRelation of paper.methods) {
+        const method = methodRelation?.method;
+        if (method && method.slug && !methodsBySlug.has(method.slug)) {
+          methodsBySlug.set(method.slug, method);
+        }
       }
     }
 
-    for (const datasetRelation of paper.datasets) {
-      const dataset = datasetRelation.dataset;
-
-      if (!datasetsBySlug.has(dataset.slug)) {
-        datasetsBySlug.set(dataset.slug, dataset);
+    if (Array.isArray(paper.datasets)) {
+      for (const datasetRelation of paper.datasets) {
+        const dataset = datasetRelation?.dataset;
+        if (dataset && dataset.slug && !datasetsBySlug.has(dataset.slug)) {
+          datasetsBySlug.set(dataset.slug, dataset);
+        }
       }
     }
 
-    for (const ranking of paper.rankings) {
-      const benchmark = ranking.benchmark;
-
-      if (!benchmarksBySlug.has(benchmark.slug)) {
-        benchmarksBySlug.set(benchmark.slug, {
-          ...benchmark,
-          rank: ranking.rank,
-        });
+    if (Array.isArray(paper.rankings)) {
+      for (const ranking of paper.rankings) {
+        const benchmark = ranking?.benchmark;
+        if (benchmark && benchmark.slug && !benchmarksBySlug.has(benchmark.slug)) {
+          benchmarksBySlug.set(benchmark.slug, {
+            ...benchmark,
+            rank: ranking.rank,
+          });
+        }
       }
     }
   }
 
   dedupPapers.sort((a, b) => {
     const scoreA = Math.max(
-      a.paper.githubStars || 0,
-      a.paper.citationCount || 0,
+      a.paper?.githubStars || 0,
+      a.paper?.citationCount || 0
     );
-
     const scoreB = Math.max(
-      b.paper.githubStars || 0,
-      b.paper.citationCount || 0,
+      b.paper?.githubStars || 0,
+      b.paper?.citationCount || 0
     );
-
     return scoreB - scoreA;
   });
 
@@ -599,7 +652,7 @@ export const getModelBySlug = async (
       id: model.id,
       name: model.name,
       slug: model.slug,
-      paperCount: model._count.papers,
+      paperCount: model._count?.papers || 0,
     })),
   };
 };
@@ -628,11 +681,12 @@ export const getModelFacets = async (queryRouter: QueryRouter) => {
     });
   });
 
-  const modelsById = new Map<string, any>();
+  const modelsById = new Map<string, ModelRecord>();
 
   for (const result of routingResult.results) {
-    for (const model of result) {
-      if (!modelsById.has(model.id)) {
+    if (!Array.isArray(result)) continue;
+    for (const model of result as ModelRecord[]) {
+      if (model && model.id && !modelsById.has(model.id)) {
         modelsById.set(model.id, model);
       }
     }
@@ -648,11 +702,13 @@ export const getModelFacets = async (queryRouter: QueryRouter) => {
 
   const incrementCount = (
     map: Map<string, number>,
-    value: string | null,
+    value: string | null | undefined
   ) => {
-    if (!value) return;
+    if (!value || typeof value !== "string") return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
 
-    map.set(value, (map.get(value) || 0) + 1);
+    map.set(trimmed, (map.get(trimmed) || 0) + 1);
   };
 
   for (const model of modelsById.values()) {
@@ -662,7 +718,7 @@ export const getModelFacets = async (queryRouter: QueryRouter) => {
     incrementCount(opennessTypes, model.opennessType);
     incrementCount(
       modelFamilies,
-      model.modelFamily ?? model.model_family,
+      model.modelFamily ?? model.model_family
     );
 
     const modelCapabilities = Array.isArray(model.capabilities)
@@ -675,8 +731,7 @@ export const getModelFacets = async (queryRouter: QueryRouter) => {
       }
     }
 
-    const modelResearchAreas =
-      model.researchAreas ?? model.research_areas;
+    const modelResearchAreas = model.researchAreas ?? model.research_areas;
 
     if (Array.isArray(modelResearchAreas)) {
       for (const researchArea of modelResearchAreas) {
