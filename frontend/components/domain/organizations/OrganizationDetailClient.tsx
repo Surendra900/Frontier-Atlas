@@ -19,6 +19,7 @@ import Navbar from "@/components/Navbar";
 import { PaperCard } from "@/components/PaperFeed";
 import { getModelFacets, getModels, type ModelItem } from "@/lib/models";
 import { getPapers, type Paper } from "@/lib/paperApi";
+import { calculateOrganizationImpactMetrics } from "@/lib/impactMetrics";
 
 const toSlug = (value: string) =>
   value
@@ -84,13 +85,18 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [models, setModels] = useState<ModelItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [papersLoading, setPapersLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"models" | "papers">("models");
   const [paperSort, setPaperSort] = useState<"latest" | "citations" | "stars">("latest");
 
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+
     Promise.all([getModelFacets(), getModels()])
       .then(([facets, allModels]) => {
+        if (cancelled) return;
+
         const organization = facets.vendors.find((vendor) => toSlug(vendor.name) === slug);
         const organizationName = organization?.name ?? slug.replace(/-/g, " ");
         setName(organizationName);
@@ -110,62 +116,49 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
         if (vendorModels.length === 0) {
           setActiveTab("papers");
         }
+      })
+      .catch((error) => {
+        if (!cancelled) console.error("Unable to load organization data:", error);
+      });
 
-        return getPapers({ organization: organizationName, limit: 100, sort: "latest" });
-      })
-      .then((result) => {
-        setPapers(result.papers || []);
-      })
-      .catch((error) => console.error("Unable to load organization data:", error))
-      .finally(() => setLoading(false));
+    return () => {
+      cancelled = true;
+    };
   }, [slug]);
 
-  // Aggregate Impact Metrics
-  const metrics = useMemo(() => {
-    let totalCitations = 0;
-    let totalStars = 0;
+  useEffect(() => {
+    if (!name) return;
+    let cancelled = false;
+    setPapersLoading(true);
 
-    papers.forEach((p) => {
-      totalCitations += p.citations || 0;
-      const stars = parseFloat(p.upvotes) || (p as any).githubStars || 0;
-      totalStars += stars;
-    });
+    getPapers({ organization: name, limit: 100, sort: paperSort })
+      .then((result) => {
+        if (!cancelled) {
+          setPapers(result.papers || []);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) console.error("Unable to load organization papers:", error);
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setPapersLoading(false);
+          setLoading(false);
+        }
+      });
 
-    models.forEach((m) => {
-      totalCitations += m.citationCount || 0;
-      totalStars += m.githubStars || 0;
-    });
-
-    // Unique research areas / topics
-    const focusAreas = new Set<string>();
-    models.forEach((m) => {
-      if (Array.isArray(m.researchAreas)) {
-        m.researchAreas.forEach((area) => focusAreas.add(area));
-      }
-      if (Array.isArray(m.capabilities)) {
-        m.capabilities.forEach((cap) => focusAreas.add(cap));
-      }
-    });
-
-    return {
-      totalCitations,
-      totalStars,
-      focusAreas: Array.from(focusAreas).slice(0, 6),
+    return () => {
+      cancelled = true;
     };
+  }, [name, paperSort]);
+
+  // Aggregate Impact Metrics (deduplicated to avoid double-counting overlapping paper & model metrics)
+  const metrics = useMemo(() => {
+    return calculateOrganizationImpactMetrics(papers, models);
   }, [papers, models]);
 
-  // Sort papers
-  const displayedPapers = useMemo(() => {
-    return [...papers].sort((a, b) => {
-      if (paperSort === "citations") return (b.citations || 0) - (a.citations || 0);
-      if (paperSort === "stars") {
-        const starsA = parseFloat(a.upvotes) || (a as any).githubStars || 0;
-        const starsB = parseFloat(b.upvotes) || (b as any).githubStars || 0;
-        return starsB - starsA;
-      }
-      return new Date(b.date).getTime() - new Date(a.date).getTime();
-    });
-  }, [papers, paperSort]);
+  // Papers are sorted directly by the backend database query
+  const displayedPapers = papers;
 
   const displayName = name.replace(/\b\w/g, (letter) => letter.toUpperCase());
   const website = ORGANIZATION_WEBSITES[name] || ORGANIZATION_WEBSITES[displayName];
@@ -468,7 +461,16 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
         ) : (
           /* Papers Tab View */
           <div className="space-y-4">
-            {displayedPapers.length === 0 ? (
+            {papersLoading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="h-44 animate-pulse rounded-xl border border-[#E7E4DD] bg-white"
+                  />
+                ))}
+              </div>
+            ) : displayedPapers.length === 0 ? (
               <div className="rounded-xl border border-dashed border-[#D9D5CB] bg-white p-12 text-center text-[#6B665F]">
                 No papers have been associated with this organization yet.
               </div>
