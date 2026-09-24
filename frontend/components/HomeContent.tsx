@@ -151,32 +151,19 @@ export default function HomeContent({
   //   flex-1 scrolling container
   //
   // The entire homepage must use the browser's normal document scroll.
-  // This allows the footer in page.tsx to remain physically attached to
-  // the homepage content.
   // ---------------------------------------------------------------------------
 
   return (
     <div className="w-full bg-[#F8F7F2] text-[#111111]">
-      {/* -----------------------------------------------------------------
-          NAVBAR
-          ----------------------------------------------------------------- */}
 
       <Navbar
         activeSort={activeSort}
         onItemSelect={handleSidebarSelect}
       />
 
-      {/* -----------------------------------------------------------------
-          HOMEPAGE CONTENT
-          
-          This is a normal document-flow container.
-          There is intentionally NO overflow-y-auto here.
-          ----------------------------------------------------------------- */}
-
       <div className="w-full">
-        {/* ---------------------------------------------------------------
-            HERO SECTION
-            --------------------------------------------------------------- */}
+
+        {/* HERO SECTION */}
 
         <section className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-10 pt-3">
           <HeroSection
@@ -185,17 +172,11 @@ export default function HomeContent({
           />
         </section>
 
-        {/* ---------------------------------------------------------------
-            PAPERS AREA
-            --------------------------------------------------------------- */}
+        {/* PAPERS AREA */}
 
-        <section className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-10 pt-4 pb-8 flex items-start gap-5 lg:gap-8 xl:gap-10">
-          {/* -------------------------------------------------------------
-              DESKTOP SIDEBAR
+        <section className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-10 pt-0 pb-0 flex items-start gap-5 lg:gap-8 xl:gap-10">
 
-              Sticky is okay here because only the sidebar is sticky.
-              It does NOT create a separate scrolling page.
-              ------------------------------------------------------------- */}
+          {/* DESKTOP SIDEBAR */}
 
           <aside className="hidden lg:block w-[240px] shrink-0 sticky top-[68px] self-start">
             <Sidebar
@@ -204,11 +185,10 @@ export default function HomeContent({
             />
           </aside>
 
-          {/* -------------------------------------------------------------
-              MAIN PAPER CONTENT
-              ------------------------------------------------------------- */}
+          {/* MAIN PAPER CONTENT */}
 
           <main className="flex-1 min-w-0 max-w-[1380px]">
+
             <PaperTabs
               selectedPeriod={selectedPeriod}
               onPeriodSelect={handlePeriodSelect}
@@ -223,17 +203,14 @@ export default function HomeContent({
               isFilterChanging={isFilterChanging}
               onFilterDone={() => setIsFilterChanging(false)}
             />
+
           </main>
         </section>
 
-        {/* -----------------------------------------------------------------
-            IMPORTANT BOTTOM SPACING
+        {/* NO EXTRA BOTTOM SPACE */}
 
-            Gives the final homepage content some breathing room before
-            the footer begins naturally.
-            ----------------------------------------------------------------- */}
+        <div className="h-0 w-full" />
 
-        <div className="h-8 w-full" />
       </div>
     </div>
   );

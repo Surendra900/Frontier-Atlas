@@ -1,84 +1,172 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { getPapers } from "@/lib/paperApi";
-import { cn } from "@/lib/utils";
 
-interface SidebarProps {
+import {
+  Fire,
+  Clock,
+  Star,
+  ChatCircleDots,
+  Robot,
+  Brain,
+  ImageSquare,
+  CirclesThreePlus,
+  GlobeHemisphereWest,
+  MagicWand,
+  Waveform,
+  Cpu,
+  Files,
+  Lightning,
+  CloudFog,
+  Stack,
+  ChartBar,
+  LinkSimple,
+  MagnifyingGlass,
+  PlugsConnected,
+  Cube,
+  Target,
+  type Icon,
+} from "@phosphor-icons/react";
+
+import { getPapers } from "@/lib/paperApi";
+
+type SidebarProps = {
   onItemClick?: () => void;
-  onItemSelect?: (item: string) => void;
+  onItemSelect?: (label: string) => void;
   initialActive?: string;
+};
+
+type SidebarItem = {
+  label: string;
+  slug: string;
+  icon: Icon;
+  color: string;
+};
+
+// ============================================================
+// SIDEBAR ITEM
+// ============================================================
+
+function SidebarItem({
+  item,
+  isActive,
+  onClick,
+  href,
+  onMouseEnter,
+}: {
+  item: SidebarItem;
+  isActive: boolean;
+  onClick: () => void;
+  href: string;
+  onMouseEnter?: () => void;
+}) {
+  const IconComponent = item.icon;
+
+  return (
+    <a
+      href={href}
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      className={`
+        group
+        flex
+        items-center
+        w-full
+        h-[34px]
+        px-3
+        rounded-md
+        no-underline
+        transition-all
+        duration-150
+        ease-out
+        ${
+          isActive
+            ? "bg-[#ECECE7] text-[#111111]"
+            : "text-[#666666] hover:bg-[#EFEEE9] hover:text-[#111111]"
+        }
+      `}
+    >
+      <span
+        className="
+          flex
+          items-center
+          justify-center
+          w-[21px]
+          h-[21px]
+          mr-2.5
+          shrink-0
+        "
+      >
+        <IconComponent
+          size={17}
+          weight="duotone"
+          className={`
+            transition-all
+            duration-150
+            ${
+              isActive
+                ? "opacity-100"
+                : "opacity-80 group-hover:opacity-100"
+            }
+          `}
+          style={{
+            color: item.color,
+          }}
+        />
+      </span>
+
+      <span
+        className={`
+          truncate
+          text-[12.5px]
+          leading-none
+          ${
+            isActive
+              ? "font-semibold text-[#111111]"
+              : "font-medium text-[#666666] group-hover:text-[#222222]"
+          }
+        `}
+      >
+        {item.label}
+      </span>
+    </a>
+  );
 }
 
 // ============================================================
 // SECTION LABEL
 // ============================================================
 
-const SectionLabel = ({ title }: { title: string }) => {
-  return (
-    <div className="px-3 mb-0.5 mt-3 first:mt-0">
-      <p className="text-[11px] font-bold italic text-[#8B8B8B] uppercase tracking-wider">
-        {title}
-      </p>
-    </div>
-  );
-};
-
-// ============================================================
-// NAV ITEM
-// ============================================================
-
-const NavItem = ({
-  icon,
-  label,
-  isActive = false,
-  onClick,
-  href,
-  onMouseEnter,
+function SidebarSection({
+  title,
+  children,
 }: {
-  icon?: string;
-  label: string;
-  isActive?: boolean;
-  onClick: () => void;
-  href?: string;
-  onMouseEnter?: () => void;
-}) => {
-  const content = (
-    <div
-      onClick={onClick}
-      onMouseEnter={onMouseEnter}
-      className={cn(
-        "flex items-center gap-2.5 px-3 py-1 mx-1 cursor-pointer transition-colors rounded-md text-[13px] font-medium leading-snug",
-        isActive
-          ? "text-[#F55036]"
-          : "text-[#555555] hover:text-[#111111]"
-      )}
-    >
-      {icon && (
-        <span
-          className="flex items-center justify-center shrink-0 w-4 h-4 text-[15px] leading-none"
-          aria-hidden="true"
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <div className="px-3 mb-1.5">
+        <div
+          className="
+            text-[10px]
+            uppercase
+            tracking-[0.13em]
+            font-semibold
+            text-[#969690]
+          "
         >
-          {icon}
-        </span>
-      )}
+          {title}
+        </div>
+      </div>
 
-      <span className="whitespace-normal leading-tight">{label}</span>
+      <div className="flex flex-col gap-[1px]">
+        {children}
+      </div>
     </div>
   );
-
-  if (href) {
-    return (
-      <Link href={href} className="block no-underline">
-        {content}
-      </Link>
-    );
-  }
-
-  return content;
-};
+}
 
 // ============================================================
 // MAIN SIDEBAR
@@ -98,21 +186,24 @@ export default function Sidebar({
   // DISCOVER
   // ============================================================
 
-  const discover = [
+  const discover: SidebarItem[] = [
     {
       label: "Trending Papers",
       slug: "trending",
-      icon: "🔥",
+      icon: Fire,
+      color: "#E4572E",
     },
     {
       label: "Latest Papers",
       slug: "latest",
-      icon: "🕐",
+      icon: Clock,
+      color: "#4B6B8A",
     },
     {
       label: "Most GitHub Stars",
       slug: "github-stars",
-      icon: "⭐",
+      icon: Star,
+      color: "#C28A18",
     },
   ];
 
@@ -120,56 +211,66 @@ export default function Sidebar({
   // TASKS
   // ============================================================
 
-  const tasks = [
+  const tasks: SidebarItem[] = [
     {
       label: "Large Language Models",
-      icon: "💬",
+      icon: ChatCircleDots,
       slug: "large-language-models",
+      color: "#5271A4",
     },
     {
       label: "Agents",
-      icon: "🤖",
+      icon: Robot,
       slug: "agents",
+      color: "#7656A8",
     },
     {
       label: "Reasoning",
-      icon: "🧠",
+      icon: Brain,
       slug: "reasoning-models",
+      color: "#6654A6",
     },
     {
       label: "Vision-Language Models",
-      icon: "🖼️",
+      icon: ImageSquare,
       slug: "vision-language-models",
+      color: "#3E7C91",
     },
     {
       label: "Multimodal Models",
-      icon: "🧩",
+      icon: CirclesThreePlus,
       slug: "multimodal-models",
+      color: "#497D6B",
     },
     {
       label: "World Models",
-      icon: "🌍",
+      icon: GlobeHemisphereWest,
       slug: "world-models",
+      color: "#3F7F76",
     },
     {
       label: "Image Generation",
-      icon: "🎨",
+      icon: MagicWand,
       slug: "image-generation",
+      color: "#9A5D91",
     },
     {
       label: "Automatic Speech Recognition",
-      icon: "🔊",
+      icon: Waveform,
       slug: "automatic-speech-recognition",
+      color: "#4E7896",
     },
     {
       label: "Robotics",
-      icon: "🤖",
+      icon: Cpu,
       slug: "robotics",
+      color: "#596A82",
     },
     {
       label: "All Tasks",
-      icon: "📄",
+      icon: Files,
       slug: "",
+      color: "#777777",
     },
   ];
 
@@ -177,56 +278,66 @@ export default function Sidebar({
   // METHODS
   // ============================================================
 
-  const methods = [
+  const methods: SidebarItem[] = [
     {
       label: "Transformers",
-      icon: "⚡",
+      icon: Lightning,
       slug: "transformer",
+      color: "#C07824",
     },
     {
       label: "Diffusion Models",
-      icon: "🌫️",
+      icon: CloudFog,
       slug: "diffusion-models",
+      color: "#66829B",
     },
     {
       label: "Mixture of Experts",
-      icon: "🧩",
+      icon: Stack,
       slug: "mixture-of-experts",
+      color: "#7165A0",
     },
     {
       label: "Reinforcement Learning",
-      icon: "📊",
+      icon: ChartBar,
       slug: "policy-learning",
+      color: "#527C68",
     },
     {
       label: "Chain-of-Thought",
-      icon: "🔗",
+      icon: LinkSimple,
       slug: "chain-of-thought",
+      color: "#61718C",
     },
     {
       label: "RAG",
-      icon: "🔍",
+      icon: MagnifyingGlass,
       slug: "retrieval-augmented-generation",
+      color: "#4B7F91",
     },
     {
       label: "Model Context Protocol",
-      icon: "🔌",
+      icon: PlugsConnected,
       slug: "mcp",
+      color: "#557A86",
     },
     {
       label: "LoRA",
-      icon: "🧱",
+      icon: Cube,
       slug: "lora",
+      color: "#776C9B",
     },
     {
       label: "RLHF",
-      icon: "🎯",
+      icon: Target,
       slug: "rlhf",
+      color: "#A35C59",
     },
     {
       label: "All Methods",
-      icon: "📄",
+      icon: Files,
       slug: "",
+      color: "#777777",
     },
   ];
 
@@ -238,37 +349,54 @@ export default function Sidebar({
     if (pathname.startsWith("/tasks/")) {
       const taskSlug = pathname.replace("/tasks/", "");
 
-      const matched = tasks.find((t) => t.slug === taskSlug);
+      const matched = tasks.find(
+        (task) => task.slug === taskSlug
+      );
 
       if (matched) {
         setActiveItem(matched.label);
         return;
       }
-    } else if (pathname === "/tasks") {
+    }
+
+    if (pathname === "/tasks") {
       setActiveItem("All Tasks");
       return;
-    } else if (pathname.startsWith("/methods/")) {
+    }
+
+    if (pathname.startsWith("/methods/")) {
       const methodSlug = pathname.replace("/methods/", "");
 
-      const matched = methods.find((m) => m.slug === methodSlug);
+      const matched = methods.find(
+        (method) => method.slug === methodSlug
+      );
 
       if (matched) {
         setActiveItem(matched.label);
         return;
       }
-    } else if (pathname === "/methods") {
+    }
+
+    if (pathname === "/methods") {
       setActiveItem("All Methods");
       return;
-    } else if (pathname.startsWith("/category/")) {
-      const catSlug = pathname.replace("/category/", "");
+    }
 
-      const matched = discover.find((d) => d.slug === catSlug);
+    if (pathname.startsWith("/category/")) {
+      const categorySlug =
+        pathname.replace("/category/", "");
+
+      const matched = discover.find(
+        (item) => item.slug === categorySlug
+      );
 
       if (matched) {
         setActiveItem(matched.label);
         return;
       }
-    } else if (pathname === "/" || pathname === "/papers") {
+    }
+
+    if (pathname === "/" || pathname === "/papers") {
       if (initialActive) {
         setActiveItem(initialActive);
       } else {
@@ -334,94 +462,85 @@ export default function Sidebar({
   // ============================================================
 
   return (
-    <aside className="flex flex-col w-full bg-transparent h-full border-r border-[#E5E5E0]">
-      <div className="flex-1 px-2 pt-1 pb-2 space-y-3">
+    <aside className="flex flex-col w-full bg-transparent h-full">
+      <div className="flex-1 px-2 pt-1 pb-2 space-y-4">
 
         {/* ======================================================
             DISCOVER
             ====================================================== */}
 
-        <div>
-          <SectionLabel title="Discover" />
-
-          <div className="flex flex-col gap-0">
-            {discover.map((item) => (
-              <NavItem
-                key={item.label}
-                icon={item.icon}
-                label={item.label}
-                isActive={activeItem === item.label}
-                onClick={() => handleItemClick(item.label)}
-                href={
-                  pathname === "/"
-                    ? undefined
-                    : item.slug === "trending"
-                      ? "/"
-                      : `/category/${item.slug}`
-                }
-              />
-            ))}
-          </div>
-        </div>
+        <SidebarSection title="Discover">
+          {discover.map((item) => (
+            <SidebarItem
+              key={item.label}
+              item={item}
+              isActive={activeItem === item.label}
+              onClick={() =>
+                handleItemClick(item.label)
+              }
+              href={
+                pathname === "/"
+                  ? "#"
+                  : item.slug === "trending"
+                    ? "/"
+                    : `/category/${item.slug}`
+              }
+            />
+          ))}
+        </SidebarSection>
 
         {/* ======================================================
             TASKS
             ====================================================== */}
 
-        <div>
-          <SectionLabel title="Tasks" />
-
-          <div className="flex flex-col gap-0">
-            {tasks.map((item) => (
-              <NavItem
-                key={item.label}
-                icon={item.icon}
-                label={item.label}
-                isActive={activeItem === item.label}
-                onClick={() => handleItemClick(item.label)}
-                onMouseEnter={() => {
-                  if (item.slug) {
-                    void getPapers({
-                      page: 1,
-                      task: item.slug,
-                      sort: "popular",
-                    });
-                  }
-                }}
-                href={
-                  item.slug
-                    ? `/tasks/${item.slug}`
-                    : `/tasks`
+        <SidebarSection title="Tasks">
+          {tasks.map((item) => (
+            <SidebarItem
+              key={item.label}
+              item={item}
+              isActive={activeItem === item.label}
+              onClick={() =>
+                handleItemClick(item.label)
+              }
+              onMouseEnter={() => {
+                if (item.slug) {
+                  void getPapers({
+                    page: 1,
+                    task: item.slug,
+                    sort: "popular",
+                  });
                 }
-              />
-            ))}
-          </div>
-        </div>
+              }}
+              href={
+                item.slug
+                  ? `/tasks/${item.slug}`
+                  : "/tasks"
+              }
+            />
+          ))}
+        </SidebarSection>
 
         {/* ======================================================
             METHODS
             ====================================================== */}
 
-        <div>
-          <SectionLabel title="Methods" />
-
-          <div className="flex flex-col gap-0">
-            {methods.map((item) => (
-              <NavItem
-                key={item.label}
-                icon={item.icon}
-                label={item.label}
-                isActive={activeItem === item.label}
-                onClick={() => handleItemClick(item.label)}
-                href={
-                  item.slug
-                    ? `/methods/${item.slug}`
-                    : `/methods`
-                }
-              />
-            ))}
-          </div>
-        </div>
+        <SidebarSection title="Methods">
+          {methods.map((item) => (
+            <SidebarItem
+              key={item.label}
+              item={item}
+              isActive={activeItem === item.label}
+              onClick={() =>
+                handleItemClick(item.label)
+              }
+              href={
+                item.slug
+                  ? `/methods/${item.slug}`
+                  : "/methods"
+              }
+            />
+          ))}
+        </SidebarSection>
 
       </div>
     </aside>

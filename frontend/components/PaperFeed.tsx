@@ -512,7 +512,7 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
       onMouseEnter={handlePrefetch}
       onTouchStart={handlePrefetch}
     >
-      <div className="group flex flex-col xl:flex-row gap-3 sm:gap-4 xl:gap-5 p-3 sm:p-4 xl:pt-2 xl:pb-2 bg-white xl:bg-transparent border xl:border-none border-[#E5E5E0] rounded-none hover:shadow-lg xl:hover:bg-white xl:hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all duration-300 ease-out">
+      <div className="group flex flex-col xl:flex-row gap-3 sm:gap-4 xl:gap-5 p-3 sm:p-4 xl:pt-3 xl:pb-3 bg-white xl:bg-transparent border xl:border-none border-[#E5E5E0] rounded-none hover:shadow-lg xl:hover:bg-white xl:hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all duration-300 ease-out">
         {/* PDF thumbnail */}
         <div className="order-first xl:order-last shrink-0 w-full xl:w-auto mx-auto xl:mx-0 xl:self-stretch border-b xl:border-b-0 border-[#E5E5E0] pb-3 xl:pb-0 mb-1 xl:mb-0">
           <Link href={`/papers/${paper.slug}`} className="block h-full group/thumb cursor-pointer">
