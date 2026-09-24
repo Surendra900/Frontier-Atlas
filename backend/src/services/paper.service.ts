@@ -391,12 +391,18 @@ export const getPapers = async (
     where.publicationDate = { not: null };
   }
 
+  // When sorting by stars, prioritize papers with confirmed GitHub stars
+  if (sort === "stars" || sort === "github-stars" || sort === "most-stars") {
+    if (period === "all" || period === "month") {
+      where.githubStars = { gt: 0 };
+    }
+  }
+
   const orderBy =
     sort === "latest" || sort === "recent"
       ? [
         { publicationDate: "desc" as const },
-        { githubStars: "desc" as const },
-        { slug: "asc" as const },
+        { id: "desc" as const },
       ]
       : sort === "citations"
         ? [
@@ -421,9 +427,10 @@ export const getPapers = async (
           ]
         : sort === "trending" || sort === "popular"
           ? [
-            { trendingScore: "desc" as const },
             { github_hourly_increase: "desc" as const },
+            { hfUpvotes: "desc" as const },
             { githubStars: "desc" as const },
+            { citationCount: "desc" as const },
             { publicationDate: "desc" as const },
             { slug: "asc" as const },
           ]
@@ -433,9 +440,9 @@ export const getPapers = async (
             { slug: "asc" as const }
           ]
           : [
-            // Failsafe Default (Trending oriented)
-            { trendingScore: "desc" as const },
+            // Failsafe Default (Trending velocity oriented)
             { github_hourly_increase: "desc" as const },
+            { hfUpvotes: "desc" as const },
             { githubStars: "desc" as const },
             { publicationDate: "desc" as const },
             { slug: "asc" as const },
@@ -452,15 +459,27 @@ export const getPapers = async (
     },
   );
 
-  // ADDED: Cascading fallback to guarantee papers are always shown while keeping new papers (2026) first
+  // Cascading lookback fallback to guarantee papers are always found
   if (papers.length === 0 && skip === 0) {
-    if (period !== "all") {
-      // Fallback 1: Expand date window progressively (e.g. 7 days -> 30 days -> 90 days) while preserving date filter
-      const fallbackCutoff = new Date(baseDate);
-      const lookbackDays = period === "today" ? 7 : period === "week" ? 30 : 90;
-      fallbackCutoff.setDate(fallbackCutoff.getDate() - lookbackDays);
+    const lookbackSequence =
+      period === "today"
+        ? [7, 30, 90, 0]
+        : period === "week"
+          ? [30, 90, 0]
+          : period === "month"
+            ? [90, 180, 0]
+            : [0];
 
-      const fallbackWhere = { ...where, publicationDate: { gte: fallbackCutoff } };
+    for (const lookbackDays of lookbackSequence) {
+      const fallbackWhere = { ...where };
+      if (lookbackDays > 0) {
+        const fallbackCutoff = new Date(baseDate);
+        fallbackCutoff.setDate(fallbackCutoff.getDate() - lookbackDays);
+        fallbackWhere.publicationDate = { gte: fallbackCutoff };
+      } else {
+        delete fallbackWhere.publicationDate;
+        delete fallbackWhere.githubStars;
+      }
 
       papers = await queryRouter.routeQuery<any>(
         async (prisma: PrismaClient) => {
@@ -473,20 +492,7 @@ export const getPapers = async (
           });
         },
       );
-    } else {
-      // Fallback for period === "all"
-      const fallbackWhere = { ...where, publicationDate: { not: null } };
-      papers = await queryRouter.routeQuery<any>(
-        async (prisma: PrismaClient) => {
-          return prisma.paper.findMany({
-            where: fallbackWhere,
-            orderBy,
-            take: limit + 1,
-            skip,
-            select: paperSelect,
-          });
-        },
-      );
+      if (papers.length > 0) break;
     }
   }
 

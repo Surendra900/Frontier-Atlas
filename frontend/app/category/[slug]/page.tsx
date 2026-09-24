@@ -128,7 +128,9 @@ export default function CategoryPage({ params }: { params: Promise<{ slug: strin
   const { slug } = use(params);
   const label = SLUG_TO_LABEL[slug] || slug.split("-").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
   const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined);
-  const [selectedPeriod, setSelectedPeriod] = useState<string>("All time");
+  const [selectedPeriod, setSelectedPeriod] = useState<string>(
+    slug === "latest" ? "Today" : slug === "trending" ? "This Week" : "All time"
+  );
   const filterParams = useMemo(() => getFilterParams(slug), [slug]);
 
   const handleSidebarSelect = (item: string) => {

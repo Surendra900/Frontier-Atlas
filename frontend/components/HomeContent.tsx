@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Navbar from "@/components/Navbar";
 import Sidebar from "@/components/Sidebar";
 import PaperList from "@/components/PaperFeed";
@@ -42,17 +42,29 @@ export default function HomeContent({
   }, []);
 
   // --- FILTER HANDLERS ---
- const handleSidebarSelect = (label: string) => {
-  if (
-    label === "Trending Papers" ||
-    label === "Latest Papers" ||
-    label === "Most GitHub Stars" ||
-    label === "GitHub Hourly"
-  ) {
-    setIsFilterChanging(true);
-    setActiveSort(label);
-  }
-};
+  const handleSidebarSelect = (label: string) => {
+    if (
+      label === "Trending Papers" ||
+      label === "Latest Papers" ||
+      label === "Most GitHub Stars" ||
+      label === "GitHub Hourly"
+    ) {
+      setIsFilterChanging(true);
+      setActiveSort(label);
+
+      // Intelligently sync the timeframe when switching discovery sorts
+      if (label === "Most GitHub Stars") {
+        // High-starred AI papers span all time, so default to All time
+        setSelectedPeriod("All time");
+      } else if (label === "Trending Papers") {
+        // Trending papers show optimal velocity within This Week
+        setSelectedPeriod("This Week");
+      } else if (label === "Latest Papers") {
+        // Latest preprints are best experienced from Today
+        setSelectedPeriod("Today");
+      }
+    }
+  };
 
   const handlePeriodSelect = (period: string) => {
     setIsFilterChanging(true);
@@ -81,17 +93,20 @@ export default function HomeContent({
       : "latest";
 
   // Distinguish methods from tasks and ensure case-insensitivity
- const isMethod =
-  selectedTag?.toLowerCase() === "model-context-protocol-mcp";
-  const dynamicFilterParams: Record<string, string> = { sort: apiSort };
+  const isMethod =
+    selectedTag?.toLowerCase() === "model-context-protocol-mcp";
 
-  if (selectedTag) {
-    if (isMethod) {
-      dynamicFilterParams.method = selectedTag.toLowerCase();
-    } else {
-      dynamicFilterParams.task = selectedTag.toLowerCase(); 
+  const dynamicFilterParams = useMemo(() => {
+    const params: Record<string, string> = { sort: apiSort };
+    if (selectedTag) {
+      if (isMethod) {
+        params.method = selectedTag.toLowerCase();
+      } else {
+        params.task = selectedTag.toLowerCase(); 
+      }
     }
-  }
+    return params;
+  }, [apiSort, selectedTag, isMethod]);
 
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#F8F7F2] text-[#111111]">

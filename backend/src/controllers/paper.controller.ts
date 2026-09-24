@@ -78,7 +78,7 @@ export const getPapers = async (c: Context) => {
 
   try {
     const version = await getPapersVersion();
-    const cacheKey = `papers:v${version}:${JSON.stringify({ sort, task, method, model, organization, period, page, limit, cursor })}`;
+    const cacheKey = `papers:v3:v${version}:${JSON.stringify({ sort, task, method, model, organization, period, page, limit, cursor })}`;
 
     // 1. Check zero-latency in-memory cache (0.1ms response)
     const localHit = localMemoryCache.get(cacheKey);
