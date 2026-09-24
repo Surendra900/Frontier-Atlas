@@ -19,6 +19,7 @@ import Navbar from "@/components/Navbar";
 import { PaperCard } from "@/components/PaperFeed";
 import { getModelFacets, getModels, type ModelItem } from "@/lib/models";
 import { getPapers, type Paper } from "@/lib/paperApi";
+import { calculateOrganizationImpactMetrics } from "@/lib/impactMetrics";
 
 const toSlug = (value: string) =>
   value
@@ -151,38 +152,9 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
     };
   }, [name, paperSort]);
 
-  // Aggregate Impact Metrics
+  // Aggregate Impact Metrics (deduplicated to avoid double-counting overlapping paper & model metrics)
   const metrics = useMemo(() => {
-    let totalCitations = 0;
-    let totalStars = 0;
-
-    papers.forEach((p) => {
-      totalCitations += p.citations || 0;
-      const stars = parseFloat(p.upvotes) || (p as any).githubStars || 0;
-      totalStars += stars;
-    });
-
-    models.forEach((m) => {
-      totalCitations += m.citationCount || 0;
-      totalStars += m.githubStars || 0;
-    });
-
-    // Unique research areas / topics
-    const focusAreas = new Set<string>();
-    models.forEach((m) => {
-      if (Array.isArray(m.researchAreas)) {
-        m.researchAreas.forEach((area) => focusAreas.add(area));
-      }
-      if (Array.isArray(m.capabilities)) {
-        m.capabilities.forEach((cap) => focusAreas.add(cap));
-      }
-    });
-
-    return {
-      totalCitations,
-      totalStars,
-      focusAreas: Array.from(focusAreas).slice(0, 6),
-    };
+    return calculateOrganizationImpactMetrics(papers, models);
   }, [papers, models]);
 
   // Papers are sorted directly by the backend database query
