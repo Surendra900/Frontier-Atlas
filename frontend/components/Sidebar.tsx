@@ -73,7 +73,7 @@ function SidebarItem({
         flex
         items-center
         w-full
-        h-[34px]
+        h-[27px]
         px-3
         rounded-md
         no-underline
@@ -147,7 +147,7 @@ function SidebarSection({
 }) {
   return (
     <div>
-      <div className="px-3 mb-1.5">
+      <div className="px-3 mb-0.5">
         <div
           className="
             text-[10px]
@@ -161,7 +161,7 @@ function SidebarSection({
         </div>
       </div>
 
-      <div className="flex flex-col gap-[1px]">
+      <div className="flex flex-col gap-0">
         {children}
       </div>
     </div>
@@ -463,7 +463,7 @@ export default function Sidebar({
 
   return (
     <aside className="flex flex-col w-full bg-transparent h-full">
-      <div className="flex-1 px-2 pt-1 pb-2 space-y-4">
+      <div className="flex-1 px-2 pt-1 pb-2 space-y-2">
 
         {/* ======================================================
             DISCOVER
