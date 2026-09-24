@@ -2,18 +2,20 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Building2, ExternalLink, FileText, TrendingUp } from "lucide-react";
+import { ExternalLink, FileText, TrendingUp } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import { PaperCard } from "@/components/PaperFeed";
 import { getModelFacets, getModels } from "@/lib/models";
 import { getPapers, type Paper } from "@/lib/paperApi";
 
 const toSlug = (value: string) =>
-  value
-    .toLowerCase()
-    .trim()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/(^-|-$)/g, "");
+  typeof value === "string"
+    ? value
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/(^-|-$)/g, "")
+    : "";
 
 function organizationLogoUrl(logo?: string) {
   if (!logo) return undefined;
@@ -61,9 +63,11 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
   const [papers, setPapers] = useState<Paper[]>([]);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<"latest" | "citations">("latest");
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    let isMounted = true;
+    setIsMounted(true);
+    let mounted = true;
     setImageError(false);
 
     if (!safeSlug) {
@@ -76,7 +80,7 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
       getModels().catch(() => []),
     ])
       .then(([facets, models]) => {
-        if (!isMounted) return;
+        if (!mounted) return;
 
         const safeVendors = Array.isArray(facets?.vendors) ? facets.vendors : [];
         const safeModels = Array.isArray(models) ? models : [];
@@ -97,24 +101,24 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
         return getPapers({ organization: organizationName, limit: 50, sort: "latest" });
       })
       .then((result) => {
-        if (isMounted && result && Array.isArray(result.papers)) {
+        if (mounted && result && Array.isArray(result.papers)) {
           setPapers(result.papers);
         }
       })
       .catch((error) => {
-        if (isMounted) {
+        if (mounted) {
           console.error("Unable to load organization papers:", error);
           setPapers([]);
         }
       })
       .finally(() => {
-        if (isMounted) {
+        if (mounted) {
           setLoading(false);
         }
       });
 
     return () => {
-      isMounted = false;
+      mounted = false;
     };
   }, [safeSlug]);
 
@@ -134,6 +138,7 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
 
   const displayName = name ? name.replace(/\b\w/g, (letter) => letter.toUpperCase()) : "Organization";
   const website = name ? ORGANIZATION_WEBSITES[name] : undefined;
+  const initial = displayName ? displayName.trim().charAt(0).toUpperCase() : "O";
 
   return (
     <div className="min-h-screen bg-[#F8F7F2] text-[#171717]">
@@ -164,7 +169,9 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
                     onError={() => setImageError(true)}
                   />
                 ) : (
-                  <Building2 size={34} />
+                  <span className="text-3xl font-bold uppercase text-[#FF5A1F] select-none">
+                    {initial}
+                  </span>
                 )}
               </div>
               <div>
@@ -195,7 +202,7 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
                   Papers
                 </span>
                 <strong className="mt-1 block text-2xl tracking-[-0.04em] text-[#171717]">
-                  {papers.length}
+                  {isMounted ? papers.length : "..."}
                 </strong>
               </div>
               <div className="rounded-xl border border-[#EEE9E1] bg-[#FCFBF8] px-4 py-3">
@@ -215,9 +222,9 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
             <div className="flex items-center gap-2">
               <FileText size={17} className="text-[#FF5A1F]" />
               <h2 className="text-xl font-semibold">Papers</h2>
-              <span className="text-sm text-[#7B766E]">{papers.length}</span>
+              <span className="text-sm text-[#7B766E]">{isMounted ? papers.length : "..."}</span>
             </div>
-            <div className="flex rounded-lg border border-[#DDD9D0] bg-white p-1">
+            <div className="flex rounded-lg border border-[#DDD9D0] bg-white p-1" role="radiogroup" aria-label="Sort papers">
               {(
                 [
                   ["latest", "Recent"],
@@ -227,6 +234,8 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
                 <button
                   key={value}
                   type="button"
+                  role="radio"
+                  aria-checked={sort === value}
                   onClick={() => setSort(value)}
                   className={`flex items-center gap-1 rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
                     sort === value ? "bg-[#171717] text-white" : "text-[#6B665F] hover:text-[#171717]"

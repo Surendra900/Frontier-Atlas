@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowUpRight, Building2, Sparkles } from "lucide-react";
+import { ArrowUpRight, Sparkles } from "lucide-react";
 import Navbar from "@/components/Navbar";
 import {
   getCachedModelFacets,
@@ -65,6 +65,7 @@ function OrganizationCard({
   const [imageError, setImageError] = useState(false);
   const targetSlug = organizationSlug(name);
   const href = targetSlug ? `/organizations/${encodeURIComponent(targetSlug)}` : "/organizations";
+  const initial = name ? name.trim().charAt(0).toUpperCase() : "O";
 
   return (
     <Link
@@ -81,7 +82,9 @@ function OrganizationCard({
               onError={() => setImageError(true)}
             />
           ) : (
-            <Building2 size={20} className="text-[#FF5A1F]" />
+            <span className="text-lg font-bold uppercase text-[#FF5A1F] select-none">
+              {initial}
+            </span>
           )}
         </div>
         <div className="min-w-0 flex-1">
@@ -119,8 +122,10 @@ export default function OrganizationsPage() {
   const [paperCounts, setPaperCounts] = useState<Record<string, number>>({});
   const [sort, setSort] = useState<SortMode>("trending");
   const [loading, setLoading] = useState(() => !(cachedModels && cachedFacets));
+  const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
+    setIsMounted(true);
     let cancelled = false;
 
     getOrganizationDirectory()
@@ -183,6 +188,8 @@ export default function OrganizationsPage() {
       });
   }, [facets?.vendors, models, paperCounts, sort]);
 
+  const orgCount = isMounted ? (facets?.vendors?.length ?? organizations.length) : "...";
+
   return (
     <div className="min-h-screen bg-[#F8F7F2] text-[#171717]">
       <Navbar />
@@ -205,7 +212,7 @@ export default function OrganizationsPage() {
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-[#8C877E]">Model ecosystem</p>
               <h2 id="organizations-heading" className="mt-2 text-[25px] font-semibold tracking-[-0.03em]">
-                {facets?.vendors?.length ?? organizations.length} organizations
+                {orgCount} organizations
               </h2>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
