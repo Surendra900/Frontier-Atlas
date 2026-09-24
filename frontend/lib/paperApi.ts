@@ -598,3 +598,11 @@ export async function ingestPaper(payload: IngestPaperPayload): Promise<{
     }),
   });
 }
+
+export async function getOrganizationPaperCounts(): Promise<Record<string, number>> {
+  const response = await fetchApi<{ status: string; data: Record<string, number> }>(
+    '/api/v1/research-papers/organization-counts'
+  );
+  return response?.data || {};
+}
+

@@ -32,6 +32,7 @@ const paperRoutes = new Hono();
 
 // Specific routes before catch-all /:slug
 paperRoutes.get("/search", paperController.searchPapers as any);
+paperRoutes.get("/organization-counts", paperController.getOrganizationPaperCounts as any);
 paperRoutes.get("/id/:id", paperController.getPaperById as any);
 paperRoutes.get("/check-saved", optionalAuthMiddleware, paperController.checkSavedPaper as any);
 paperRoutes.post("/save", authMiddleware, paperController.toggleSavePaper as any);
