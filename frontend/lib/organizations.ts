@@ -46,6 +46,39 @@ export function sortOrganizations<T extends { name: string; count: number; momen
   });
 }
 
+/**
+ * Normalizes and validates an organization logo URL.
+ * Converts Clearbit logo service URLs to Google favicon service URLs,
+ * and validates that the URL is a safe http(s) URL, relative path, or data URI.
+ * Returns undefined for missing, empty, or invalid URLs to prevent broken network requests.
+ */
+export function organizationLogoUrl(logo?: string | null): string | undefined {
+  if (!logo) return undefined;
+  const trimmed = logo.trim();
+  if (!trimmed) return undefined;
+
+  // Relative path or data URL
+  if (trimmed.startsWith("/") || trimmed.startsWith("data:image/")) {
+    return trimmed;
+  }
+
+  try {
+    const url = new URL(trimmed);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return undefined;
+    }
+    // Clearbit logo proxy fallback to Google Favicons
+    if (url.hostname === "logo.clearbit.com") {
+      const domain = url.pathname.replace(/^\//, "");
+      if (!domain) return undefined;
+      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+    }
+    return trimmed;
+  } catch {
+    return undefined;
+  }
+}
+
 /** The compact endpoint that supplies all organization names immediately. */
 export function getOrganizationFacets(): Promise<ModelFacets> {
   if (!facetsPromise) {

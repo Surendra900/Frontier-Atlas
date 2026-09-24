@@ -20,6 +20,8 @@ import { PaperCard } from "@/components/PaperFeed";
 import { getModelFacets, getModels, type ModelItem } from "@/lib/models";
 import { getPapers, type Paper } from "@/lib/paperApi";
 import { calculateOrganizationImpactMetrics } from "@/lib/impactMetrics";
+import { organizationLogoUrl } from "@/lib/organizations";
+import OrganizationLogo from "./OrganizationLogo";
 
 const toSlug = (value: string) =>
   value
@@ -27,22 +29,6 @@ const toSlug = (value: string) =>
     .trim()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
-
-function organizationLogoUrl(logo?: string) {
-  if (!logo) return undefined;
-
-  try {
-    const url = new URL(logo);
-    if (url.hostname === "logo.clearbit.com") {
-      const domain = url.pathname.replace(/^\//, "");
-      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
-    }
-  } catch {
-    return logo;
-  }
-
-  return logo;
-}
 
 const ORGANIZATION_WEBSITES: Record<string, string> = {
   Adobe: "https://www.adobe.com/",
@@ -188,15 +174,11 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
           <div className="relative grid gap-7 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-end">
             <div className="flex items-start gap-5">
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-[#E7E4DD] bg-[#FAFAF8] p-3 text-[#FF5A1F] shadow-[0_6px_18px_rgba(24,24,20,0.06)]">
-                {logo ? (
-                  <img
-                    src={logo}
-                    alt={`${displayName} logo`}
-                    className="h-full w-full object-contain"
-                  />
-                ) : (
-                  <Building2 size={34} />
-                )}
+                <OrganizationLogo
+                  logo={logo}
+                  name={displayName}
+                  size={34}
+                />
               </div>
 
               <div>

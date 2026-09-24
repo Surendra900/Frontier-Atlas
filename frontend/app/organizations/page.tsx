@@ -13,9 +13,11 @@ import {
 import {
   getOrganizationCatalog,
   getOrganizationDirectory,
+  organizationLogoUrl,
   sortOrganizations,
   type SortMode,
 } from "@/lib/organizations";
+import OrganizationLogo from "@/components/domain/organizations/OrganizationLogo";
 
 const descriptions = [
   "A leading organization shaping the frontier of AI research and production.",
@@ -31,22 +33,6 @@ function organizationDescription(name: string) {
 
 function organizationSlug(name: string) {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
-
-function organizationLogoUrl(logo?: string) {
-  if (!logo) return undefined;
-
-  try {
-    const url = new URL(logo);
-    if (url.hostname === "logo.clearbit.com") {
-      const domain = url.pathname.replace(/^\//, "");
-      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
-    }
-  } catch {
-    return logo;
-  }
-
-  return logo;
 }
 
 function OrganizationCard({
@@ -71,11 +57,12 @@ function OrganizationCard({
     >
       <div className="flex items-start gap-2.5 border-b border-[#EEECE6] bg-[#FBFAF7] p-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#E2DED5] bg-gradient-to-br from-white to-[#FFF8F4] p-1.5 shadow-[0_2px_5px_rgba(24,24,20,0.07)] ring-1 ring-white transition-all duration-200 group-hover:scale-105 group-hover:border-[#FFB098] group-hover:shadow-[0_4px_10px_rgba(255,90,31,0.14)]">
-          {logo ? (
-            <img src={logo} alt={`${name} logo`} className="h-full w-full object-contain" />
-          ) : (
-            <Building2 size={20} className="text-[#FF5A1F]" />
-          )}
+          <OrganizationLogo
+            logo={logo}
+            name={name}
+            size={20}
+            iconClassName="text-[#FF5A1F]"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
