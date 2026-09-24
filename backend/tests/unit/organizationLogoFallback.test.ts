@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import React from "react";
 import { organizationLogoUrl } from "../../../frontend/lib/organizations";
-import OrganizationLogo from "../../../frontend/components/domain/organizations/OrganizationLogo";
+import OrganizationLogo, { getInitials } from "../../../frontend/components/domain/organizations/OrganizationLogo";
 
 test("Test 1: organizationLogoUrl preserves valid standard logo URLs", () => {
   const validUrl = "https://ai.meta.com/static/images/logo.png";
@@ -76,3 +76,22 @@ test("Test 6: OrganizationLogo props support both card (size 20) and detail (siz
   assert.strictEqual(detailElement.props.size, 34);
   assert.strictEqual(detailElement.props.name, "Google DeepMind");
 });
+
+test("Test 7: getInitials generates correct model initials matching model detail page", () => {
+  assert.strictEqual(getInitials("AscendKernelGen/KernelGen-LM-32B"), "AL");
+  assert.strictEqual(getInitials("AscendKernelGen/KernelGen-LM-1.7B"), "AL");
+  assert.strictEqual(getInitials("Llama-3.1-Tulu-3-8B"), "L3");
+});
+
+test("Test 8: OrganizationLogo passes fallbackText prop correctly for initials rendering", () => {
+  const element = React.createElement(OrganizationLogo, {
+    logo: null,
+    name: "AscendKernelGen",
+    fallbackText: "AscendKernelGen/KernelGen-LM-32B",
+    size: 20,
+  });
+
+  assert.strictEqual(element.props.fallbackText, "AscendKernelGen/KernelGen-LM-32B");
+  assert.strictEqual(element.props.name, "AscendKernelGen");
+});
+

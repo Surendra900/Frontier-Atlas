@@ -177,6 +177,7 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
                 <OrganizationLogo
                   logo={logo}
                   name={displayName}
+                  fallbackText={models[0]?.name}
                   size={34}
                 />
               </div>

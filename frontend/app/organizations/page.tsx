@@ -60,6 +60,7 @@ function OrganizationCard({
           <OrganizationLogo
             logo={logo}
             name={name}
+            fallbackText={featuredModel?.name}
             size={20}
             iconClassName="text-[#FF5A1F]"
           />
@@ -134,12 +135,23 @@ export default function OrganizationsPage() {
   }, []);
 
   const organizations = useMemo(() => {
+    const normalizeKey = (val: string) => val.toLowerCase().trim().replace(/[^a-z0-9]+/g, "");
     const grouped = new Map<string, ModelItem[]>();
+
     models.forEach((model) => {
       if (!model.vendor) return;
-      const previous = grouped.get(model.vendor) ?? [];
-      previous.push(model);
-      grouped.set(model.vendor, previous);
+      const exactKey = model.vendor;
+      const normKey = normalizeKey(model.vendor);
+
+      const previousExact = grouped.get(exactKey) ?? [];
+      previousExact.push(model);
+      grouped.set(exactKey, previousExact);
+
+      if (normKey && normKey !== exactKey) {
+        const previousNorm = grouped.get(normKey) ?? [];
+        previousNorm.push(model);
+        grouped.set(normKey, previousNorm);
+      }
     });
 
     const source = facets?.vendors?.length
@@ -147,7 +159,8 @@ export default function OrganizationsPage() {
       : [...grouped.entries()].map(([name, entries]) => ({ name, count: entries.length }));
 
     const mapped = source.map((organization) => {
-      const organizationModels = grouped.get(organization.name) ?? [];
+      const normOrg = normalizeKey(organization.name);
+      const organizationModels = grouped.get(organization.name) ?? grouped.get(normOrg) ?? [];
       return {
         ...organization,
         logo: organizationLogoUrl(organizationModels.find((model) => model.vendorLogoUrl)?.vendorLogoUrl),

@@ -16,7 +16,7 @@ let facetsPromise: Promise<ModelFacets> | null = null;
 /** The small, fast data set needed to render every organization card. */
 export function getOrganizationCatalog(): Promise<OrganizationCatalogData> {
   if (!catalogPromise) {
-    catalogPromise = Promise.all([getModels({ sort: "trending" }), getOrganizationFacets()])
+    catalogPromise = Promise.all([getModels(), getOrganizationFacets()])
       .then(([models, facets]) => ({ models, facets }))
       .catch((error) => {
         catalogPromise = null;
