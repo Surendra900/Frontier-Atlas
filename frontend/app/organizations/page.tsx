@@ -10,9 +10,12 @@ import {
   type ModelFacets,
   type ModelItem,
 } from "@/lib/models";
-import { getOrganizationCatalog, getOrganizationDirectory } from "@/lib/organizations";
-
-type SortMode = "trending" | "models" | "az";
+import {
+  getOrganizationCatalog,
+  getOrganizationDirectory,
+  sortOrganizations,
+  type SortMode,
+} from "@/lib/organizations";
 
 const descriptions = [
   "A leading organization shaping the frontier of AI research and production.",
@@ -156,22 +159,20 @@ export default function OrganizationsPage() {
       ? facets.vendors.map((vendor) => ({ name: vendor.name, count: vendor.count }))
       : [...grouped.entries()].map(([name, entries]) => ({ name, count: entries.length }));
 
-    return source
-      .map((organization) => {
-        const organizationModels = grouped.get(organization.name) ?? [];
-        return {
-          ...organization,
-          logo: organizationLogoUrl(organizationModels.find((model) => model.vendorLogoUrl)?.vendorLogoUrl),
-          featuredModel: [...organizationModels].sort((a, b) => b.trendingScore - a.trendingScore)[0],
-          paperCount: paperCounts[organization.name] ?? 0,
-          momentum: organizationModels.reduce((total, model) => total + (model.trendingScore || 0), 0),
-        };
-      })
-      .sort((a, b) => {
-        if (sort === "az") return a.name.localeCompare(b.name);
-        if (sort === "models") return b.count - a.count || a.name.localeCompare(b.name);
-        return b.momentum - a.momentum || b.count - a.count;
-      });
+    const mapped = source.map((organization) => {
+      const organizationModels = grouped.get(organization.name) ?? [];
+      return {
+        ...organization,
+        logo: organizationLogoUrl(organizationModels.find((model) => model.vendorLogoUrl)?.vendorLogoUrl),
+        featuredModel: [...organizationModels].sort(
+          (a, b) => (b.trendingScore || 0) - (a.trendingScore || 0) || b.paperCount - a.paperCount
+        )[0],
+        paperCount: paperCounts[organization.name] ?? 0,
+        momentum: organizationModels.reduce((total, model) => total + (model.trendingScore || 0), 0),
+      };
+    });
+
+    return sortOrganizations(mapped, sort);
   }, [facets?.vendors, models, paperCounts, sort]);
 
   return (

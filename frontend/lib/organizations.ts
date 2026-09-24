@@ -1,5 +1,5 @@
-import { getModelFacets, getModels, type ModelFacets, type ModelItem } from "@/lib/models";
-import { getOrganizationPaperCounts } from "@/lib/paperApi";
+import { getModelFacets, getModels, type ModelFacets, type ModelItem } from "./models";
+import { getOrganizationPaperCounts } from "./paperApi";
 
 export type OrganizationDirectoryData = {
   models: ModelItem[];
@@ -16,7 +16,7 @@ let facetsPromise: Promise<ModelFacets> | null = null;
 /** The small, fast data set needed to render every organization card. */
 export function getOrganizationCatalog(): Promise<OrganizationCatalogData> {
   if (!catalogPromise) {
-    catalogPromise = Promise.all([getModels(), getOrganizationFacets()])
+    catalogPromise = Promise.all([getModels({ sort: "trending" }), getOrganizationFacets()])
       .then(([models, facets]) => ({ models, facets }))
       .catch((error) => {
         catalogPromise = null;
@@ -25,6 +25,25 @@ export function getOrganizationCatalog(): Promise<OrganizationCatalogData> {
   }
 
   return catalogPromise;
+}
+
+export type SortMode = "trending" | "az" | "models";
+
+/**
+ * Deterministically sorts organizations based on the selected SortMode.
+ */
+export function sortOrganizations<T extends { name: string; count: number; momentum: number }>(
+  items: T[],
+  sort: SortMode
+): T[] {
+  return [...items].sort((a, b) => {
+    if (sort === "az") return a.name.localeCompare(b.name);
+    if (sort === "models") {
+      return b.count - a.count || (b.momentum - a.momentum) || a.name.localeCompare(b.name);
+    }
+    // "trending" sort: highest momentum first, breaking ties with model count, then name
+    return (b.momentum - a.momentum) || (b.count - a.count) || a.name.localeCompare(b.name);
+  });
 }
 
 /** The compact endpoint that supplies all organization names immediately. */
