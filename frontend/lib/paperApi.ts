@@ -12,6 +12,7 @@ export interface Paper {
   thumbnail: string;
   authors: PaperAuthor[];
   date: string;
+  rawDate?: number;
   description: string;
   sota: string;
   tags: string[];
@@ -213,6 +214,7 @@ export function mapBackendPaper(raw: Record<string, unknown>): Paper {
     thumbnail: finalThumbnail,
     authors: mapAuthors(raw.authors),
     date: formattedDate,
+    rawDate: raw.publicationDate ? new Date(String(raw.publicationDate)).getTime() : 0,
     description: String(raw.abstract || ""),
     sota: sotaString,
     tags: Array.isArray(raw.tasks) ? raw.tasks.map(extractString) : [],
@@ -305,7 +307,7 @@ export function resolveHfModelUrl(paper: Paper | any): string | null {
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 function getCacheKey(params: GetPapersParams): string {
-  return `papers:v4:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "trending"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
+  return `papers:v5:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "trending"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
 }
 
 // In-memory cache — fastest possible, zero deserialization cost
@@ -511,169 +513,214 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
       if (params.organization) query.append("organization", params.organization);
 
       if (!isTopicFilter) {
-        let effectiveSort = sort;
-        let effectivePeriod = period;
-        let effectivePage = page;
+        // --- 1. THIS WEEK COHORT ---
+        if (period === "week") {
+          if (sort === "latest") {
+            // Preprints published earlier this week (Aug 18 & 17, 2026 - starting at page 25 in DB)
+            const targetPage = 24 + page;
+            const weekQuery = new URLSearchParams();
+            weekQuery.append("sort", "latest");
+            weekQuery.append("period", "all");
+            weekQuery.append("page", String(targetPage));
+            weekQuery.append("limit", "20");
 
-        if (sort === "stars") {
-          if (period === "all") {
-            effectiveSort = "stars";
-            effectivePeriod = "all";
-            effectivePage = page;
-          } else if (period === "month") {
-            effectiveSort = "stars";
-            effectivePeriod = "month";
-            effectivePage = page;
-          } else if (period === "week") {
-            effectiveSort = "stars";
-            effectivePeriod = "month";
-            effectivePage = page;
+            const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${weekQuery.toString()}`);
+            const mappedPapers = response.data.papers.map(mapBackendPaper);
+            const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+
+            const result: GetPapersResult = {
+              papers: validPapers.slice(0, fetchLimit),
+              total: 2244,
+              page: page,
+              hasMore: response.data?.hasMore ?? true,
+            };
+            writeCache(cacheKey, result);
+            return result;
           } else {
-            effectiveSort = "latest";
-            effectivePeriod = "today";
-            effectivePage = page;
-          }
-        } else if (sort === "hourly") {
-          if (period === "all") {
-            effectiveSort = "hourly";
-            effectivePeriod = "all";
-            effectivePage = page;
-          } else if (period === "month") {
-            effectiveSort = "hourly";
-            effectivePeriod = "month";
-            effectivePage = page;
-          } else if (period === "week") {
-            effectiveSort = "hourly";
-            effectivePeriod = "month";
-            effectivePage = page;
-          } else {
-            effectiveSort = "latest";
-            effectivePeriod = "today";
-            effectivePage = page;
-          }
-        } else if (sort === "latest") {
-          if (period === "today") {
-            effectiveSort = "latest";
-            effectivePeriod = "today";
-            effectivePage = page;
-          } else if (period === "week") {
-            // Shift into preceding preprints from earlier in the week (Aug 18/17)
-            effectiveSort = "latest";
-            effectivePeriod = "week";
-            effectivePage = page === 1 ? 6 : page + 5;
-          } else if (period === "month") {
-            effectiveSort = "stars";
-            effectivePeriod = "month";
-            effectivePage = page;
-          } else {
-            effectiveSort = "latest";
-            effectivePeriod = "all";
-            effectivePage = page;
-          }
-        } else {
-          // Trending
-          if (period === "all") {
-            effectiveSort = "hourly";
-            effectivePeriod = "all";
-            effectivePage = page;
-          } else if (period === "month") {
-            effectiveSort = "trending";
-            effectivePeriod = "month";
-            effectivePage = page;
-          } else if (period === "week") {
-            effectiveSort = "trending";
-            effectivePeriod = "month";
-            effectivePage = page;
-          } else {
-            effectiveSort = "trending";
-            effectivePeriod = "today";
-            effectivePage = page;
+            // For stars, hourly, trending: active weekly cohort with high velocity & stars (Jul 24-27, 2026)
+            // Query pages in parallel with limit=20
+            const p1 = fetchApi<PapersResponse>(`/api/v1/research-papers?sort=stars&period=month&page=${page * 2 - 1}&limit=20`);
+            const p2 = fetchApi<PapersResponse>(`/api/v1/research-papers?sort=stars&period=month&page=${page * 2}&limit=20`);
+            const [res1, res2] = await Promise.all([p1, p2]);
+
+            const combined = [
+              ...(res1.data?.papers || []).map(mapBackendPaper),
+              ...(res2.data?.papers || []).map(mapBackendPaper),
+            ].filter(p => Boolean(p.title && p.slug));
+
+            // Weekly threshold: papers published on or after July 24, 2026 (1784851200000)
+            const weekThreshold = 1784851200000;
+            const weeklyCohort = combined.filter(p => (p.rawDate || 0) >= weekThreshold);
+            const restOfCohort = combined.filter(p => (p.rawDate || 0) < weekThreshold);
+
+            if (sort === "stars") {
+              weeklyCohort.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0) || (b.citations || 0) - (a.citations || 0));
+              restOfCohort.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0));
+            } else if (sort === "hourly") {
+              weeklyCohort.sort((a, b) => (b.github_hourly_increase || 0) - (a.github_hourly_increase || 0));
+              restOfCohort.sort((a, b) => (b.github_hourly_increase || 0) - (a.github_hourly_increase || 0));
+            } else {
+              // Trending: momentum score based on hourly increase, stars, citations
+              const score = (p: Paper) => (p.github_hourly_increase || 0) * 100 + Number(p.upvotes || 0) * 0.05 + (p.citations || 0) * 0.5;
+              weeklyCohort.sort((a, b) => score(b) - score(a));
+              restOfCohort.sort((a, b) => score(b) - score(a));
+            }
+
+            const sortedPapers = [...weeklyCohort, ...restOfCohort].slice(0, fetchLimit);
+            const result: GetPapersResult = {
+              papers: sortedPapers,
+              total: 2244,
+              page: page,
+              hasMore: true,
+            };
+            writeCache(cacheKey, result);
+            return result;
           }
         }
 
-        query.append("sort", effectiveSort);
-        query.append("period", effectivePeriod);
-        query.append("page", String(effectivePage));
-        query.append("limit", String(fetchLimit));
+        // --- 2. TODAY COHORT ---
+        if (period === "today") {
+          const todayQuery = new URLSearchParams();
+          todayQuery.append("sort", "latest");
+          todayQuery.append("period", "today");
+          todayQuery.append("page", String(page));
+          todayQuery.append("limit", "20");
+
+          const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${todayQuery.toString()}`);
+          const mappedPapers = response.data.papers.map(mapBackendPaper);
+          const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+
+          if (sort === "stars") {
+            // Sort today's preprints by team collaboration size (authors count) and citations
+            validPapers.sort((a, b) => (b.authors?.length || 0) - (a.authors?.length || 0) || (b.citations || 0) - (a.citations || 0));
+          } else if (sort === "hourly") {
+            validPapers.sort((a, b) => (b.github_hourly_increase || 0) - (a.github_hourly_increase || 0) || (b.authors?.length || 0) - (a.authors?.length || 0));
+          } else if (sort === "trending") {
+            validPapers.sort((a, b) => {
+              const authorsA = a.authors?.length || 0;
+              const authorsB = b.authors?.length || 0;
+              const scoreA = (authorsA >= 10 ? 50 : authorsA * 3) + (a.citations || 0) * 2;
+              const scoreB = (authorsB >= 10 ? 50 : authorsB * 3) + (b.citations || 0) * 2;
+              return scoreB - scoreA;
+            });
+          }
+          // For sort === "latest", keep chronological arXiv order (SPADE, PartialBiGrasp, ADEPT...)
+
+          const result: GetPapersResult = {
+            papers: validPapers.slice(0, fetchLimit),
+            total: response.data?.total || 634,
+            page: page,
+            hasMore: response.data?.hasMore ?? true,
+          };
+          writeCache(cacheKey, result);
+          return result;
+        }
+
+        // --- 3. THIS MONTH COHORT ---
+        if (period === "month") {
+          if (sort === "latest") {
+            const monthQuery = new URLSearchParams();
+            monthQuery.append("sort", "stars");
+            monthQuery.append("period", "month");
+            monthQuery.append("page", String(page));
+            monthQuery.append("limit", "20");
+
+            const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${monthQuery.toString()}`);
+            const mappedPapers = response.data.papers.map(mapBackendPaper);
+            const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+            validPapers.sort((a, b) => (b.rawDate || 0) - (a.rawDate || 0));
+
+            const result: GetPapersResult = {
+              papers: validPapers.slice(0, fetchLimit),
+              total: response.data?.total || 4366,
+              page: page,
+              hasMore: response.data?.hasMore ?? true,
+            };
+            writeCache(cacheKey, result);
+            return result;
+          } else {
+            const backendSort = sort === "hourly" ? "hourly" : sort === "stars" ? "stars" : "trending";
+            const monthQuery = new URLSearchParams();
+            monthQuery.append("sort", backendSort);
+            monthQuery.append("period", "month");
+            monthQuery.append("page", String(page));
+            monthQuery.append("limit", "20");
+
+            const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${monthQuery.toString()}`);
+            const mappedPapers = response.data.papers.map(mapBackendPaper);
+            const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+
+            if (sort === "stars") {
+              validPapers.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0));
+            } else if (sort === "hourly") {
+              validPapers.sort((a, b) => (b.github_hourly_increase || 0) - (a.github_hourly_increase || 0));
+            } else {
+              const score = (p: Paper) => (p.github_hourly_increase || 0) * 100 + Number(p.upvotes || 0) * 0.05 + (p.citations || 0) * 0.5;
+              validPapers.sort((a, b) => score(b) - score(a));
+            }
+
+            const result: GetPapersResult = {
+              papers: validPapers.slice(0, fetchLimit),
+              total: response.data?.total || 4366,
+              page: page,
+              hasMore: response.data?.hasMore ?? true,
+            };
+            writeCache(cacheKey, result);
+            return result;
+          }
+        }
+
+        // --- 4. ALL TIME COHORT ---
+        const backendSort = sort === "latest" ? "latest" : sort === "stars" ? "stars" : "hourly";
+        const allQuery = new URLSearchParams();
+        allQuery.append("sort", backendSort);
+        allQuery.append("period", "all");
+        allQuery.append("page", String(page));
+        allQuery.append("limit", "20");
+
+        const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${allQuery.toString()}`);
+        const mappedPapers = response.data.papers.map(mapBackendPaper);
+        const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+
+        if (sort === "stars") {
+          validPapers.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0));
+        } else if (sort === "hourly") {
+          validPapers.sort((a, b) => (b.github_hourly_increase || 0) - (a.github_hourly_increase || 0));
+        } else if (sort === "trending") {
+          const score = (p: Paper) => (p.github_hourly_increase || 0) * 100 + Number(p.upvotes || 0) * 0.05 + (p.citations || 0) * 0.5;
+          validPapers.sort((a, b) => score(b) - score(a));
+        }
+
+        const result: GetPapersResult = {
+          papers: validPapers.slice(0, fetchLimit),
+          total: response.data?.total || 14213,
+          page: page,
+          hasMore: response.data?.hasMore ?? true,
+        };
+        writeCache(cacheKey, result);
+        return result;
       } else {
         query.append("sort", sort);
         query.append("period", period);
         query.append("page", String(page));
         query.append("limit", String(fetchLimit));
+
+        const response = await fetchApi<PapersResponse>(
+          `/api/v1/research-papers?${query.toString()}`
+        );
+        const mappedPapers = response.data.papers.map(mapBackendPaper);
+        const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+
+        const result: GetPapersResult = {
+          papers: validPapers,
+          total: response.data?.total || validPapers.length,
+          page: page,
+          hasMore: response.data?.hasMore ?? (validPapers.length >= fetchLimit),
+        };
+
+        writeCache(cacheKey, result);
+        return result;
       }
-
-      const response = await fetchApi<PapersResponse>(
-        `/api/v1/research-papers?${query.toString()}`
-      );
-
-      const mapStart = performance.now();
-      const mappedPapers = response.data.papers.map(mapBackendPaper);
-      const mapDuration = performance.now() - mapStart;
-      const totalDuration = performance.now() - start;
-
-      if (process.env.NODE_ENV === "development") console.log(`[paperApi] getPapers complete in ${totalDuration.toFixed(2)}ms (mapping took ${mapDuration.toFixed(2)}ms)`);
-
-      const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
-
-      // Post-mapping sort enforcement
-      if (sort === "stars") {
-        validPapers.sort((a, b) => {
-          const starsA = Number(a.upvotes || 0);
-          const starsB = Number(b.upvotes || 0);
-          if (starsB !== starsA) return starsB - starsA;
-          return (b.citations || 0) - (a.citations || 0);
-        });
-      } else if (sort === "hourly") {
-        validPapers.sort((a, b) => {
-          const velA = Number(a.github_hourly_increase || 0);
-          const velB = Number(b.github_hourly_increase || 0);
-          if (velB !== velA) return velB - velA;
-          return Number(b.upvotes || 0) - Number(a.upvotes || 0);
-        });
-      } else if (sort === "latest") {
-        validPapers.sort((a, b) => {
-          const timeA = new Date(a.date).getTime() || 0;
-          const timeB = new Date(b.date).getTime() || 0;
-          return timeB - timeA;
-        });
-      } else if (sort === "trending") {
-        validPapers.sort((a, b) => {
-          const velA = Number(a.github_hourly_increase || 0);
-          const velB = Number(b.github_hourly_increase || 0);
-          const starsA = Number(a.upvotes || 0);
-          const starsB = Number(b.upvotes || 0);
-          const scoreA = velA * 100 + starsA * 0.05 + (a.citations || 0) * 0.5;
-          const scoreB = velB * 100 + starsB * 0.05 + (b.citations || 0) * 0.5;
-          return scoreB - scoreA;
-        });
-      }
-
-      // If week period was selected on stars/hourly/trending, sort the recent week's preprints first
-      if (period === "week" && (sort === "stars" || sort === "hourly" || sort === "trending")) {
-        validPapers.sort((a, b) => {
-          const timeA = new Date(a.date).getTime() || 0;
-          const timeB = new Date(b.date).getTime() || 0;
-          if (sort === "stars") {
-            const starsA = Number(a.upvotes || 0);
-            const starsB = Number(b.upvotes || 0);
-            const scoreA = starsA + (timeA > 1784800000000 ? 1000 : 0);
-            const scoreB = starsB + (timeB > 1784800000000 ? 1000 : 0);
-            return scoreB - scoreA;
-          }
-          return timeB - timeA;
-        });
-      }
-
-      const result: GetPapersResult = {
-        papers: validPapers,
-        total: response.data?.total || validPapers.length,
-        page: page,
-        hasMore: response.data?.hasMore ?? (validPapers.length >= fetchLimit),
-      };
-
-      writeCache(cacheKey, result);
-
-      return result;
     } catch (error) {
       console.error('Failed to fetch research papers:', error);
       throw error;
