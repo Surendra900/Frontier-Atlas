@@ -7,13 +7,15 @@ import Navbar from "@/components/Navbar";
 import {
   getCachedModelFacets,
   getCachedModels,
-  getModels,
   type ModelFacets,
   type ModelItem,
 } from "@/lib/models";
-import { getOrganizationDirectory } from "@/lib/organizations";
-
-type SortMode = "trending" | "models" | "az";
+import {
+  getOrganizationCatalog,
+  getOrganizationDirectory,
+  sortOrganizations,
+  type SortMode,
+} from "@/lib/organizations";
 
 const descriptions = [
   "A leading organization shaping the frontier of AI research and production.",
@@ -114,6 +116,19 @@ export default function OrganizationsPage() {
   useEffect(() => {
     let cancelled = false;
 
+    // Load fast catalog immediately for instant rendering
+    getOrganizationCatalog()
+      .then((catalog) => {
+        if (cancelled) return;
+        setModels(catalog.models);
+        setFacets(catalog.facets);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Unable to load organization catalog", error);
+      });
+
+    // Load directory with paper counts
     getOrganizationDirectory()
       .then((directory) => {
         if (cancelled) return;
@@ -121,7 +136,7 @@ export default function OrganizationsPage() {
         setFacets(directory.facets);
         setPaperCounts(directory.paperCounts);
       })
-      .catch((error) => console.error("Unable to load organizations", error))
+      .catch((error) => console.error("Unable to load organization directory counts", error))
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -144,22 +159,20 @@ export default function OrganizationsPage() {
       ? facets.vendors.map((vendor) => ({ name: vendor.name, count: vendor.count }))
       : [...grouped.entries()].map(([name, entries]) => ({ name, count: entries.length }));
 
-    return source
-      .map((organization) => {
-        const organizationModels = grouped.get(organization.name) ?? [];
-        return {
-          ...organization,
-          logo: organizationLogoUrl(organizationModels.find((model) => model.vendorLogoUrl)?.vendorLogoUrl),
-          featuredModel: [...organizationModels].sort((a, b) => b.trendingScore - a.trendingScore)[0],
-          paperCount: paperCounts[organization.name] ?? 0,
-          momentum: organizationModels.reduce((total, model) => total + (model.trendingScore || 0), 0),
-        };
-      })
-      .sort((a, b) => {
-        if (sort === "az") return a.name.localeCompare(b.name);
-        if (sort === "models") return b.count - a.count || a.name.localeCompare(b.name);
-        return b.momentum - a.momentum || b.count - a.count;
-      });
+    const mapped = source.map((organization) => {
+      const organizationModels = grouped.get(organization.name) ?? [];
+      return {
+        ...organization,
+        logo: organizationLogoUrl(organizationModels.find((model) => model.vendorLogoUrl)?.vendorLogoUrl),
+        featuredModel: [...organizationModels].sort(
+          (a, b) => (b.trendingScore || 0) - (a.trendingScore || 0) || b.paperCount - a.paperCount
+        )[0],
+        paperCount: paperCounts[organization.name] ?? 0,
+        momentum: organizationModels.reduce((total, model) => total + (model.trendingScore || 0), 0),
+      };
+    });
+
+    return sortOrganizations(mapped, sort);
   }, [facets?.vendors, models, paperCounts, sort]);
 
   return (
