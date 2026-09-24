@@ -14,9 +14,9 @@ const getPapersVersion = async (): Promise<string> => {
   try {
     const redis = redisManager.getClient();
     const v = await redis.get("papers:version");
-    return v ? String(v) : "0";
+    return v ? `2_${String(v)}` : "2_0";
   } catch {
-    return "0";
+    return "2_0";
   }
 };
 
