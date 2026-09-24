@@ -782,20 +782,45 @@ const PaperCardSkeleton = memo(() => {
 });
 PaperCardSkeleton.displayName = "PaperCardSkeleton";
 
-function getPaginationRange(currentPage: number, totalPages: number): (number | string)[] {
-  if (totalPages <= 7) {
+function getPaginationRange(
+  currentPage: number,
+  totalPages: number,
+): (number | string)[] {
+  // If there are 6 or fewer pages, show all pages.
+  if (totalPages <= 6) {
     return Array.from({ length: totalPages }, (_, i) => i + 1);
   }
 
-  if (currentPage <= 4) {
+  // Beginning: 1 2 3 4 5 ... last
+  if (currentPage <= 3) {
     return [1, 2, 3, 4, 5, "...", totalPages];
   }
 
-  if (currentPage >= totalPages - 3) {
-    return [1, "...", totalPages - 4, totalPages - 3, totalPages - 2, totalPages - 1, totalPages];
+  // End: 1 ... last-4 last-3 last-2 last-1 last
+  if (currentPage >= totalPages - 2) {
+    return [
+      1,
+      "...",
+      totalPages - 4,
+      totalPages - 3,
+      totalPages - 2,
+      totalPages - 1,
+      totalPages,
+    ];
   }
 
-  return [1, "...", currentPage - 1, currentPage, currentPage + 1, "...", totalPages];
+  // Middle: 1 ... current-2 current-1 current current+1 current+2 ... last
+  return [
+    1,
+    "...",
+    currentPage - 2,
+    currentPage - 1,
+    currentPage,
+    currentPage + 1,
+    currentPage + 2,
+    "...",
+    totalPages,
+  ];
 }
 
 /* ─── List ───────────────────────────────────────────────────────────────── */
@@ -1222,21 +1247,9 @@ export default function PaperList({
         )}
   
         {(totalPapers > 0 || papers.length > 0) && (
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full col-span-full mt-10 mb-6 pt-5 border-t border-[#E5E5E0]">
-            <div className="text-[13px] text-[#666] font-mono">
-              {totalPapers > 0 ? (
-                <span>
-                  Showing <strong className="text-[#111]">{(page - 1) * itemsPerPage + 1}</strong>–
-                  <strong className="text-[#111]">{Math.min(page * itemsPerPage, totalPapers).toLocaleString()}</strong> of{" "}
-                  <strong className="text-[#111]">{totalPapers.toLocaleString()}</strong> papers
-                </span>
-              ) : (
-                <span>Page {page}</span>
-              )}
-            </div>
-
-            <div className="flex items-center bg-white border border-[#E5E5E0] shadow-sm rounded-full p-1.5 h-[48px] max-w-full overflow-x-auto hide-scroll">
-              <div className="flex items-center px-1 gap-1">
+          <div className="flex justify-center w-full col-span-full mt-10 mb-6 pt-5 border-t border-[#E5E5E0]">
+            <div className="flex items-center justify-center bg-white border border-[#E5E5E0] shadow-sm rounded-full p-1.5 min-h-[48px] max-w-full overflow-x-auto hide-scroll">
+              <div className="flex items-center px-1 gap-1 shrink-0">
                 {/* Previous Page Button */}
                 <button
                   onClick={() => {
@@ -1262,7 +1275,7 @@ export default function PaperList({
                 {getPaginationRange(page, totalPages).map((item, index) => {
                   if (item === "...") {
                     return (
-                      <span key={`dots-${index}`} className="w-6 h-8 flex items-center justify-center text-[#999] text-[13px] font-medium select-none shrink-0">
+                      <span key={`dots-${index}`} className="w-7 h-9 flex items-center justify-center text-[#777] text-[13px] font-medium select-none shrink-0">
                         …
                       </span>
                     );
@@ -1285,7 +1298,7 @@ export default function PaperList({
                           }
                         }
                       }}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-medium transition-all shrink-0 ${
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-medium transition-all shrink-0 ${
                         isActive
                           ? "bg-[#F55036] text-white font-bold shadow-sm"
                           : "text-[#555] hover:text-[#111] hover:bg-[#F8F7F2]"
@@ -1342,7 +1355,7 @@ export default function PaperList({
                   <option value={50}>50 / page</option>
                   <option value={100}>100 / page</option>
                 </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#666]">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#777]">
                   <ChevronDown size={14} />
                 </div>
               </div>

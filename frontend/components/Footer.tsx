@@ -1,19 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import {
-  FaXTwitter,
-  FaLinkedinIn,
-  FaInstagram,
-  FaYoutube,
-  FaDiscord,
-} from "react-icons/fa6";
 
 const footerColumns = [
   {
-    title: "PRODUCT",
+    title: "PRODUCTS",
     links: [
-      { label: "Tasks", href: "/tasks" },
       { label: "Methods", href: "/methods" },
       { label: "Benchmarks", href: "/benchmarks" },
       { label: "Models", href: "/models" },
@@ -21,9 +13,19 @@ const footerColumns = [
     ],
   },
   {
+    title: "COMPANY",
+    links: [
+      { label: "About", href: "/about" },
+      { label: "Contact", href: "/contact" },
+      { label: "Write Blog", href: "/contact" },
+      { label: "Privacy", href: "/privacy" },
+      { label: "Terms", href: "/terms" },
+    ],
+  },
+  {
     title: "CONNECT",
     links: [
-      { label: "X", href: "#" },
+      { label: "X / Twitter", href: "#" },
       { label: "LinkedIn", href: "#" },
       { label: "Instagram", href: "#" },
       { label: "YouTube", href: "#" },
@@ -35,240 +37,154 @@ const footerColumns = [
       { label: "Podcast", href: "#" },
       { label: "Newsletter", href: "#" },
       { label: "AI Tools", href: "#" },
-      { label: "GraphOne", href: "#" },
+      { label: "Graph One", href: "#" },
     ],
-  },
-  {
-    title: "COMPANY",
-    links: [
-      { label: "About", href: "/about" },
-      { label: "Contact", href: "/contact" },
-      { label: "Write Blog", href: "/contact" },
-      { label: "Press", href: "/contact" },
-      { label: "Privacy", href: "/privacy" },
-      { label: "Terms", href: "/terms" },
-    ],
-  },
-];
-
-const socialLinks = [
-  {
-    label: "X",
-    href: "#",
-    icon: FaXTwitter,
-  },
-  {
-    label: "LinkedIn",
-    href: "#",
-    icon: FaLinkedinIn,
-  },
-  {
-    label: "Instagram",
-    href: "#",
-    icon: FaInstagram,
-  },
-  {
-    label: "YouTube",
-    href: "#",
-    icon: FaYoutube,
-  },
-  {
-    label: "Discord",
-    href: "#",
-    icon: FaDiscord,
   },
 ];
 
 export default function Footer() {
   return (
-    <footer className="w-full bg-black text-white overflow-hidden">
+    <footer className="w-full overflow-hidden bg-[#1D2B38] text-white">
+      <div
+        className="
+          mx-auto
+          w-full
+          max-w-[1900px]
+          px-5
+          pt-9
+          sm:px-7
+          sm:pt-10
+          md:px-9
+          lg:px-11
+          xl:px-14
+        "
+      >
+        {/* TOP SECTION */}
+        <div
+          className="
+            grid
+            grid-cols-1
+            gap-8
+            lg:grid-cols-[1.05fr_2.95fr]
+            lg:gap-12
+            xl:gap-16
+          "
+        >
+          {/* BRAND */}
+          <div className="min-w-0">
+            <Link
+              href="/"
+              className="
+                inline-block
+                text-[26px]
+                font-bold
+                tracking-[-0.04em]
+                text-white
+                transition-opacity
+                hover:opacity-80
+                sm:text-[29px]
+              "
+            >
+              FrontierAtlas
+            </Link>
 
-      {/* ============================================================
-          LARGE FRONTIER ATLAS WORD
-          ============================================================ */}
+            <p className="mt-5 max-w-[430px] text-[18px] leading-[1.35] text-white sm:text-[20px]">
+              The Home of Everything AI.
+            </p>
 
-      <div className="w-full border-b border-[#292929]">
-        <div className="w-full overflow-hidden px-3 sm:px-5 md:px-7 lg:px-10">
-          <div
-            className="
-              w-full
-              text-center
-              font-bold
-              leading-[0.82]
-              tracking-[0.035em]
-              text-white
-              whitespace-nowrap
-            "
-            style={{
-              fontSize: "clamp(46px, 12.5vw, 205px)",
-            }}
-          >
-            FrontierAtlas
+            <p className="mt-3 max-w-[450px] text-[14px] leading-6 text-[#C1CBD4] sm:text-[15px]">
+              Discover methods, benchmarks, models, organizations, and the
+              latest research shaping the global AI ecosystem.
+            </p>
           </div>
-        </div>
-      </div>
 
-      {/* ============================================================
-          MAIN FOOTER
-          ============================================================ */}
-
-      <div className="w-full px-6 sm:px-8 md:px-10 lg:px-12 xl:px-16">
-        <div className="mx-auto max-w-[1700px]">
-
+          {/* FOUR COLUMNS */}
           <div
             className="
               grid
-              grid-cols-1
-              md:grid-cols-2
-              xl:grid-cols-[1.35fr_0.8fr_0.8fr_0.9fr_0.9fr]
-              gap-x-10
-              lg:gap-x-14
-              xl:gap-x-16
-              gap-y-12
-              py-12
-              md:py-14
-              lg:py-16
+              grid-cols-4
+              gap-x-3
+              sm:gap-x-5
+              md:gap-x-7
+              lg:gap-x-9
+              xl:gap-x-12
             "
           >
-
-            {/* ======================================================
-                BRAND / LEFT SIDE
-                ====================================================== */}
-
-            <div className="min-w-0">
-
-              {/* Brand */}
-              <Link
-                href="/"
-                className="
-                  inline-block
-                  text-[28px]
-                  sm:text-[31px]
-                  font-bold
-                  tracking-[-0.045em]
-                  text-white
-                  transition-opacity
-                  hover:opacity-75
-                "
-              >
-                FrontierAtlas
-              </Link>
-
-              {/* Tagline */}
-              <p
-                className="
-                  mt-9
-                  max-w-[390px]
-                  text-[20px]
-                  sm:text-[22px]
-                  lg:text-[23px]
-                  leading-[1.35]
-                  text-white
-                "
-              >
-                The Home of Everything AI.
-              </p>
-
-              {/* Description */}
-              <p
-                className="
-                  mt-5
-                  max-w-[430px]
-                  text-[15px]
-                  sm:text-[16px]
-                  leading-[1.7]
-                  text-[#9E9E9E]
-                "
-              >
-                Discover the tools, companies, and technologies shaping the
-                global AI ecosystem.
-              </p>
-
-              {/* Social icons */}
-              <div className="mt-8 flex items-center gap-6">
-                {socialLinks.map((social) => {
-                  const Icon = social.icon;
-
-                  return (
-                    <a
-                      key={social.label}
-                      href={social.href}
-                      aria-label={social.label}
-                      className="
-                        text-white
-                        transition-all
-                        duration-200
-                        hover:text-[#F55036]
-                        hover:-translate-y-0.5
-                      "
-                    >
-                      <Icon size={20} />
-                    </a>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* ======================================================
-                FOUR FOOTER COLUMNS
-                ====================================================== */}
-
             {footerColumns.map((column) => (
               <div key={column.title} className="min-w-0">
-
-                {/* Heading */}
                 <h3
                   className="
-                    text-[14px]
-                    sm:text-[15px]
+                    whitespace-nowrap
+                    text-[9px]
                     font-bold
-                    tracking-[0.055em]
+                    tracking-[0.16em]
                     text-white
+                    sm:text-[11px]
+                    md:text-[12px]
+                    lg:text-[13px]
                   "
                 >
                   {column.title}
                 </h3>
 
-                {/* Single divider */}
-                <div className="mt-5 mb-6 h-px w-full bg-[#292929]" />
+                <div className="mt-3 h-px w-full bg-[#52606B]" />
 
-                {/* Links */}
-                <ul className="space-y-5">
+                <div className="mt-4 flex flex-col gap-2.5">
                   {column.links.map((link) => (
-                    <li key={link.label}>
-                      <Link
-                        href={link.href}
-                        className="
-                          text-[15px]
-                          sm:text-[16px]
-                          leading-none
-                          text-[#D0D0D0]
-                          transition-colors
-                          duration-200
-                          hover:text-white
-                        "
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
+                    <Link
+                      key={link.label}
+                      href={link.href}
+                      className="
+                        text-[10px]
+                        leading-[1.3]
+                        text-[#D5DCE2]
+                        transition-colors
+                        duration-200
+                        hover:text-white
+                        sm:text-[12px]
+                        md:text-[13px]
+                        lg:text-[15px]
+                      "
+                    >
+                      {link.label}
+                    </Link>
                   ))}
-                </ul>
-
+                </div>
               </div>
             ))}
-
           </div>
-
-          {/* ==========================================================
-              SINGLE BOTTOM DIVIDER
-              ========================================================== */}
-
-          <div className="h-px w-full bg-[#292929]" />
-
-          {/* Small bottom spacing only */}
-          <div className="h-8 sm:h-10" />
-
         </div>
+
+        {/* SINGLE DIVIDER */}
+        <div className="mt-9 h-px w-full bg-[#52606B] sm:mt-11 md:mt-12" />
+
+       {/* LARGE FRONTIER ATLAS */}
+<div className="w-full overflow-hidden pt-6 sm:pt-7 md:pt-8">
+  <div
+    className="
+      w-full
+      whitespace-nowrap
+      text-center
+      font-bold
+      leading-[0.74]
+      tracking-[-0.085em]
+      text-white
+      select-none
+    "
+    style={{
+      fontSize: "clamp(46px, 15vw, 290px)",
+      transform: "scaleX(1.11)",
+      transformOrigin: "center",
+    }}
+  >
+    FrontierAtlas
+  </div>
+</div>
+
+<div className="h-5 sm:h-6 md:h-7" />
+
+        {/* SMALL BOTTOM SPACE */}
+        <div className="h-5 sm:h-6 md:h-7" />
       </div>
     </footer>
   );
