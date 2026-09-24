@@ -51,18 +51,6 @@ export default function HomeContent({
     ) {
       setIsFilterChanging(true);
       setActiveSort(label);
-
-      // Intelligently sync the timeframe when switching discovery sorts
-      if (label === "Most GitHub Stars") {
-        // High-starred AI papers span all time, so default to All time
-        setSelectedPeriod("All time");
-      } else if (label === "Trending Papers") {
-        // Trending papers show optimal velocity within This Week
-        setSelectedPeriod("This Week");
-      } else if (label === "Latest Papers") {
-        // Latest preprints are best experienced from Today
-        setSelectedPeriod("Today");
-      }
     }
   };
 
