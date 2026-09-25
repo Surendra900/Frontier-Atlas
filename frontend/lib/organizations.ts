@@ -1,4 +1,17 @@
 import { getModelFacets, getModels, type ModelFacets, type ModelItem } from "@/lib/models";
+import { fetchApi } from "@/lib/api"; // Adjust import path if needed based on your project structure
+
+export type OrganizationMetricsResponse = {
+  status: string;
+  count: number;
+  data: Array<{
+    organization: string;
+    paperCount: number;
+    citations: number;
+    stars: number;
+    trendingScore: number;
+  }>;
+};
 
 export type OrganizationDirectoryData = {
   models: ModelItem[];
@@ -73,20 +86,37 @@ export async function getOrganizationMetrics(): Promise<OrganizationMetricsRespo
 export function getOrganizationDirectory(): Promise<OrganizationDirectoryData> {
   if (!directoryPromise) {
     directoryPromise = (async () => {
-      const [facets, models] = await Promise.all([
+      const [facets, models, metricsResponse] = await Promise.all([
         getOrganizationFacets().catch(() => DEFAULT_FACETS),
         getModels().catch(() => []),
+        getOrganizationMetrics().catch(() => null),
       ]);
 
       const safeModels = Array.isArray(models) ? models : [];
       const safeVendors = Array.isArray(facets?.vendors) ? facets.vendors : [];
 
-      // Derive paper counts directly from models for instant rendering
       const initialCounts: Record<string, number> = {};
+      const initialCitations: Record<string, number> = {};
+      const initialStars: Record<string, number> = {};
+      const initialTrending: Record<string, number> = {};
 
+      // Populate metrics from backend response if available
+      if (metricsResponse?.data && Array.isArray(metricsResponse.data)) {
+        metricsResponse.data.forEach((item) => {
+          if (item && item.organization) {
+            const key = item.organization.trim().toLowerCase();
+            initialCounts[key] = item.paperCount || 0;
+            initialCitations[key] = item.citations || 0;
+            initialStars[key] = item.stars || 0;
+            initialTrending[key] = item.trendingScore || 0;
+          }
+        });
+      }
+
+      // Derive paper counts from models as fallback/supplement
       safeModels.forEach((m) => {
         if (m && typeof m.vendor === "string" && m.vendor.trim()) {
-          const key = m.vendor.trim();
+          const key = m.vendor.trim().toLowerCase();
           const count = typeof m.paperCount === "number" && m.paperCount > 0 ? m.paperCount : 1;
           initialCounts[key] = (initialCounts[key] || 0) + count;
         }
@@ -94,23 +124,20 @@ export function getOrganizationDirectory(): Promise<OrganizationDirectoryData> {
 
       safeVendors.forEach((v) => {
         if (v && typeof v.name === "string" && v.name.trim()) {
-          const key = v.name.trim();
+          const key = v.name.trim().toLowerCase();
           if (!initialCounts[key]) {
             initialCounts[key] = typeof v.count === "number" ? v.count : 0;
           }
         }
-
-        // Also map under original name casing for easy lookup
-        paperCounts[vendor.name] = paperCounts[key] ?? 0;
-        citations[vendor.name] = citations[key] ?? 0;
-        stars[vendor.name] = stars[key] ?? 0;
-        trendingScores[vendor.name] = trendingScores[key] ?? 0;
-      }
+      });
 
       return {
         models: safeModels,
         facets: facets || DEFAULT_FACETS,
         paperCounts: initialCounts,
+        citations: initialCitations,
+        stars: initialStars,
+        trendingScores: initialTrending,
       };
     })().catch((error) => {
       directoryPromise = null;
