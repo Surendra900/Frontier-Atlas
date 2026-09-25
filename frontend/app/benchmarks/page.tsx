@@ -494,9 +494,7 @@ function BenchmarksContent() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [yearFilter, setYearFilter]     = useState<string | null>(null);
   const [showFilters, setShowFilters]   = useState(false);
-  const [showSubmitModal, setShowSubmitModal] = useState(false);
-  const [submitSubmitted, setSubmitSubmitted] = useState(false);
-  const [submitForm, setSubmitForm] = useState({ name: "", datasetUrl: "", paperUrl: "", description: "" });
+  
 
   const [compareItems, setCompareItems] = useState<BenchmarkItem[]>([]);
   const [showCompareModal, setShowCompareModal] = useState(false);
@@ -691,15 +689,7 @@ function BenchmarksContent() {
       label: "Evaluations",
     },
   ]}
-  action={
-  <button
-    onClick={() => setShowSubmitModal(true)}
-    className="inline-flex items-center gap-1.5 px-4 py-2 text-[13px] font-semibold text-white bg-[#F55036] hover:bg-[#e0432b] active:scale-[0.97] rounded-full shadow-sm transition-all cursor-pointer"
-  >
-    <Plus size={16} />
-    Submit Benchmark
-  </button>
-}
+ 
 />
 
             {/* ══ CONTENT TWO-COLUMN LAYOUT (Preserved sidebar layout) ══ */}
@@ -920,7 +910,7 @@ function BenchmarksContent() {
                     </section>
                   </>
                 )}
-                {/* 👆 THIS IS THE END OF THE HIDDEN SECTIONS 👆 */}
+                {/*  THIS IS THE END OF THE HIDDEN SECTIONS */}
 
                 {/* ══ 8. BENCHMARK DIRECTORY ══ */}
                 <section ref={directoryRef} className="scroll-mt-6">
@@ -1148,25 +1138,7 @@ function BenchmarksContent() {
                   )}
                 </section>
 
-                {/* ══ 9. FOOTER CTA ══ */}
-                <section className="py-8 text-center border-t border-gray-100">
-                  <div className="max-w-xl mx-auto space-y-4">
-                    <h3 className="text-[20px] font-extrabold text-gray-900 tracking-tight">
-                      Missing a benchmark?
-                    </h3>
-                    <p className="text-sm text-gray-500 leading-relaxed">
-                      Submit a benchmark or contribute evaluation results to help keep Frontier Atlas up to date.
-                    </p>
-                    <div className="pt-2 flex items-center justify-center gap-3">
-                      <button
-                        onClick={() => setShowSubmitModal(true)}
-                        className="flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white px-6 py-2.5 rounded-lg font-medium text-sm transition-colors shadow-sm cursor-pointer"
-                      >
-                        <Plus size={14} /> Submit Benchmark
-                      </button>
-                    </div>
-                  </div>
-                </section>
+                
 
               </div>
             </div>
@@ -1209,121 +1181,7 @@ function BenchmarksContent() {
         <BenchmarkCompareModal items={compareItems} onClose={() => setShowCompareModal(false)} />
       )}
 
-      {/* ══ SUBMIT BENCHMARK MODAL ══ */}
-      {showSubmitModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-[#E5E5E0] relative animate-in fade-in zoom-in duration-200">
-            <button
-              onClick={() => {
-                setShowSubmitModal(false);
-                setSubmitSubmitted(false);
-              }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 p-1 rounded-full hover:bg-gray-100 transition-colors"
-            >
-              <X size={18} />
-            </button>
-
-            {submitSubmitted ? (
-              <div className="py-8 text-center space-y-3">
-                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl">
-                  ✓
-                </div>
-                <h3 className="text-lg font-bold text-gray-900">Benchmark Submitted!</h3>
-                <p className="text-xs text-gray-500 max-w-xs mx-auto">
-                  Thank you for submitting <strong>{submitForm.name || "your benchmark"}</strong>. Our team will review and index it shortly.
-                </p>
-                <button
-                  onClick={() => {
-                    setShowSubmitModal(false);
-                    setSubmitSubmitted(false);
-                    setSubmitForm({ name: "", datasetUrl: "", paperUrl: "", description: "" });
-                  }}
-                  className="mt-4 px-5 py-2 bg-gray-900 text-white text-xs font-semibold rounded-lg hover:bg-gray-800 transition-colors"
-                >
-                  Done
-                </button>
-              </div>
-            ) : (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  if (!submitForm.name.trim()) return;
-                  setSubmitSubmitted(true);
-                }}
-                className="space-y-4"
-              >
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Submit a Benchmark</h3>
-                  <p className="text-xs text-gray-500">Provide details about the new benchmark or dataset.</p>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Benchmark Name *</label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="e.g. CodeEval-2025"
-                      value={submitForm.name}
-                      onChange={(e) => setSubmitForm({ ...submitForm, name: e.target.value })}
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg outline-none focus:border-[#F55036] focus:ring-1 focus:ring-[#F55036]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Paper URL / arXiv ID</label>
-                    <input
-                      type="text"
-                      placeholder="https://arxiv.org/abs/2401.xxxxx"
-                      value={submitForm.paperUrl}
-                      onChange={(e) => setSubmitForm({ ...submitForm, paperUrl: e.target.value })}
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg outline-none focus:border-[#F55036] focus:ring-1 focus:ring-[#F55036]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Dataset / Repo URL</label>
-                    <input
-                      type="text"
-                      placeholder="https://github.com/..."
-                      value={submitForm.datasetUrl}
-                      onChange={(e) => setSubmitForm({ ...submitForm, datasetUrl: e.target.value })}
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg outline-none focus:border-[#F55036] focus:ring-1 focus:ring-[#F55036]"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-gray-700 mb-1">Description</label>
-                    <textarea
-                      rows={3}
-                      placeholder="Briefly describe the task, evaluation metric, or domain..."
-                      value={submitForm.description}
-                      onChange={(e) => setSubmitForm({ ...submitForm, description: e.target.value })}
-                      className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg outline-none focus:border-[#F55036] focus:ring-1 focus:ring-[#F55036] resize-none"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowSubmitModal(false)}
-                    className="px-4 py-2 text-xs font-medium text-gray-600 hover:text-gray-900 rounded-lg"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-5 py-2 text-xs font-semibold text-white bg-[#F55036] hover:bg-[#e0432b] rounded-lg shadow-xs transition-colors cursor-pointer"
-                  >
-                    Submit
-                  </button>
-                </div>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+      
     </div>
   );
 }

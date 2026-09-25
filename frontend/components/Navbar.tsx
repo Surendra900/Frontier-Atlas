@@ -25,7 +25,7 @@ export default function Navbar({
   const isBenchmarksActive = pathname.startsWith("/benchmarks");
   const isModelsActive = pathname.startsWith("/models");
   const isOrganizationsActive = pathname.startsWith("/organizations");
-
+  const isSubmitActive = pathname.startsWith("/submit");
   const isHomePage = pathname === "/";
   const isCategoryPage = pathname.startsWith("/category/");
 
@@ -246,6 +246,18 @@ export default function Navbar({
             >
               Organizations
             </Link>
+                        <Link
+              href="/submit"
+              data-text="Submit"
+              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${
+                isSubmitActive
+                  ? "text-[#F55036] font-bold"
+                  : "text-[#555555] font-medium hover:text-[#F55036]"
+              }`}
+            >
+              Submit
+            </Link>
+            
           </div>
         </div>
       </nav>
