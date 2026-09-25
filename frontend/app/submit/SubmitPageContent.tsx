@@ -59,7 +59,7 @@ function Field({
         {label} {required && <span className="text-[#F55036]">*</span>}
       </label>
       {children}
-      {hint && <p className="mt-1 text-[12px] text-[#888888]">{hint}</p>}
+
     </div>
   );
 }
@@ -119,8 +119,8 @@ function PaperForm() {
   const [done, setDone] = useState(false);
   const set =
     (k: keyof typeof form) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm((f) => ({ ...f, [k]: e.target.value }));
+      (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+        setForm((f) => ({ ...f, [k]: e.target.value }));
 
   if (done) {
     return (
@@ -188,8 +188,8 @@ function BenchmarkForm() {
   const [done, setDone] = useState(false);
   const set =
     (k: keyof typeof form) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm((f) => ({ ...f, [k]: e.target.value }));
+      (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+        setForm((f) => ({ ...f, [k]: e.target.value }));
 
   if (done) {
     return (
@@ -246,8 +246,8 @@ function DataForm() {
   const [done, setDone] = useState(false);
   const set =
     (k: keyof typeof form) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-      setForm((f) => ({ ...f, [k]: e.target.value }));
+      (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+        setForm((f) => ({ ...f, [k]: e.target.value }));
 
   if (done) {
     return (
@@ -307,8 +307,8 @@ function SuggestionForm() {
   const [done, setDone] = useState(false);
   const set =
     (k: keyof typeof form) =>
-    (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
-      setForm((f) => ({ ...f, [k]: e.target.value }));
+      (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
+        setForm((f) => ({ ...f, [k]: e.target.value }));
 
   if (done) {
     return (
@@ -374,11 +374,10 @@ export default function SubmitPageContent() {
             role="tab"
             aria-selected={tab === t.key}
             onClick={() => setTab(t.key)}
-            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-semibold transition-colors cursor-pointer ${
-              tab === t.key
+            className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-[13px] font-semibold transition-colors cursor-pointer ${tab === t.key
                 ? "bg-[#111111] text-white"
                 : "bg-white text-[#555555] border border-[#E5E5E0] hover:border-[#111111]"
-            }`}
+              }`}
           >
             {t.icon}
             {t.label}
