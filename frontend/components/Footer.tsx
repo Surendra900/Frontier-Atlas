@@ -1,120 +1,217 @@
 "use client";
 
 import Link from "next/link";
-import Image from "next/image";
-import { FaXTwitter, FaLinkedinIn, FaInstagram, FaYoutube, FaDiscord } from "react-icons/fa6";
-import { ArrowUp } from "lucide-react";
-import MatrixLogo from "./MatrixLogo";
+
+const footerSections = [
+  {
+    title: "PRODUCTS",
+    links: [
+      { label: "Tasks", href: "/tasks" },
+      { label: "Methods", href: "/methods" },
+      { label: "Benchmarks", href: "/benchmarks" },
+      { label: "Models", href: "/models" },
+      { label: "Organizations", href: "/organizations" },
+    ],
+  },
+  {
+    title: "COMPANY",
+    links: [
+      { label: "About", href: "/about" },
+      { label: "Contact", href: "/contact" },
+      { label: "Press", href: "/press" },
+      { label: "Privacy", href: "/privacy" },
+      { label: "Terms", href: "/terms" },
+    ],
+  },
+  {
+    title: "CONNECT",
+    links: [
+      {
+        label: "X / Twitter",
+        href: "#",
+      },
+      {
+        label: "LinkedIn",
+        href: "https://www.linkedin.com/company/frontieratlashq",
+      },
+      {
+        label: "Instagram",
+        href: "#",
+      },
+      {
+        label: "YouTube",
+        href: "https://www.youtube.com/@graphoneofficial",
+      },
+    ],
+  },
+  {
+    title: "FROM OUR WORLD",
+    links: [
+      {
+        label: "Podcast",
+        href: "https://www.youtube.com/@graphoneofficial",
+      },
+      {
+        label: "Newsletter",
+        href: "https://brief.graphone.co/",
+      },
+      {
+        label: "AI Tools",
+        href: "https://aiorbit.club/",
+      },
+      {
+        label: "Graph One",
+        href: "https://graphone.co/",
+      },
+    ],
+  },
+];
 
 export default function Footer() {
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
   return (
-    <footer className="w-full bg-[#1B2733] mt-auto shrink-0 border-t border-[#E5E5E0]">
-      <MatrixLogo />
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 md:px-12 pt-8 pb-4 md:pt-10 md:pb-4">
-        <div className="grid grid-cols-12 gap-x-2 sm:gap-x-6 gap-y-10 sm:gap-y-12 lg:gap-x-8">
-          
-          {/* Brand Column */}
-          <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
-            <Link href="/" className="relative block w-[240px] sm:w-[280px] h-12 sm:h-14 -ml-1">
-              <Image src="/logo.png" alt="Frontier Atlas" fill className="object-contain object-left brightness-0 invert" sizes="(max-width: 640px) 240px, 280px" />
-            </Link>
-            <div className="flex flex-col gap-2 mt-2">
-              <p className="text-[15px] text-white font-medium">
-                The Home of Everything AI.
-              </p>
-              <p className="text-[15px] text-white/70 leading-relaxed max-w-[320px]">
-                Discover the tools, companies, and technologies shaping the global AI ecosystem.
+    <footer className="w-full overflow-hidden bg-[#0A2026] text-white">
+      <div className="w-full px-6 pt-10 pb-0 sm:px-8 sm:pt-12 md:px-10 lg:px-12 xl:px-14">
+        <div className="mx-auto w-full max-w-[1800px]">
+
+          {/* TOP SECTION */}
+          <div className="grid grid-cols-1 gap-10 md:grid-cols-[1.25fr_3fr] md:gap-12 lg:grid-cols-[1.15fr_3fr] lg:gap-16">
+
+            {/* BRAND / DESCRIPTION */}
+            <div className="min-w-0">
+              <Link
+                href="/"
+                className="
+                  inline-block
+                  text-[28px]
+                  font-bold
+                  tracking-[-0.045em]
+                  text-white
+                  transition-opacity
+                  hover:opacity-80
+                  sm:text-[30px]
+                  md:text-[32px]
+                "
+              >
+                FrontierAtlas
+              </Link>
+
+              <p
+                className="
+                  mt-6
+                  max-w-[420px]
+                  text-[17px]
+                  leading-[1.55]
+                  text-white
+                  sm:text-[18px]
+                  md:mt-7
+                  md:text-[19px]
+                "
+              >
+                Discover methods, benchmarks, models, organizations, and the
+                latest research shaping the global AI ecosystem.
               </p>
             </div>
-            <div className="flex items-center gap-5 mt-4">
-              <a href="https://x.com" target="_blank" rel="noopener noreferrer" aria-label="X (Twitter)" className="text-white/70 hover:text-[#F55036] transition-colors">
-                <FaXTwitter size={20} />
-              </a>
-              <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn" className="text-white/70 hover:text-[#F55036] transition-colors">
-                <FaLinkedinIn size={20} />
-              </a>
-              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" aria-label="Instagram" className="text-white/70 hover:text-[#F55036] transition-colors">
-                <FaInstagram size={20} />
-              </a>
-              <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" aria-label="YouTube" className="text-white/70 hover:text-[#F55036] transition-colors">
-                <FaYoutube size={20} />
-              </a>
-              <a href="https://discord.com" target="_blank" rel="noopener noreferrer" aria-label="Discord" className="text-white/70 hover:text-[#F55036] transition-colors">
-                <FaDiscord size={20} />
-              </a>
+
+            {/* FOUR COLUMNS */}
+            <div
+              className="
+                grid
+                grid-cols-2
+                gap-x-8
+                gap-y-10
+                sm:grid-cols-2
+                md:grid-cols-4
+                md:gap-x-7
+                lg:gap-x-10
+                xl:gap-x-14
+              "
+            >
+              {footerSections.map((section) => (
+                <div key={section.title} className="min-w-0">
+                  {/* HEADING */}
+                  <h3
+                    className="
+                      text-[13px]
+                      font-bold
+                      tracking-[0.16em]
+                      text-white
+                      sm:text-[14px]
+                    "
+                  >
+                    {section.title}
+                  </h3>
+
+                  {/* DIVIDER */}
+                  <div className="mt-5 h-px w-full bg-white/30" />
+
+                  {/* LINKS */}
+                  <ul className="mt-5 space-y-4">
+                    {section.links.map((link) => {
+                      const isExternal = link.href.startsWith("http");
+
+                      return (
+                        <li key={link.label}>
+                          <Link
+                            href={link.href}
+                            target={isExternal ? "_blank" : undefined}
+                            rel={
+                              isExternal
+                                ? "noopener noreferrer"
+                                : undefined
+                            }
+                            className="
+                              block
+                              text-[15px]
+                              leading-[1.3]
+                              text-white/90
+                              transition-opacity
+                              duration-200
+                              hover:text-white
+                              hover:opacity-70
+                              sm:text-[16px]
+                            "
+                          >
+                            {link.label}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Explore Column */}
-          <div className="col-span-3 lg:col-span-2">
-            <h4 className="font-bold text-white text-[10px] sm:text-[13px] uppercase tracking-normal sm:tracking-wider mb-3 sm:mb-4">Explore</h4>
-            <div className="w-full h-px bg-white/10 mb-4 sm:mb-6 max-w-[120px]"></div>
-            <ul className="flex flex-col gap-2 sm:gap-3.5">
-              <li><Link href="/" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Papers</Link></li>
-              <li><Link href="/models" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Models</Link></li>
-              <li><Link href="/tasks" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Tasks</Link></li>
-              <li><Link href="/datasets" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Datasets</Link></li>
-            </ul>
+          {/* DIVIDER */}
+          <div className="mt-10 h-px w-full bg-white/30 sm:mt-12 md:mt-14" />
+
+          {/* LARGE FRONTIER ATLAS */}
+          <div className="w-full overflow-hidden pt-6 sm:pt-7 md:pt-8">
+            <div
+              className="
+                w-full
+                whitespace-nowrap
+                text-center
+                font-bold
+                leading-[0.74]
+                tracking-[-0.085em]
+                text-white
+                select-none
+              "
+              style={{
+                fontSize: "clamp(46px, 15vw, 290px)",
+                transform: "scaleX(1.11)",
+                transformOrigin: "center",
+              }}
+            >
+              FrontierAtlas
+            </div>
           </div>
 
-          {/* Discover Column */}
-          <div className="col-span-3 lg:col-span-2">
-            <h4 className="font-bold text-white text-[10px] sm:text-[13px] uppercase tracking-normal sm:tracking-wider mb-3 sm:mb-4">Discover</h4>
-            <div className="w-full h-px bg-white/10 mb-4 sm:mb-6 max-w-[120px]"></div>
-            <ul className="flex flex-col gap-2 sm:gap-3.5">
-              <li><Link href="/methods" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Methods</Link></li>
-              <li><Link href="/benchmarks" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Benchmarks</Link></li>
-              <li><Link href="/organizations" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Organizations</Link></li>
-              <li><Link href="/authors" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Authors</Link></li>
-            </ul>
-          </div>
-
-          {/* Ecosystem Column */}
-          <div className="col-span-3 lg:col-span-2">
-            <h4 className="font-bold text-white text-[10px] sm:text-[13px] uppercase tracking-normal sm:tracking-wider mb-3 sm:mb-4">Ecosystem</h4>
-            <div className="w-full h-px bg-white/10 mb-4 sm:mb-6 max-w-[120px]"></div>
-            <ul className="flex flex-col gap-2 sm:gap-3.5">
-              <li><Link href="/discussions" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Discussions</Link></li>
-              <li><Link href="/saved" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Saved Papers</Link></li>
-              <li><a href="https://github.com/AtlasFrontierOrg" target="_blank" rel="noopener noreferrer" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">API Docs</a></li>
-              <li><Link href="/contact" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Submit Research</Link></li>
-            </ul>
-          </div>
-
-          {/* Company Column */}
-          <div className="col-span-3 lg:col-span-2">
-            <h4 className="font-bold text-white text-[10px] sm:text-[13px] uppercase tracking-normal sm:tracking-wider mb-3 sm:mb-4">Company</h4>
-            <div className="w-full h-px bg-white/10 mb-4 sm:mb-6 max-w-[120px]"></div>
-            <ul className="flex flex-col gap-2 sm:gap-3.5">
-              <li><Link href="/about" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">About</Link></li>
-              <li><Link href="/contact" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Contact</Link></li>
-              <li><Link href="/contact" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Write</Link></li>
-              <li><Link href="/contact" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Press</Link></li>
-              <li><Link href="/privacy" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Privacy</Link></li>
-              <li><Link href="/terms" className="inline-block text-[11px] sm:text-[14px] leading-tight sm:leading-normal font-medium text-white/80 hover:text-white transition-colors">Terms</Link></li>
-            </ul>
-          </div>
-
-        </div>
-
-        <div className="w-full h-px bg-white/10 mt-8 mb-4"></div>
-
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-[13px] text-white/50 font-medium pb-2">
-          <p suppressHydrationWarning>© {new Date().getFullYear()} FrontierAtlas. All rights reserved.</p>
-          <button 
-            onClick={scrollToTop}
-            aria-label="Scroll to top"
-            className="w-8 h-8 rounded-full border border-white/20 flex items-center justify-center text-white/70 hover:text-white hover:border-white transition-all bg-transparent"
-          >
-            <ArrowUp size={16} />
-          </button>
+          {/* BOTTOM SPACING */}
+          <div className="h-5 sm:h-6 md:h-7" />
         </div>
       </div>
     </footer>
   );
 }
-
