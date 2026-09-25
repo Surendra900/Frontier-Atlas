@@ -27,6 +27,11 @@ public getClient(): PrismaClient {
   }
 
   const connectionString = this.urls.DATABASE_URL;
+  if (!connectionString) {
+    throw new Error(
+      "DatabaseManager: DATABASE_URL is missing or empty. Please ensure DATABASE_URL (or SHARD_1_DATABASE_URL) is configured in your environment or .dev.vars."
+    );
+  }
   const isNeon = connectionString.includes("neon.tech");
 
   if (isNeon) {

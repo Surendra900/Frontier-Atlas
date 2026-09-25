@@ -11,8 +11,16 @@ import {
   type ModelItem,
 } from "@/lib/models";
 import { getOrganizationDirectory } from "@/lib/organizations";
+import { OrganizationLogo } from "@/components/domain/organizations/OrganizationLogo";
 
-type SortMode = "trending" | "models" | "az";
+type SortMode =
+  | "trending"
+  | "models"
+  | "citations"
+  | "citations-asc"
+  | "stars"
+  | "stars-asc"
+  | "az";
 
 const descriptions = [
   "A leading organization shaping the frontier of AI research and production.",
@@ -30,22 +38,6 @@ function organizationDescription(name: string) {
 function organizationSlug(name: string) {
   if (!name) return "";
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
-
-function organizationLogoUrl(logo?: string) {
-  if (!logo) return undefined;
-
-  try {
-    const url = new URL(logo);
-    if (url.hostname === "logo.clearbit.com") {
-      const domain = url.pathname.replace(/^\//, "");
-      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
-    }
-  } catch {
-    return logo;
-  }
-
-  return logo;
 }
 
 function OrganizationCard({
@@ -115,11 +107,12 @@ function OrganizationCard({
 }
 
 export default function OrganizationsPage() {
-  const cachedModels = getCachedModels();
-  const cachedFacets = getCachedModelFacets();
-  const [models, setModels] = useState<ModelItem[]>(cachedModels ?? []);
-  const [facets, setFacets] = useState<ModelFacets | null>(cachedFacets);
+  const [models, setModels] = useState<ModelItem[]>([]);
+  const [facets, setFacets] = useState<ModelFacets | null>(null);
   const [paperCounts, setPaperCounts] = useState<Record<string, number>>({});
+  const [citations, setCitations] = useState<Record<string, number>>({});
+  const [stars, setStars] = useState<Record<string, number>>({});
+  const [trendingScores, setTrendingScores] = useState<Record<string, number>>({});
   const [sort, setSort] = useState<SortMode>("trending");
   const [loading, setLoading] = useState(() => !(cachedModels && cachedFacets));
   const [isMounted, setIsMounted] = useState(false);
@@ -127,6 +120,14 @@ export default function OrganizationsPage() {
   useEffect(() => {
     setIsMounted(true);
     let cancelled = false;
+
+    const cachedModels = getCachedModels();
+    const cachedFacets = getCachedModelFacets();
+    if (cachedModels?.length && cachedFacets) {
+      setModels(cachedModels);
+      setFacets(cachedFacets);
+      setLoading(false);
+    }
 
     getOrganizationDirectory()
       .then((directory) => {
@@ -182,11 +183,41 @@ export default function OrganizationsPage() {
         };
       })
       .sort((a, b) => {
-        if (sort === "az") return a.name.localeCompare(b.name);
-        if (sort === "models") return b.count - a.count || a.name.localeCompare(b.name);
-        return b.momentum - a.momentum || b.count - a.count;
+        if (sort === "az") {
+          return a.name.localeCompare(b.name);
+        }
+        if (sort === "models") {
+          return (b.count - a.count) || a.name.localeCompare(b.name);
+        }
+        if (sort === "citations") {
+          return (Number(b.citations || 0) - Number(a.citations || 0)) || a.name.localeCompare(b.name);
+        }
+        if (sort === "citations-asc") {
+          return (Number(a.citations || 0) - Number(b.citations || 0)) || a.name.localeCompare(b.name);
+        }
+        if (sort === "stars") {
+          return (Number(b.stars || 0) - Number(a.stars || 0)) || a.name.localeCompare(b.name);
+        }
+        if (sort === "stars-asc") {
+          return (Number(a.stars || 0) - Number(b.stars || 0)) || a.name.localeCompare(b.name);
+        }
+        // Trending: deterministic numeric ranking on momentum / trendingScore, then paperCount, then model count, then name
+        return (
+          (Number(b.trendingScore || 0) - Number(a.trendingScore || 0)) ||
+          (Number(b.paperCount || 0) - Number(a.paperCount || 0)) ||
+          (b.count - a.count) ||
+          a.name.localeCompare(b.name)
+        );
       });
-  }, [facets?.vendors, models, paperCounts, sort]);
+  }, [facets?.vendors, models, paperCounts, citations, stars, trendingScores, sort]);
+
+  const handleCitationsClick = () => {
+    setSort((current) => (current === "citations" ? "citations-asc" : "citations"));
+  };
+
+  const handleStarsClick = () => {
+    setSort((current) => (current === "stars" ? "stars-asc" : "stars"));
+  };
 
   const orgCount = isMounted ? (facets?.vendors?.length ?? organizations.length) : "...";
 
@@ -241,7 +272,7 @@ export default function OrganizationsPage() {
             </div>
           </div>
 
-          {loading ? (
+          {(!mounted || loading) ? (
             <div className="mt-6 grid max-w-[1140px] grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, index) => (
                 <div key={index} className="h-[224px] animate-pulse rounded-md border border-[#E7E4DD] bg-white" />

@@ -4,6 +4,9 @@ export type OrganizationDirectoryData = {
   models: ModelItem[];
   facets: ModelFacets;
   paperCounts: Record<string, number>;
+  citations: Record<string, number>;
+  stars: Record<string, number>;
+  trendingScores: Record<string, number>;
 };
 
 export type OrganizationCatalogData = Pick<OrganizationDirectoryData, "models" | "facets">;
@@ -54,6 +57,16 @@ export function getOrganizationFacets(): Promise<ModelFacets> {
   return facetsPromise;
 }
 
+/** Fetches aggregated organization metrics from backend in a single batched query. */
+export async function getOrganizationMetrics(): Promise<OrganizationMetricsResponse | null> {
+  try {
+    return await fetchApi<OrganizationMetricsResponse>("/api/v1/research-papers/organization-metrics");
+  } catch {
+    // Non-critical: if endpoint is not available or fails, gracefully return null
+    return null;
+  }
+}
+
 /**
  * Warms counts and paper lists after the catalog is available.
  */
@@ -86,7 +99,13 @@ export function getOrganizationDirectory(): Promise<OrganizationDirectoryData> {
             initialCounts[key] = typeof v.count === "number" ? v.count : 0;
           }
         }
-      });
+
+        // Also map under original name casing for easy lookup
+        paperCounts[vendor.name] = paperCounts[key] ?? 0;
+        citations[vendor.name] = citations[key] ?? 0;
+        stars[vendor.name] = stars[key] ?? 0;
+        trendingScores[vendor.name] = trendingScores[key] ?? 0;
+      }
 
       return {
         models: safeModels,

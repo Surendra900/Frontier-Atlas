@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import { PaperCard } from "@/components/PaperFeed";
 import { getModelFacets, getModels } from "@/lib/models";
 import { getPapers, type Paper } from "@/lib/paperApi";
+import { OrganizationLogo } from "@/components/domain/organizations/OrganizationLogo";
 
 const toSlug = (value: string) =>
   typeof value === "string"
@@ -61,6 +62,7 @@ export default function OrganizationDetailClient({ slug }: { slug: string }) {
   const [logo, setLogo] = useState<string | undefined>();
   const [imageError, setImageError] = useState(false);
   const [papers, setPapers] = useState<Paper[]>([]);
+  const [paperCount, setPaperCount] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [sort, setSort] = useState<"latest" | "citations">("latest");
   const [isMounted, setIsMounted] = useState(false);

@@ -245,6 +245,23 @@ export const getPapers = async (
     ];
   }
 
+  // Enforce papers must have at least one task/method AND at least one sotaClaim/ranking
+  where.AND = [
+    ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
+    {
+      OR: [
+        { sotaClaims: { some: {} } },
+        { rankings: { some: {} } }
+      ]
+    },
+    {
+      OR: [
+        { tasks: { some: {} } },
+        { methods: { some: {} } }
+      ]
+    }
+  ];
+
   let baseDate = new Date();
   if (period !== "all") {
     let latestDbDate = new Date();
@@ -592,6 +609,9 @@ export const searchPapers = async (
   return {
     papers: safePapers.map((paper) => ({
       ...exposeThumbnailUrl(paper),
+      repositories: paper.repositories?.map(
+        ({ repository }: any) => repository
+      ) || [],
       authors: parseAuthors(paper.authors),
     })),
     total: safePapers.length,

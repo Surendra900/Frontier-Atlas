@@ -559,7 +559,7 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
       onMouseEnter={handlePrefetch}
       onTouchStart={handlePrefetch}
     >
-      <div className="group flex flex-col xl:flex-row gap-3 sm:gap-4 xl:gap-5 p-3 sm:p-4 xl:pt-2 xl:pb-2 bg-white xl:bg-transparent border xl:border-none border-[#E5E5E0] rounded-none hover:shadow-lg xl:hover:bg-white xl:hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all duration-300 ease-out">
+      <div className="group flex flex-col xl:flex-row gap-3 sm:gap-4 xl:gap-5 p-3 sm:p-4 xl:pt-3 xl:pb-3 bg-white xl:bg-transparent border xl:border-none border-[#E5E5E0] rounded-none hover:shadow-lg xl:hover:bg-white xl:hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all duration-300 ease-out">
         {/* PDF thumbnail */}
         <div className="order-first xl:order-last shrink-0 w-full xl:w-auto mx-auto xl:mx-0 xl:self-stretch border-b xl:border-b-0 border-[#E5E5E0] pb-3 xl:pb-0 mb-1 xl:mb-0">
           <Link
@@ -935,7 +935,8 @@ function getPaginationRange(
     return Array.from({ length: totalPages }, (_, i) => i + 1);
   }
 
-  if (currentPage <= 4) {
+  // Beginning: 1 2 3 4 5 ... last
+  if (currentPage <= 3) {
     return [1, 2, 3, 4, 5, "...", totalPages];
   }
 
@@ -1484,7 +1485,7 @@ export default function PaperList({
                           }
                         }
                       }}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center text-[13px] font-medium transition-all shrink-0 ${
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-[13px] font-medium transition-all shrink-0 ${
                         isActive
                           ? "bg-[#F55036] text-white font-bold shadow-sm"
                           : "text-[#555] hover:text-[#111] hover:bg-[#F8F7F2]"
@@ -1543,7 +1544,7 @@ export default function PaperList({
                   <option value={50}>50 / page</option>
                   <option value={100}>100 / page</option>
                 </select>
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#666]">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-[#777]">
                   <ChevronDown size={14} />
                 </div>
               </div>
