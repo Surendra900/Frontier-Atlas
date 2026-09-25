@@ -241,7 +241,7 @@ function mapBackendPaper(raw: Record<string, unknown>): Paper {
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 function getCacheKey(params: GetPapersParams): string {
-  return `papers_v2:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "none"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
+  return `papers_v4:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "none"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
 }
 
 // In-memory cache — fastest possible, zero deserialization cost
@@ -254,12 +254,12 @@ if (typeof window !== "undefined") {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
       // Clean up old papers: prefix as well
-      if (k && (k.startsWith("papers_v2:") || k.startsWith("papers:"))) {
+      if (k && (k.startsWith("papers_v4:") || k.startsWith("papers_v3:") || k.startsWith("papers_v2:") || k.startsWith("papers:"))) {
         const item = localStorage.getItem(k);
         if (item) {
           try {
             const parsed = JSON.parse(item);
-            if (k.startsWith("papers:") || !parsed?.data?.papers || parsed.data.papers.length === 0) {
+            if (k.startsWith("papers:") || k.startsWith("papers_v2:") || k.startsWith("papers_v3:") || !parsed?.data?.papers || parsed.data.papers.length === 0) {
               localStorage.removeItem(k);
             }
           } catch {
@@ -338,7 +338,7 @@ function findFuzzyCache(params: GetPapersParams): GetPapersResult | null {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (!k || !k.startsWith("papers_v2:")) continue;
+      if (!k || !k.startsWith("papers_v4:")) continue;
       if (params.task && k.toLowerCase().includes(params.task.toLowerCase())) {
         const item = readCache<GetPapersResult>(k);
         if (item?.data?.papers?.length) return item.data;
