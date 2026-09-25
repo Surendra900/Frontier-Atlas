@@ -46,11 +46,17 @@ export default function HomeContent({
     if (
       label === "Trending Papers" ||
       label === "Latest Papers" ||
-      label === "Most GitHub Stars" ||
-      label === "GitHub Hourly"
+      label === "Most GitHub Stars"
     ) {
       setIsFilterChanging(true);
       setActiveSort(label);
+      if (label === "Latest Papers") {
+        setSelectedPeriod("Today");
+      } else if (label === "Most GitHub Stars") {
+        setSelectedPeriod("All time");
+      } else if (label === "Trending Papers") {
+        setSelectedPeriod("All time");
+      }
     }
   };
 
@@ -76,8 +82,6 @@ export default function HomeContent({
       ? "trending"
       : activeSort === "Most GitHub Stars"
       ? "stars"
-      : activeSort === "GitHub Hourly"
-      ? "hourly"
       : "latest";
 
   // Distinguish methods from tasks and ensure case-insensitivity

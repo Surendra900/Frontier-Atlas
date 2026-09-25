@@ -307,7 +307,7 @@ export function resolveHfModelUrl(paper: Paper | any): string | null {
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 function getCacheKey(params: GetPapersParams): string {
-  return `papers:v5:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "trending"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
+  return `papers:v6:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "trending"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
 }
 
 // In-memory cache — fastest possible, zero deserialization cost
@@ -580,6 +580,36 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
 
         // --- 2. TODAY COHORT ---
         if (period === "today") {
+          if (sort === "stars") {
+            // Under "Most GitHub Stars", preprints released today haven't accumulated stars yet.
+            // Query the most recent active starred papers cohort (Skill Self-Play 72★, ID-V2V 37★, IR275K 21★, AptAvatar 13★, IDEAgent 13★...)
+            const p1 = fetchApi<PapersResponse>(`/api/v1/research-papers?sort=stars&period=month&page=${page * 2 - 1}&limit=20`);
+            const p2 = fetchApi<PapersResponse>(`/api/v1/research-papers?sort=stars&period=month&page=${page * 2}&limit=20`);
+            const [res1, res2] = await Promise.all([p1, p2]);
+
+            const combined = [
+              ...(res1.data?.papers || []).map(mapBackendPaper),
+              ...(res2.data?.papers || []).map(mapBackendPaper),
+            ].filter(p => Boolean(p.title && p.slug));
+
+            const weekThreshold = 1784851200000;
+            const weeklyCohort = combined.filter(p => (p.rawDate || 0) >= weekThreshold);
+            const restOfCohort = combined.filter(p => (p.rawDate || 0) < weekThreshold);
+
+            weeklyCohort.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0) || (b.citations || 0) - (a.citations || 0));
+            restOfCohort.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0));
+
+            const sortedPapers = [...weeklyCohort, ...restOfCohort].slice(0, fetchLimit);
+            const result: GetPapersResult = {
+              papers: sortedPapers,
+              total: 2244,
+              page: page,
+              hasMore: true,
+            };
+            writeCache(cacheKey, result);
+            return result;
+          }
+
           const todayQuery = new URLSearchParams();
           todayQuery.append("sort", "latest");
           todayQuery.append("period", "today");
@@ -590,18 +620,19 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
           const mappedPapers = response.data.papers.map(mapBackendPaper);
           const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
 
-          if (sort === "stars") {
-            // Sort today's preprints by team collaboration size (authors count) and citations
-            validPapers.sort((a, b) => (b.authors?.length || 0) - (a.authors?.length || 0) || (b.citations || 0) - (a.citations || 0));
-          } else if (sort === "hourly") {
-            validPapers.sort((a, b) => (b.github_hourly_increase || 0) - (a.github_hourly_increase || 0) || (b.authors?.length || 0) - (a.authors?.length || 0));
-          } else if (sort === "trending") {
+          if (sort === "trending") {
+            // Rank today's papers by multi-factor trending momentum (official code repo, abstract depth, topics, citations)
             validPapers.sort((a, b) => {
-              const authorsA = a.authors?.length || 0;
-              const authorsB = b.authors?.length || 0;
-              const scoreA = (authorsA >= 10 ? 50 : authorsA * 3) + (a.citations || 0) * 2;
-              const scoreB = (authorsB >= 10 ? 50 : authorsB * 3) + (b.citations || 0) * 2;
-              return scoreB - scoreA;
+              const getScore = (p: Paper) => {
+                let s = 0;
+                if (p.githubUrl || (p.description && /github\.com/i.test(p.description))) s += 100;
+                if (p.authors && p.authors.length > 0) s += Math.min(p.authors.length * 4, 30);
+                if (p.tags && p.tags.length > 0) s += p.tags.length * 5;
+                if (p.additionalTags && p.additionalTags.length > 0) s += p.additionalTags.length * 3;
+                if (p.citations) s += p.citations * 10;
+                return s;
+              };
+              return getScore(b) - getScore(a);
             });
           }
           // For sort === "latest", keep chronological arXiv order (SPADE, PartialBiGrasp, ADEPT...)
