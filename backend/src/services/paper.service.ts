@@ -330,6 +330,23 @@ export const getPapers = async (
     ];
   }
 
+  // Enforce papers must have at least one task/method AND at least one sotaClaim/ranking
+  where.AND = [
+    ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
+    {
+      OR: [
+        { sotaClaims: { some: {} } },
+        { rankings: { some: {} } }
+      ]
+    },
+    {
+      OR: [
+        { tasks: { some: {} } },
+        { methods: { some: {} } }
+      ]
+    }
+  ];
+
   let baseDate = new Date();
   if (period !== "all") {
     let latestDbDate = new Date();
@@ -682,10 +699,25 @@ export const searchPapers = async (
     async (prisma: PrismaClient) => {
       return prisma.paper.findMany({
         where: {
-          OR: [
-            { title: { contains: searchTerm, mode: "insensitive" } },
-
-          ],
+          AND: [
+            {
+              OR: [
+                { title: { contains: searchTerm, mode: "insensitive" } },
+              ],
+            },
+            {
+              OR: [
+                { sotaClaims: { some: {} } },
+                { rankings: { some: {} } }
+              ]
+            },
+            {
+              OR: [
+                { tasks: { some: {} } },
+                { methods: { some: {} } }
+              ]
+            }
+          ]
         },
         orderBy:
           sort === "latest"
@@ -693,22 +725,20 @@ export const searchPapers = async (
             : [{ githubStars: "desc" }, { publicationDate: "desc" }],
         take: limit,
         skip,
-        select: paperSearchSelect,
+        select: paperSelect,
       });
     },
   );
-  console.log(JSON.stringify(papers[0], null, 2));
-
-
-
-
-
 
   return {
     papers: papers.map((paper: any) => ({
       ...exposeThumbnailUrl(paper),
+      repositories: paper.repositories?.map(
+        ({ repository }: any) => repository
+      ) || [],
       authors: parseAuthors(paper.authors),
-
+      tasks: paper.tasks?.map(({ task }: any) => task) || [],
+      methods: paper.methods?.map(({ method }: any) => method) || [],
     })),
     total: papers.length,
     page,
