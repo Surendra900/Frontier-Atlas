@@ -28,18 +28,12 @@ const paperUpdateSchema = z.object({
 const paperRoutes = new Hono();
 
 paperRoutes.get("/search", paperController.searchPapers as any);
+paperRoutes.get("/organization-metrics", paperController.getOrganizationMetrics as any);
+paperRoutes.get("/organization-counts", paperController.getOrganizationMetrics as any);
 paperRoutes.get("/id/:id", paperController.getPaperById as any);
 paperRoutes.get("/check-saved", authMiddleware, paperController.checkSavedPaper as any);
 paperRoutes.post("/save", authMiddleware, paperController.toggleSavePaper as any);
-paperRoutes.get("/", paperController.getPapers as any);
 paperRoutes.get("/saved", authMiddleware, paperController.getSavedPapers as any);
-
-
-// === IMPORTANT: Specific routes BEFORE catch-all ===
-paperRoutes.get("/search", paperController.searchPapers as any);
-
-paperRoutes.get("/id/:id", paperController.getPaperById as any);
-
 paperRoutes.get("/", paperController.getPapers as any);
 
 paperRoutes.get("/:slug", paperController.getPaperBySlug as any);

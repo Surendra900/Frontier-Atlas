@@ -467,3 +467,74 @@ export const getSavedPapers = async (c: any) => {
     return c.json({ error: "Failed to fetch saved papers" }, 500);
   }
 };
+
+export const getOrganizationMetrics = async (c: Context) => {
+  const queryRouter = c.var.queryRouter as QueryRouter;
+  const organization = c.req.query("organization");
+
+  try {
+    const version = await getPapersVersion();
+    const cacheKey = `org_metrics:v${version}:${organization || "all"}`;
+
+    const localHit = localMemoryCache.get(cacheKey);
+    if (localHit && Date.now() < localHit.expiresAt) {
+      return c.json(localHit.data, 200);
+    }
+
+    const redis = redisManager.getClient();
+    let cached = null;
+    try {
+      cached = await redis.get(cacheKey);
+    } catch (err) {
+      console.error("Redis GET failed:", err);
+    }
+
+    if (cached) {
+      localMemoryCache.set(cacheKey, { data: cached, expiresAt: Date.now() + LOCAL_TTL_MS });
+      return c.json(cached as any, 200);
+    }
+
+    const metrics = await paperService.getOrganizationMetrics(queryRouter, organization);
+
+    const counts: Record<string, number> = {};
+    const citations: Record<string, number> = {};
+    const stars: Record<string, number> = {};
+    const trendingScores: Record<string, number> = {};
+
+    for (const item of metrics) {
+      counts[item.organization] = item.paperCount;
+      citations[item.organization] = item.citations;
+      stars[item.organization] = item.stars;
+      trendingScores[item.organization] = item.trendingScore;
+    }
+
+    const response = {
+      status: "success",
+      count: metrics.length,
+      data: metrics,
+      counts,
+      citations,
+      stars,
+      trendingScores,
+    };
+
+    localMemoryCache.set(cacheKey, { data: response, expiresAt: Date.now() + LOCAL_TTL_MS });
+
+    try {
+      await redis.set(cacheKey, response, { ex: 600 });
+    } catch (err) {
+      console.error("Redis SET failed:", err);
+    }
+
+    return c.json(response, 200);
+  } catch (error: any) {
+    console.error("Error in getOrganizationMetrics controller:", error);
+    return c.json(
+      {
+        status: "error",
+        detail: error instanceof Error ? error.message : String(error),
+      },
+      500,
+    );
+  }
+};

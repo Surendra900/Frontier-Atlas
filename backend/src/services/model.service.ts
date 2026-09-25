@@ -149,7 +149,7 @@ export const getModels = async (
             }
           : {}),
       },
-      take: needsFullSort ? 200 : limit,
+      take: needsFullSort ? Math.max(200, skip + limit) : limit,
       skip: needsFullSort ? 0 : skip,
       orderBy:
         sort === "recent"

@@ -20,6 +20,7 @@ import searchRoutes from "./routes/search.routes.js";
 type Env = {
   Bindings: {
     DATABASE_URL: string;
+    SHARD_1_DATABASE_URL?: string;
     UPSTASH_REDIS_REST_URL: string;
     UPSTASH_REDIS_REST_TOKEN: string;
     QUERY_TIMEOUT_MS?: string;
@@ -63,7 +64,8 @@ app.use(
 
 // Per-Request Middleware
 app.use("*", async (c, next) => {
-  const DATABASE_URL = c.env.DATABASE_URL as string;
+  const rawDbUrl = c.env.DATABASE_URL || c.env.SHARD_1_DATABASE_URL;
+  const DATABASE_URL = (rawDbUrl || "") as string;
   const QUERY_TIMEOUT_MS = c.env.QUERY_TIMEOUT_MS;
 
   const REDIS_URL = c.env.UPSTASH_REDIS_REST_URL;
@@ -72,7 +74,17 @@ app.use("*", async (c, next) => {
   redisManager.connect(REDIS_URL, REDIS_TOKEN);
 
   // Strip quotes if they were included in the .dev.vars file
-  const cleanUrl = DATABASE_URL ? DATABASE_URL.replace(/^"|"$/g, "") : "";
+  const cleanUrl = DATABASE_URL ? DATABASE_URL.replace(/^"|"$/g, "").trim() : "";
+
+  if (!cleanUrl) {
+    return c.json(
+      {
+        status: "error",
+        message: "Database connection string is missing. Please configure DATABASE_URL in .dev.vars or environment bindings.",
+      },
+      500
+    );
+  }
 
   // DatabaseManager and QueryRouter
   const databaseManager = new DatabaseManager({
@@ -112,7 +124,8 @@ app.route("/api/v1/search", searchRoutes);
 export default {
   fetch: app.fetch,
   async scheduled(event: any, env: any, ctx: any) {
-    const cleanUrl = env.DATABASE_URL ? env.DATABASE_URL.replace(/^"|"$/g, "") : "";
+    const rawUrl = env.DATABASE_URL || env.SHARD_1_DATABASE_URL;
+    const cleanUrl = rawUrl ? rawUrl.replace(/^"|"$/g, "").trim() : "";
     if (!cleanUrl) return;
 
     const dbManager = new DatabaseManager({ DATABASE_URL: cleanUrl });
