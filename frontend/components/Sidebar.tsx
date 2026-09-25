@@ -27,6 +27,7 @@ import {
   Target,
   Plug,
   Search,
+  Send,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -131,7 +132,7 @@ export default function Sidebar({
   const tasks = [
     { label: "Large Language Models", icon: <MessageSquare size={16} />, slug: "large-language-models" },
     { label: "Agents", icon: <Bot size={16} />, slug: "agents" },
-{ label: "Reasoning", icon: <Brain size={16} />, slug: "reasoning-models" },
+    { label: "Reasoning", icon: <Brain size={16} />, slug: "reasoning-models" },
     { label: "Vision-Language Models", icon: <ImageIcon size={16} />, slug: "vision-language-models" },
     { label: "Multimodal Models", icon: <Layers size={16} />, slug: "multimodal-models" },
     { label: "World Models", icon: <Globe size={16} />, slug: "world-models" },
@@ -205,7 +206,7 @@ export default function Sidebar({
       "/methods/transformer", "/methods/diffusion-models",
       "/methods/mixture-of-experts", "/methods/policy-learning",
       "/methods/chain-of-thought", "/methods/retrieval-augmented-generation", "/methods/model-context-protocol-mcp",
-      "/methods/lora", "/methods/rlhf", "/methods",
+      "/methods/lora", "/methods/rlhf", "/methods","/submit",
     ];
     routes.forEach((route) => router.prefetch(route));
   }, [router]);
@@ -219,6 +220,19 @@ export default function Sidebar({
   return (
     <aside className="flex flex-col w-full bg-transparent h-full border-r border-[#E5E5E0]">
       <div className="flex-1 px-2 pt-1 pb-2 space-y-3">
+        {/* SUBMIT */}
+        <div className="mb-1">
+          <NavItem
+            icon={<Send size={16} />}
+            label="Submit"
+            isActive={pathname === "/submit"}
+            onClick={() => {
+              setActiveItem("Submit");
+              onItemClick?.();
+            }}
+            href="/submit"
+          />
+        </div>
         {/* DISCOVER Section */}
         <div>
           <SectionLabel title="Discover" />
@@ -241,24 +255,24 @@ export default function Sidebar({
           <SectionLabel title="Tasks" />
           <div className="flex flex-col gap-0">
             {tasks.map((item) => (
-  <NavItem
-    key={item.label}
-    icon={item.icon}
-    label={item.label}
-    isActive={activeItem === item.label}
-    onClick={() => handleItemClick(item.label)}
-    onMouseEnter={() => {
-      if (item.slug) {
-        void getPapers({
-          page: 1,
-          task: item.slug,
-          sort: "popular",
-        });
-      }
-    }}
-    href={item.slug ? `/tasks/${item.slug}` : `/tasks`}
-  />
-))}
+              <NavItem
+                key={item.label}
+                icon={item.icon}
+                label={item.label}
+                isActive={activeItem === item.label}
+                onClick={() => handleItemClick(item.label)}
+                onMouseEnter={() => {
+                  if (item.slug) {
+                    void getPapers({
+                      page: 1,
+                      task: item.slug,
+                      sort: "popular",
+                    });
+                  }
+                }}
+                href={item.slug ? `/tasks/${item.slug}` : `/tasks`}
+              />
+            ))}
           </div>
         </div>
 
