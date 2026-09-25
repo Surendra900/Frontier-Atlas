@@ -59,7 +59,7 @@ export interface GetPapersParams {
   method?: string;
   model?: string;
   organization?: string;
-  sort?: 'trending' | 'latest' | string;
+  sort?: 'trending' | 'latest' | 'citations' | 'stars' | string;
   period?: 'today' | 'week' | 'month' | 'all' | string;
   limit?: number;
 }
@@ -800,3 +800,11 @@ export async function ingestPaper(payload: IngestPaperPayload): Promise<{
     }),
   });
 }
+
+export async function getOrganizationPaperCounts(): Promise<Record<string, number>> {
+  const response = await fetchApi<{ status: string; data: Record<string, number> }>(
+    '/api/v1/research-papers/organization-counts'
+  );
+  return response?.data || {};
+}
+

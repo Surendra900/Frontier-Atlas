@@ -335,6 +335,9 @@ export async function getModels(params?: string | Record<string, any>): Promise<
     queryString = params.startsWith('?') ? params : `?${params}`;
   } else if (params && typeof params === 'object') {
     const searchParams = new URLSearchParams();
+    if (!('limit' in params)) {
+      searchParams.set('limit', '10000');
+    }
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null) searchParams.set(k, String(v));
     });

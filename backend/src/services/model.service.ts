@@ -268,7 +268,7 @@ export const getModels = async (
           : {}),
 
       },
-      take: needsFullSort ? 200 : limit,
+      take: needsFullSort ? Math.max(200, limit) : limit,
       skip: needsFullSort ? 0 : skip,
       orderBy:
         sort === "recent"
@@ -314,20 +314,18 @@ export const getModels = async (
             papers: true,
           },
         },
-        papers: isTrending
-          ? {
-            take: 100,
-            select: {
-              paper: {
-                select: {
-                  id: true,
-                  citationCount: true,
-                  githubStars: true,
-                },
+        papers: {
+          take: 100,
+          select: {
+            paper: {
+              select: {
+                id: true,
+                citationCount: true,
+                githubStars: true,
               },
             },
-          }
-          : false,
+          },
+        },
       },
     });
   });
@@ -352,7 +350,7 @@ export const getModels = async (
     let citationCount = 0;
     let githubStars = 0;
 
-    if (isTrending && model.papers) {
+    if (model.papers) {
       const seenPaperIds = new Set<string>();
 
       for (const paperRelation of model.papers) {
@@ -367,7 +365,11 @@ export const getModels = async (
       }
     }
 
-    const trendingScore = citationCount + githubStars;
+    const calculatedTrendingScore = citationCount + githubStars;
+    const finalTrendingScore =
+      calculatedTrendingScore > 0
+        ? calculatedTrendingScore
+        : (model.trendingScore || 0);
 
     return {
       id: model.id,
@@ -396,10 +398,10 @@ export const getModels = async (
       apiUrl: model.apiUrl ?? model.api_url,
       huggingFaceUrl: resolveHuggingFaceUrl(model),
       createdAt: model.createdAt,
-      trendingScore: model.trendingScore,
+      trendingScore: finalTrendingScore,
       paperCount: model._count.papers,
-      citationCount: isTrending ? citationCount : undefined,
-      githubStars: isTrending ? githubStars : undefined,
+      citationCount: citationCount,
+      githubStars: githubStars,
     };
   });
 

@@ -144,6 +144,61 @@ export const getPapers = async (c: Context) => {
   }
 };
 
+export const getOrganizationPaperCounts = async (c: Context) => {
+  const queryRouter = c.var.queryRouter as QueryRouter;
+
+  c.header("Cache-Control", "public, max-age=120, s-maxage=600, stale-while-revalidate=1200");
+
+  try {
+    const version = await getPapersVersion();
+    const cacheKey = `papers:v${version}:org_counts`;
+
+    const localHit = localMemoryCache.get(cacheKey);
+    if (localHit && Date.now() < localHit.expiresAt) {
+      return c.json(localHit.data, 200);
+    }
+
+    const redis = redisManager.getClient();
+    let cached = null;
+    try {
+      cached = await redis.get(cacheKey);
+    } catch (err) {
+      console.error("Redis GET failed for org counts:", err);
+    }
+
+    if (cached) {
+      localMemoryCache.set(cacheKey, { data: cached, expiresAt: Date.now() + LOCAL_TTL_MS });
+      return c.json(cached as any, 200);
+    }
+
+    const counts = await paperService.getOrganizationPaperCounts(queryRouter);
+
+    const response = {
+      status: "success",
+      data: counts,
+    };
+
+    localMemoryCache.set(cacheKey, { data: response, expiresAt: Date.now() + LOCAL_TTL_MS });
+
+    try {
+      await redis.set(cacheKey, response, { ex: 600 });
+    } catch (err) {
+      console.error("Redis SET failed for org counts:", err);
+    }
+
+    return c.json(response, 200);
+  } catch (error: any) {
+    console.error("Error in getOrganizationPaperCounts controller:", error);
+    return c.json(
+      {
+        status: "error",
+        detail: error instanceof Error ? error.message : String(error),
+      },
+      500,
+    );
+  }
+};
+
 export const getPaperBySlug = async (c: Context) => {
   const queryRouter = c.var.queryRouter as QueryRouter;
   const slug = c.req.param("slug") as string;

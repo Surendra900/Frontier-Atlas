@@ -7,13 +7,17 @@ import Navbar from "@/components/Navbar";
 import {
   getCachedModelFacets,
   getCachedModels,
-  getModels,
   type ModelFacets,
   type ModelItem,
 } from "@/lib/models";
-import { getOrganizationDirectory } from "@/lib/organizations";
-
-type SortMode = "trending" | "models" | "az";
+import {
+  getOrganizationCatalog,
+  getOrganizationDirectory,
+  organizationLogoUrl,
+  sortOrganizations,
+  type SortMode,
+} from "@/lib/organizations";
+import OrganizationLogo from "@/components/domain/organizations/OrganizationLogo";
 
 const descriptions = [
   "A leading organization shaping the frontier of AI research and production.",
@@ -29,22 +33,6 @@ function organizationDescription(name: string) {
 
 function organizationSlug(name: string) {
   return name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
-}
-
-function organizationLogoUrl(logo?: string) {
-  if (!logo) return undefined;
-
-  try {
-    const url = new URL(logo);
-    if (url.hostname === "logo.clearbit.com") {
-      const domain = url.pathname.replace(/^\//, "");
-      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
-    }
-  } catch {
-    return logo;
-  }
-
-  return logo;
 }
 
 function OrganizationCard({
@@ -69,11 +57,13 @@ function OrganizationCard({
     >
       <div className="flex items-start gap-2.5 border-b border-[#EEECE6] bg-[#FBFAF7] p-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#E2DED5] bg-gradient-to-br from-white to-[#FFF8F4] p-1.5 shadow-[0_2px_5px_rgba(24,24,20,0.07)] ring-1 ring-white transition-all duration-200 group-hover:scale-105 group-hover:border-[#FFB098] group-hover:shadow-[0_4px_10px_rgba(255,90,31,0.14)]">
-          {logo ? (
-            <img src={logo} alt={`${name} logo`} className="h-full w-full object-contain" />
-          ) : (
-            <Building2 size={20} className="text-[#FF5A1F]" />
-          )}
+          <OrganizationLogo
+            logo={logo}
+            name={name}
+            fallbackText={featuredModel?.name}
+            size={20}
+            iconClassName="text-[#FF5A1F]"
+          />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
@@ -114,6 +104,19 @@ export default function OrganizationsPage() {
   useEffect(() => {
     let cancelled = false;
 
+    // Load fast catalog immediately for instant rendering
+    getOrganizationCatalog()
+      .then((catalog) => {
+        if (cancelled) return;
+        setModels(catalog.models);
+        setFacets(catalog.facets);
+        setLoading(false);
+      })
+      .catch((error) => {
+        console.error("Unable to load organization catalog", error);
+      });
+
+    // Load directory with paper counts
     getOrganizationDirectory()
       .then((directory) => {
         if (cancelled) return;
@@ -121,7 +124,7 @@ export default function OrganizationsPage() {
         setFacets(directory.facets);
         setPaperCounts(directory.paperCounts);
       })
-      .catch((error) => console.error("Unable to load organizations", error))
+      .catch((error) => console.error("Unable to load organization directory counts", error))
       .finally(() => {
         if (!cancelled) setLoading(false);
       });
@@ -132,34 +135,44 @@ export default function OrganizationsPage() {
   }, []);
 
   const organizations = useMemo(() => {
+    const normalizeKey = (val: string) => val.toLowerCase().trim().replace(/[^a-z0-9]+/g, "");
     const grouped = new Map<string, ModelItem[]>();
+
     models.forEach((model) => {
       if (!model.vendor) return;
-      const previous = grouped.get(model.vendor) ?? [];
-      previous.push(model);
-      grouped.set(model.vendor, previous);
+      const exactKey = model.vendor;
+      const normKey = normalizeKey(model.vendor);
+
+      const previousExact = grouped.get(exactKey) ?? [];
+      previousExact.push(model);
+      grouped.set(exactKey, previousExact);
+
+      if (normKey && normKey !== exactKey) {
+        const previousNorm = grouped.get(normKey) ?? [];
+        previousNorm.push(model);
+        grouped.set(normKey, previousNorm);
+      }
     });
 
     const source = facets?.vendors?.length
       ? facets.vendors.map((vendor) => ({ name: vendor.name, count: vendor.count }))
       : [...grouped.entries()].map(([name, entries]) => ({ name, count: entries.length }));
 
-    return source
-      .map((organization) => {
-        const organizationModels = grouped.get(organization.name) ?? [];
-        return {
-          ...organization,
-          logo: organizationLogoUrl(organizationModels.find((model) => model.vendorLogoUrl)?.vendorLogoUrl),
-          featuredModel: [...organizationModels].sort((a, b) => b.trendingScore - a.trendingScore)[0],
-          paperCount: paperCounts[organization.name] ?? 0,
-          momentum: organizationModels.reduce((total, model) => total + (model.trendingScore || 0), 0),
-        };
-      })
-      .sort((a, b) => {
-        if (sort === "az") return a.name.localeCompare(b.name);
-        if (sort === "models") return b.count - a.count || a.name.localeCompare(b.name);
-        return b.momentum - a.momentum || b.count - a.count;
-      });
+    const mapped = source.map((organization) => {
+      const normOrg = normalizeKey(organization.name);
+      const organizationModels = grouped.get(organization.name) ?? grouped.get(normOrg) ?? [];
+      return {
+        ...organization,
+        logo: organizationLogoUrl(organizationModels.find((model) => model.vendorLogoUrl)?.vendorLogoUrl),
+        featuredModel: [...organizationModels].sort(
+          (a, b) => (b.trendingScore || 0) - (a.trendingScore || 0) || b.paperCount - a.paperCount
+        )[0],
+        paperCount: paperCounts[organization.name] ?? 0,
+        momentum: organizationModels.reduce((total, model) => total + (model.trendingScore || 0), 0),
+      };
+    });
+
+    return sortOrganizations(mapped, sort);
   }, [facets?.vendors, models, paperCounts, sort]);
 
   return (
