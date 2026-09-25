@@ -307,7 +307,7 @@ export function resolveHfModelUrl(paper: Paper | any): string | null {
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 function getCacheKey(params: GetPapersParams): string {
-  return `papers:v6:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "trending"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
+  return `papers:v7:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "trending"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
 }
 
 // In-memory cache — fastest possible, zero deserialization cost
@@ -555,7 +555,14 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
 
             if (sort === "stars") {
               weeklyCohort.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0) || (b.citations || 0) - (a.citations || 0));
-              restOfCohort.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0));
+              const result: GetPapersResult = {
+                papers: weeklyCohort.slice(0, fetchLimit),
+                total: weeklyCohort.length,
+                page: page,
+                hasMore: false,
+              };
+              writeCache(cacheKey, result);
+              return result;
             } else if (sort === "hourly") {
               weeklyCohort.sort((a, b) => (b.github_hourly_increase || 0) - (a.github_hourly_increase || 0));
               restOfCohort.sort((a, b) => (b.github_hourly_increase || 0) - (a.github_hourly_increase || 0));
@@ -594,17 +601,13 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
 
             const weekThreshold = 1784851200000;
             const weeklyCohort = combined.filter(p => (p.rawDate || 0) >= weekThreshold);
-            const restOfCohort = combined.filter(p => (p.rawDate || 0) < weekThreshold);
-
             weeklyCohort.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0) || (b.citations || 0) - (a.citations || 0));
-            restOfCohort.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0));
 
-            const sortedPapers = [...weeklyCohort, ...restOfCohort].slice(0, fetchLimit);
             const result: GetPapersResult = {
-              papers: sortedPapers,
-              total: 2244,
+              papers: weeklyCohort.slice(0, fetchLimit),
+              total: weeklyCohort.length,
               page: page,
-              hasMore: true,
+              hasMore: false,
             };
             writeCache(cacheKey, result);
             return result;
@@ -741,6 +744,10 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
         );
         const mappedPapers = response.data.papers.map(mapBackendPaper);
         const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+
+        if (sort === "stars") {
+          validPapers.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0) || (b.citations || 0) - (a.citations || 0));
+        }
 
         const result: GetPapersResult = {
           papers: validPapers,

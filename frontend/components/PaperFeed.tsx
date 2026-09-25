@@ -18,6 +18,7 @@ import {
   ChevronRight,
   ChevronDown,
   Quote,
+  Star,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -548,9 +549,17 @@ export const PaperCard = memo(({ paper, onOpenCite }: { paper: Paper; onOpenCite
  
             <span>{paper.date}</span>
  
-            <span className="text-[#CCCCCC]">•</span>
- 
             <span>{paper.citations || 0} citations</span>
+
+            {upvotesNum > 0 && (
+              <>
+                <span className="text-[#CCCCCC]">•</span>
+                <span className="inline-flex items-center gap-1 font-semibold text-[#111111]">
+                  <Star size={11} className="text-[#F55036] fill-[#F55036]" />
+                  {upvotesNum >= 1000 ? (upvotesNum / 1000).toFixed(1) + "k" : upvotesNum} stars
+                </span>
+              </>
+            )}
 
             {onOpenCite && (
               <>
@@ -666,7 +675,9 @@ export const PaperCard = memo(({ paper, onOpenCite }: { paper: Paper; onOpenCite
                   <img src="https://cdn.simpleicons.org/github/24292f" alt="GitHub" className="w-[9px] h-[9px] min-[375px]:w-[10px] min-[375px]:h-[10px] md:w-[12px] md:h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-medium lg:font-semibold xl:font-medium text-[7.5px] min-[375px]:text-[8.5px] sm:text-[9.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tighter min-[375px]:tracking-tight">Code</span>
+                  <span className="font-medium lg:font-semibold xl:font-medium text-[7.5px] min-[375px]:text-[8.5px] sm:text-[9.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tighter min-[375px]:tracking-tight">
+                    Code {upvotesNum > 0 ? `(${upvotesNum >= 1000 ? (upvotesNum / 1000).toFixed(1) + "k" : upvotesNum}★)` : ""}
+                  </span>
                   <span className="hidden lg:block text-[12px] text-[#666] xl:hidden">
                     {upvotesNum > 0 ? `${upvotesNum >= 1000 ? (upvotesNum / 1000).toFixed(1) + "k" : upvotesNum} stars` : "0 stars"}
                   </span>
@@ -820,6 +831,11 @@ export default function PaperList({
 }: PaperListProps) {
   const [papers, setPapers] = useState<Paper[]>(() => {
     if (initialPapers?.papers) {
+      if (filterParams?.sort === "stars") {
+        return [...initialPapers.papers].sort(
+          (a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0) || (b.citations || 0) - (a.citations || 0)
+        );
+      }
       return initialPapers.papers;
     }
     return [];
@@ -1023,9 +1039,15 @@ export default function PaperList({
         setError(null);
 
         const result = await fetchPage(pageNumber, limit);
-        const visiblePapers = normalizedSearchQuery
+        let visiblePapers = normalizedSearchQuery
           ? result.papers.filter(matchesSearch)
           : result.papers;
+
+        if (filterParams?.sort === "stars") {
+          visiblePapers = [...visiblePapers].sort(
+            (a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0) || (b.citations || 0) - (a.citations || 0)
+          );
+        }
 
         setPage(result.page);
         setTotalPapers(result.total);
