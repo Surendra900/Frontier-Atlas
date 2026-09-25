@@ -318,17 +318,41 @@ export const getPapers = async (
   const period = query.period || "all";
 
   const where: any = {};
+  const andConditions: any[] = [];
 
-  if (query.task) where.tasks = { some: { task: { slug: query.task } } };
+  if (query.task) andConditions.push({ tasks: { some: { task: { slug: query.task } } } });
   if (query.method)
-    where.methods = { some: { method: { slug: query.method } } };
-  if (query.model) where.models = { some: { model: { slug: query.model } } };
+    andConditions.push({ methods: { some: { method: { slug: query.method } } } });
+  if (query.model) andConditions.push({ models: { some: { model: { slug: query.model } } } });
   if (query.organization) {
-    where.OR = [
-      { organization: { equals: query.organization, mode: "insensitive" } },
-      { models: { some: { model: { vendor: { equals: query.organization, mode: "insensitive" } } } } },
-    ];
+    andConditions.push({
+      OR: [
+        { organization: { equals: query.organization, mode: "insensitive" } },
+        { models: { some: { model: { vendor: { equals: query.organization, mode: "insensitive" } } } } },
+      ],
+    });
   }
+
+  if (andConditions.length > 0) {
+    where.AND = andConditions;
+  }
+
+  // Enforce papers must have at least one task/method AND at least one sotaClaim/ranking
+  where.AND = [
+    ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
+    {
+      OR: [
+        { sotaClaims: { some: {} } },
+        { rankings: { some: {} } }
+      ]
+    },
+    {
+      OR: [
+        { tasks: { some: {} } },
+        { methods: { some: {} } }
+      ]
+    }
+  ];
 
   let baseDate = new Date();
   if (period !== "all") {
@@ -678,41 +702,166 @@ export const searchPapers = async (
   const skip = (page - 1) * limit;
   const sort = query.sort || "relevance";
 
-  const papers = await queryRouter.routeQuery(
-    async (prisma: PrismaClient) => {
-      return prisma.paper.findMany({
-        where: {
-          OR: [
-            { title: { contains: searchTerm, mode: "insensitive" } },
+  const searchWhere: Prisma.PaperWhereInput = {
+    AND: [
+      {
+        OR: [
+          { title: { contains: searchTerm, mode: "insensitive" } },
+          { abstract: { contains: searchTerm, mode: "insensitive" } },
+        ],
+      },
+      {
+        OR: [
+          { sotaClaims: { some: {} } },
+          { rankings: { some: {} } },
+        ],
+      },
+      {
+        OR: [
+          { tasks: { some: {} } },
+          { methods: { some: {} } },
+        ],
+      },
+    ],
+  };
 
-          ],
-        },
-        orderBy:
-          sort === "latest"
-            ? [{ publicationDate: "desc" }, { githubStars: "desc" }]
-            : [{ githubStars: "desc" }, { publicationDate: "desc" }],
-        take: limit,
-        skip,
-        select: paperSearchSelect,
-      });
+  const [papers, totalCount] = await queryRouter.routeQuery(
+    async (prisma: PrismaClient) => {
+      return Promise.all([
+        prisma.paper.findMany({
+          where: searchWhere,
+          orderBy:
+            sort === "latest"
+              ? [{ publicationDate: "desc" }, { githubStars: "desc" }]
+              : [{ githubStars: "desc" }, { publicationDate: "desc" }],
+          take: limit,
+          skip,
+          select: paperSelect,
+        }),
+        prisma.paper.count({ where: searchWhere }),
+      ]);
     },
   );
-  console.log(JSON.stringify(papers[0], null, 2));
-
-
-
-
-
 
   return {
     papers: papers.map((paper: any) => ({
       ...exposeThumbnailUrl(paper),
+      repositories: paper.repositories?.map(
+        ({ repository }: any) => repository
+      ) || [],
       authors: parseAuthors(paper.authors),
-
+      tasks: paper.tasks?.map(({ task }: any) => task) || [],
+      methods: paper.methods?.map(({ method }: any) => method) || [],
     })),
-    total: papers.length,
+    total: typeof totalCount === "number" ? totalCount : papers.length,
     page,
-    hasMore: papers.length >= limit,
+    hasMore: skip + papers.length < totalCount,
     query: searchTerm,
   };
+};
+
+export interface OrganizationMetricResult {
+  organization: string;
+  paperCount: number;
+  citations: number;
+  stars: number;
+  trendingScore: number;
+}
+
+export const getOrganizationMetrics = async (
+  queryRouter: QueryRouter,
+  organization?: string,
+): Promise<OrganizationMetricResult[]> => {
+  return queryRouter.routeQuery(async (prisma: PrismaClient) => {
+    const orgFilter = organization?.trim().toLowerCase();
+
+    try {
+      let rows: {
+        org_name: string;
+        paper_count: number | bigint;
+        total_citations: number | bigint;
+        total_stars: number | bigint;
+        total_trending: number | bigint;
+      }[];
+
+      if (orgFilter) {
+        rows = await prisma.$queryRaw`
+          WITH org_papers AS (
+            SELECT LOWER(TRIM(p.organization)) AS org_name, p.id AS paper_id, p.citation_count, p.github_stars, p.trending_score
+            FROM papers p
+            WHERE p.organization IS NOT NULL AND TRIM(p.organization) <> ''
+            UNION
+            SELECT LOWER(TRIM(m.vendor)) AS org_name, pm.paper_id, p.citation_count, p.github_stars, p.trending_score
+            FROM paper_models pm
+            JOIN models m ON pm.model_id = m.id
+            JOIN papers p ON pm.paper_id = p.id
+            WHERE m.vendor IS NOT NULL AND TRIM(m.vendor) <> ''
+          )
+          SELECT 
+            org_name,
+            COUNT(DISTINCT paper_id)::int AS paper_count,
+            COALESCE(SUM(citation_count), 0)::int AS total_citations,
+            COALESCE(SUM(github_stars), 0)::int AS total_stars,
+            COALESCE(SUM(trending_score), 0)::float AS total_trending
+          FROM org_papers
+          WHERE org_name = ${orgFilter}
+          GROUP BY org_name;
+        `;
+      } else {
+        rows = await prisma.$queryRaw`
+          WITH org_papers AS (
+            SELECT LOWER(TRIM(p.organization)) AS org_name, p.id AS paper_id, p.citation_count, p.github_stars, p.trending_score
+            FROM papers p
+            WHERE p.organization IS NOT NULL AND TRIM(p.organization) <> ''
+            UNION
+            SELECT LOWER(TRIM(m.vendor)) AS org_name, pm.paper_id, p.citation_count, p.github_stars, p.trending_score
+            FROM paper_models pm
+            JOIN models m ON pm.model_id = m.id
+            JOIN papers p ON pm.paper_id = p.id
+            WHERE m.vendor IS NOT NULL AND TRIM(m.vendor) <> ''
+          )
+          SELECT 
+            org_name,
+            COUNT(DISTINCT paper_id)::int AS paper_count,
+            COALESCE(SUM(citation_count), 0)::int AS total_citations,
+            COALESCE(SUM(github_stars), 0)::int AS total_stars,
+            COALESCE(SUM(trending_score), 0)::float AS total_trending
+          FROM org_papers
+          GROUP BY org_name;
+        `;
+      }
+
+      return rows.map((r) => ({
+        organization: r.org_name,
+        paperCount: Number(r.paper_count || 0),
+        citations: Number(r.total_citations || 0),
+        stars: Number(r.total_stars || 0),
+        trendingScore: Number(r.total_trending || 0),
+      }));
+    } catch (rawErr) {
+      console.warn("Raw SQL getOrganizationMetrics failed, falling back to prisma groupBy:", rawErr);
+      const where: Prisma.PaperWhereInput = {
+        organization: orgFilter
+          ? { equals: orgFilter, mode: "insensitive" }
+          : { not: null },
+      };
+
+      const groups = await prisma.paper.groupBy({
+        by: ["organization"],
+        where,
+        _count: { id: true },
+        _sum: { citationCount: true, githubStars: true, trendingScore: true },
+      });
+
+      return groups
+        .filter((g) => g.organization && g.organization.trim())
+        .map((g) => ({
+          organization: g.organization!.trim().toLowerCase(),
+          paperCount: g._count.id || 0,
+          citations: g._sum.citationCount || 0,
+          stars: g._sum.githubStars || 0,
+          trendingScore: g._sum.trendingScore || 0,
+        }));
+    }
+  });
 };

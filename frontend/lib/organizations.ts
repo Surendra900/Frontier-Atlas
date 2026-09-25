@@ -1,10 +1,31 @@
 import { getModelFacets, getModels, type ModelFacets, type ModelItem } from "@/lib/models";
-import { getPapers } from "@/lib/paperApi";
+import { fetchApi } from "@/lib/api";
+
+export interface OrganizationMetric {
+  organization: string;
+  paperCount: number;
+  citations: number;
+  stars: number;
+  trendingScore: number;
+}
+
+export interface OrganizationMetricsResponse {
+  status: string;
+  count: number;
+  data: OrganizationMetric[];
+  counts?: Record<string, number>;
+  citations?: Record<string, number>;
+  stars?: Record<string, number>;
+  trendingScores?: Record<string, number>;
+}
 
 export type OrganizationDirectoryData = {
   models: ModelItem[];
   facets: ModelFacets;
   paperCounts: Record<string, number>;
+  citations: Record<string, number>;
+  stars: Record<string, number>;
+  trendingScores: Record<string, number>;
 };
 
 export type OrganizationCatalogData = Pick<OrganizationDirectoryData, "models" | "facets">;
@@ -13,28 +34,13 @@ let catalogPromise: Promise<OrganizationCatalogData> | null = null;
 let directoryPromise: Promise<OrganizationDirectoryData> | null = null;
 let facetsPromise: Promise<ModelFacets> | null = null;
 
-async function mapWithConcurrency<T, R>(
-  values: T[],
-  concurrency: number,
-  worker: (value: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(values.length);
-  let nextIndex = 0;
-
-  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, async () => {
-    while (nextIndex < values.length) {
-      const index = nextIndex++;
-      results[index] = await worker(values[index]);
-    }
-  }));
-
-  return results;
-}
-
 /** The small, fast data set needed to render every organization card. */
 export function getOrganizationCatalog(): Promise<OrganizationCatalogData> {
   if (!catalogPromise) {
-    catalogPromise = Promise.all([getModels(), getOrganizationFacets()])
+    catalogPromise = Promise.all([
+      getModels({ limit: 10000 }),
+      getOrganizationFacets(),
+    ])
       .then(([models, facets]) => ({ models, facets }))
       .catch((error) => {
         catalogPromise = null;
@@ -45,7 +51,7 @@ export function getOrganizationCatalog(): Promise<OrganizationCatalogData> {
   return catalogPromise;
 }
 
-/** The compact endpoint that supplies all 60 organization names immediately. */
+/** The compact endpoint that supplies all organization names immediately. */
 export function getOrganizationFacets(): Promise<ModelFacets> {
   if (!facetsPromise) {
     facetsPromise = getModelFacets().catch((error) => {
@@ -57,35 +63,96 @@ export function getOrganizationFacets(): Promise<ModelFacets> {
   return facetsPromise;
 }
 
+/** Fetches aggregated organization metrics from backend in a single batched query. */
+export async function getOrganizationMetrics(): Promise<OrganizationMetricsResponse | null> {
+  try {
+    return await fetchApi<OrganizationMetricsResponse>("/api/v1/research-papers/organization-metrics");
+  } catch {
+    // Non-critical: if endpoint is not available or fails, gracefully return null
+    return null;
+  }
+}
+
 /**
- * Warms counts and paper lists after the catalog is available. The paper
- * requests also warm paperApi's cache for organization profile pages.
+ * Loads the complete organization directory with zero N+1 requests.
+ * Uses a single aggregated query for paper counts, citations, stars, and trending metrics.
  */
 export function getOrganizationDirectory(): Promise<OrganizationDirectoryData> {
   if (!directoryPromise) {
     directoryPromise = (async () => {
-      const [facets, models] = await Promise.all([
-        getOrganizationFacets().catch(() => ({ totalModels: 0, vendors: [], modalities: [], accessTypes: [], opennessTypes: [], modelFamilies: [], capabilities: [], researchAreas: [] })),
-        getModels().catch(() => []),
+      const [facets, models, metricsResponse] = await Promise.all([
+        getOrganizationFacets().catch(() => ({
+          totalModels: 0,
+          vendors: [],
+          modalities: [],
+          accessTypes: [],
+          opennessTypes: [],
+          modelFamilies: [],
+          capabilities: [],
+          researchAreas: [],
+        })),
+        getModels({ limit: 10000 }).catch(() => []),
+        getOrganizationMetrics().catch(() => null),
       ]);
 
-      // Derive paper counts directly from models for instant, zero-latency rendering
-      const initialCounts: Record<string, number> = {};
-      models.forEach((m) => {
-        if (m.vendor) {
-          initialCounts[m.vendor] = (initialCounts[m.vendor] || 0) + (m.paperCount || 1);
+      const paperCounts: Record<string, number> = {};
+      const citations: Record<string, number> = {};
+      const stars: Record<string, number> = {};
+      const trendingScores: Record<string, number> = {};
+
+      if (metricsResponse && Array.isArray(metricsResponse.data)) {
+        for (const item of metricsResponse.data) {
+          const key = item.organization.toLowerCase();
+          paperCounts[key] = item.paperCount;
+          citations[key] = item.citations;
+          stars[key] = item.stars;
+          trendingScores[key] = item.trendingScore;
         }
-      });
-      facets.vendors.forEach((v) => {
-        if (!initialCounts[v.name]) {
-          initialCounts[v.name] = v.count;
+      }
+
+      // Populate distinct metrics for each vendor, with safe client-side fallback if server metrics unavailable
+      for (const vendor of facets.vendors) {
+        const key = vendor.name.toLowerCase();
+        if (paperCounts[key] === undefined) {
+          // If server metrics weren't available for this vendor, calculate safely without duplicating papers
+          const vendorModels = models.filter(
+            (m) => m.vendor?.toLowerCase() === key,
+          );
+
+          let totalCitations = 0;
+          let totalStars = 0;
+          let totalTrending = 0;
+          let paperCount = 0;
+
+          for (const m of vendorModels) {
+            totalTrending += (m.trendingScore || 0);
+            if (m.citationCount) totalCitations += m.citationCount;
+            if (m.githubStars) totalStars += m.githubStars;
+            if (m.paperCount && m.paperCount > paperCount) {
+              paperCount = m.paperCount;
+            }
+          }
+
+          paperCounts[key] = paperCount;
+          citations[key] = totalCitations;
+          stars[key] = totalStars;
+          trendingScores[key] = totalTrending;
         }
-      });
+
+        // Also map under original name casing for easy lookup
+        paperCounts[vendor.name] = paperCounts[key] ?? 0;
+        citations[vendor.name] = citations[key] ?? 0;
+        stars[vendor.name] = stars[key] ?? 0;
+        trendingScores[vendor.name] = trendingScores[key] ?? 0;
+      }
 
       return {
         models,
         facets,
-        paperCounts: initialCounts,
+        paperCounts,
+        citations,
+        stars,
+        trendingScores,
       };
     })().catch((error) => {
       directoryPromise = null;

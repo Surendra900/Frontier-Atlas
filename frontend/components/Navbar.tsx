@@ -1,26 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import SearchBar from "@/components/SearchBar";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useScrollThreshold } from "@/lib/useScroll";
 import Sidebar from "@/components/Sidebar";
 import { prefetchOrganizationDirectory } from "@/lib/organizations";
-import { Bookmark } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-
-type CurrentUser = {
-  email: string;
-};
-
-const defaultApiUrl = "https://frontieratlas-backend.morningsignal-india.workers.dev";
-// Use Next's local rewrite so authentication cookies stay on localhost rather
-// than being set by 127.0.0.1, which is a different cookie site.
-const API_BASE = process.env.NODE_ENV === "development"
-  ? ""
-  : (process.env.NEXT_PUBLIC_API_URL || defaultApiUrl).replace(/\/$/, "");
 
 export default function Navbar({
   activeSort,
@@ -30,30 +16,30 @@ export default function Navbar({
   onItemSelect?: (item: string) => void;
 } = {}) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
-  const profileRefs = useRef<Array<HTMLDivElement | null>>([]);
+
   const isScrolled = useScrollThreshold(50);
   const pathname = usePathname();
-  const router = useRouter();
+
   const isMethodsActive = pathname.startsWith("/methods");
   const isTasksActive = pathname.startsWith("/tasks");
   const isBenchmarksActive = pathname.startsWith("/benchmarks");
   const isModelsActive = pathname.startsWith("/models");
   const isOrganizationsActive = pathname.startsWith("/organizations");
-  const isSavedActive = pathname.startsWith("/saved");
   const isSubmitActive = pathname.startsWith("/submit");
-
   const isHomePage = pathname === "/";
   const isCategoryPage = pathname.startsWith("/category/");
+
   const hasHeroSection = isHomePage || isCategoryPage;
+
   const usesHomepageSearchPresentation =
-    isMethodsActive || isModelsActive || isBenchmarksActive || isTasksActive;
+    isMethodsActive ||
+    isModelsActive ||
+    isBenchmarksActive ||
+    isTasksActive;
 
   const shouldShowSearch = !hasHeroSection || isScrolled;
 
-  // Close menu on escape key
+  // Close menu on Escape key
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
@@ -75,128 +61,22 @@ export default function Navbar({
     };
   }, [isMenuOpen]);
 
-  useEffect(() => {
-    const loadCurrentUser = async () => {
-      try {
-        const response = await fetch(`${API_BASE}/api/v1/auth/me`, {
-          credentials: "include",
-        });
-
-        if (!response.ok) {
-          setCurrentUser(null);
-          return;
-        }
-
-        const data = await response.json();
-        setCurrentUser(data.user);
-      } catch {
-        // A guest session is expected to have no current user.
-        setCurrentUser(null);
-      }
-    };
-
-    loadCurrentUser();
-
-    window.addEventListener("authchange", loadCurrentUser);
-    return () => window.removeEventListener("authchange", loadCurrentUser);
-  }, []);
-
+  // Prefetch organizations
   useEffect(() => {
     prefetchOrganizationDirectory();
   }, []);
 
-  useEffect(() => {
-    const closeProfileOnOutsideClick = (event: MouseEvent) => {
-      if (!profileRefs.current.some((profile) => profile?.contains(event.target as Node))) {
-        setIsProfileOpen(false);
-      }
-    };
-
-    document.addEventListener("mousedown", closeProfileOnOutsideClick);
-    return () => document.removeEventListener("mousedown", closeProfileOnOutsideClick);
-  }, []);
-
   const closeMenu = () => setIsMenuOpen(false);
-
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-
-    try {
-      await fetch(`${API_BASE}/api/v1/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } finally {
-      setCurrentUser(null);
-      setIsProfileOpen(false);
-      setIsLoggingOut(false);
-      window.dispatchEvent(new Event("authchange"));
-      router.push("/");
-      router.refresh();
-    }
-  };
-
-  const profileControl = (index: number) => currentUser ? (
-    <div ref={(element) => { profileRefs.current[index] = element; }} className="relative">
-      <button
-        type="button"
-        onClick={() => setIsProfileOpen((open) => !open)}
-        aria-label="Open profile menu"
-        aria-expanded={isProfileOpen}
-        className="w-8 h-8 rounded-full bg-[#F55036] text-white text-[14px] font-bold flex items-center justify-center cursor-pointer hover:bg-[#E0462D] transition-colors shadow-sm hover:shadow-[0_0_0_3px_rgba(245,80,54,0.20)] hover:-translate-y-px active:scale-95"
-      >
-        {currentUser.email.trim().charAt(0).toUpperCase()}
-      </button>
-
-      {isProfileOpen && (
-        <div className="absolute right-0 top-10 w-64 rounded-xl border border-[#E5E5E0] bg-[#F8F7F2] p-3 shadow-lg">
-          <p className="truncate text-[13px] font-medium text-[#555555] px-2 pb-2 border-b border-[#E5E5E0] mb-2">{currentUser.email}</p>
-
-          <a
-            href="/saved"
-            onClick={() => setIsProfileOpen(false)}
-            className="flex items-center gap-2 px-2 py-2 rounded-lg text-[13px] font-medium text-[#444444] hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] no-underline transition-colors"
-          >
-            <Bookmark size={16} />
-            Saved Papers
-          </a>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="mt-2 w-full rounded-lg bg-[#F55036] px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#E0462D] disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {isLoggingOut ? "Logging out..." : "Log out"}
-          </button>
-        </div>
-      )}
-    </div>
-  ) : (
-    <a
-      href="/login"
-      aria-label="Sign In"
-      className="w-8 h-8 rounded-full bg-[#F55036] flex items-center justify-center cursor-pointer hover:bg-[#E0462D] transition-colors shadow-sm hover:shadow-[0_0_0_3px_rgba(245,80,54,0.20)] hover:-translate-y-px active:scale-95"
-    >
-      <svg
-        width="15"
-        height="15"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="white"
-        strokeWidth="2.5"
-      >
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-        <circle cx="12" cy="7" r="4" />
-      </svg>
-    </a>
-  );
 
   return (
     <>
+      {/* ================= NAVBAR ================= */}
       <nav className="font-sans sticky top-0 h-[56px] xl:h-[52px] w-full bg-[#F8F7F2]/80 backdrop-blur-md border-b border-[#E5E5E0] flex items-center justify-between px-4 md:px-8 xl:px-12 gap-3 xl:gap-4 shrink-0 z-50 transition-all duration-300">
-        {/* Mobile Left (Hamburger + Logo) */}
+
+        {/* ================= LEFT SECTION ================= */}
         <div className="flex items-center gap-1 lg:gap-0 lg:flex-1 lg:max-w-[440px] xl:max-w-[470px] min-w-0 shrink-0">
+
+          {/* Mobile Hamburger */}
           <button
             onClick={() => setIsMenuOpen(true)}
             aria-label="Open menu"
@@ -217,129 +97,208 @@ export default function Navbar({
               <line x1="4" y1="18" x2="20" y2="18" />
             </svg>
           </button>
-          <a href="/" className="flex items-center justify-center lg:justify-start cursor-pointer absolute left-1/2 -translate-x-1/2 lg:relative lg:left-auto lg:-translate-x-0 w-[160px] sm:w-[200px] xl:w-[240px] h-12 xl:h-14">
-            <img src="https://frontieratlas.pages.dev/logo.png" alt="Frontier Atlas" className="w-full h-full object-contain object-center lg:object-left" />
+
+          {/* Logo */}
+          <a
+            href="/"
+            className="flex items-center justify-center lg:justify-start cursor-pointer absolute left-1/2 -translate-x-1/2 lg:relative lg:left-auto lg:-translate-x-0 w-[160px] sm:w-[200px] xl:w-[240px] h-12 xl:h-14"
+          >
+            <img
+              src="https://frontieratlas.pages.dev/logo.png"
+              alt="Frontier Atlas"
+              className="w-full h-full object-contain object-center lg:object-left"
+            />
           </a>
         </div>
 
-        {/* Center — Search Bar (Desktop) */}
+        {/* ================= CENTER SEARCH ================= */}
         <div className="hidden lg:flex flex-1 items-center justify-center px-4 min-w-0 transition-all">
           {shouldShowSearch && (
-            <div className={`w-full flex justify-center ${usesHomepageSearchPresentation ? "max-w-[360px]" : "max-w-[400px] xl:max-w-[480px]"
-              }`}>
+            <div
+              className={`w-full flex justify-center ${
+                usesHomepageSearchPresentation
+                  ? "max-w-[360px]"
+                  : "max-w-[400px] xl:max-w-[480px]"
+              }`}
+            >
               <SearchBar
-                variant={usesHomepageSearchPresentation ? "homepage" : "compact"}
+                variant={
+                  usesHomepageSearchPresentation
+                    ? "homepage"
+                    : "compact"
+                }
                 placeholder="Search..."
                 initialQuery=""
               />
             </div>
           )}
         </div>
-        {/* Right Section (Nav Links + Profile) */}
+
+        {/* ================= RIGHT SECTION ================= */}
         <div className="flex items-center shrink-0">
-          {/* Nav Links (Desktop) */}
-          <div className="hidden lg:flex items-center gap-4 xl:gap-6 mr-4">
+
+          {/* Desktop Navigation */}
+          <div className="hidden lg:flex items-center gap-4 xl:gap-6">
+
+            {/* Tasks */}
             <a
               href="/tasks"
               data-text="Tasks"
-              onMouseEnter={() => { import("@/lib/tasks").then(m => m.getTaskPaperCounts()).catch(() => { }); }}
-              onTouchStart={() => { import("@/lib/tasks").then(m => m.getTaskPaperCounts()).catch(() => { }); }}
-              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${isTasksActive
-                ? "text-[#F55036] font-bold"
-                : "text-[#555555] font-medium hover:text-[#F55036]"
-                }`}
+              onMouseEnter={() => {
+                import("@/lib/tasks")
+                  .then((m) => m.getTaskPaperCounts())
+                  .catch(() => {});
+              }}
+              onTouchStart={() => {
+                import("@/lib/tasks")
+                  .then((m) => m.getTaskPaperCounts())
+                  .catch(() => {});
+              }}
+              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${
+                isTasksActive
+                  ? "text-[#F55036] font-bold"
+                  : "text-[#555555] font-medium hover:text-[#F55036]"
+              }`}
             >
               Tasks
             </a>
+
+            {/* Methods */}
             <a
               href="/methods"
               data-text="Methods"
-              onMouseEnter={() => { import("@/lib/methodCache").then(m => m.prefetchMethods()).catch(() => { }); }}
-              onTouchStart={() => { import("@/lib/methodCache").then(m => m.prefetchMethods()).catch(() => { }); }}
-              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${isMethodsActive
-                ? "text-[#F55036] font-bold"
-                : "text-[#555555] font-medium hover:text-[#F55036]"
-                }`}
+              onMouseEnter={() => {
+                import("@/lib/methodCache")
+                  .then((m) => m.prefetchMethods())
+                  .catch(() => {});
+              }}
+              onTouchStart={() => {
+                import("@/lib/methodCache")
+                  .then((m) => m.prefetchMethods())
+                  .catch(() => {});
+              }}
+              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${
+                isMethodsActive
+                  ? "text-[#F55036] font-bold"
+                  : "text-[#555555] font-medium hover:text-[#F55036]"
+              }`}
             >
               Methods
             </a>
+
+            {/* Benchmarks */}
             <a
               href="/benchmarks"
               data-text="Benchmarks"
-              onMouseEnter={() => { import("@/lib/benchmarks").then(m => m.getBenchmarks()).catch(() => { }); }}
-              onTouchStart={() => { import("@/lib/benchmarks").then(m => m.getBenchmarks()).catch(() => { }); }}
-              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${isBenchmarksActive
-                ? "text-[#F55036] font-bold"
-                : "text-[#555555] font-medium hover:text-[#F55036]"
-                }`}
+              onMouseEnter={() => {
+                import("@/lib/benchmarks")
+                  .then((m) => m.getBenchmarks())
+                  .catch(() => {});
+              }}
+              onTouchStart={() => {
+                import("@/lib/benchmarks")
+                  .then((m) => m.getBenchmarks())
+                  .catch(() => {});
+              }}
+              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${
+                isBenchmarksActive
+                  ? "text-[#F55036] font-bold"
+                  : "text-[#555555] font-medium hover:text-[#F55036]"
+              }`}
             >
               Benchmarks
             </a>
+
+            {/* Models */}
             <Link
               href="/models"
               data-text="Models"
-              onMouseEnter={() => { import("@/lib/models").then(m => m.getModels({ limit: 50 })).catch(() => { }); }}
-              onTouchStart={() => { import("@/lib/models").then(m => m.getModels({ limit: 50 })).catch(() => { }); }}
-              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${isModelsActive
-                ? "text-[#F55036] font-bold"
-                : "text-[#555555] font-medium hover:text-[#F55036]"
-                }`}
+              onMouseEnter={() => {
+                import("@/lib/models")
+                  .then((m) => m.getModels({ limit: 50 }))
+                  .catch(() => {});
+              }}
+              onTouchStart={() => {
+                import("@/lib/models")
+                  .then((m) => m.getModels({ limit: 50 }))
+                  .catch(() => {});
+              }}
+              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${
+                isModelsActive
+                  ? "text-[#F55036] font-bold"
+                  : "text-[#555555] font-medium hover:text-[#F55036]"
+              }`}
             >
               Models
             </Link>
+
+            {/* Organizations */}
             <Link
               href="/organizations"
               data-text="Organizations"
               onMouseEnter={prefetchOrganizationDirectory}
               onTouchStart={prefetchOrganizationDirectory}
-              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${isOrganizationsActive
+              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${
+                isOrganizationsActive
                   ? "text-[#F55036] font-bold"
                   : "text-[#555555] font-medium hover:text-[#F55036]"
-                }`}
+              }`}
             >
               Organizations
             </Link>
-            <Link
+                        <Link
               href="/submit"
               data-text="Submit"
-              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${isSubmitActive
-                ? "text-[#F55036] font-bold"
-                : "text-[#555555] font-medium hover:text-[#F55036]"
-                }`}
+              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${
+                isSubmitActive
+                  ? "text-[#F55036] font-bold"
+                  : "text-[#555555] font-medium hover:text-[#F55036]"
+              }`}
             >
               Submit
             </Link>
-          </div>
-
-          {/* Profile Control */}
-          <div className="flex items-center gap-4 lg:border-l lg:border-[#E5E5E0] lg:pl-4 shrink-0">
-            {profileControl(0)}
+            
           </div>
         </div>
       </nav>
 
-      {/* Mobile Menu Overlay */}
+      {/* ================= MOBILE MENU OVERLAY ================= */}
       <div
-        className={`fixed inset-0 bg-black/40 z-[60] xl:hidden transition-opacity duration-300 ${isMenuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"}`}
+        className={`fixed inset-0 bg-black/40 z-[60] xl:hidden transition-opacity duration-300 ${
+          isMenuOpen
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
         onClick={closeMenu}
         aria-hidden="true"
       />
 
+      {/* ================= MOBILE DRAWER ================= */}
       <div
-        className={`font-sans fixed inset-y-0 left-0 w-[80vw] max-w-[300px] bg-[#F8F7F2]/90 backdrop-blur-xl z-[70] shadow-2xl transform transition-transform duration-300 ease-in-out xl:hidden flex flex-col ${isMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
+        className={`font-sans fixed inset-y-0 left-0 w-[80vw] max-w-[300px] bg-[#F8F7F2]/90 backdrop-blur-xl z-[70] shadow-2xl transform transition-transform duration-300 ease-in-out xl:hidden flex flex-col ${
+          isMenuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
         role="dialog"
         aria-modal="true"
         aria-label="Mobile navigation"
       >
         {/* Drawer Header */}
         <div className="h-[52px] border-b border-[#E5E5E0] flex items-center justify-between px-4 shrink-0">
-          <a href="/" onClick={closeMenu} className="relative block w-[170px] h-10 cursor-pointer">
+
+          {/* Mobile Logo */}
+          <a
+            href="/"
+            onClick={closeMenu}
+            className="relative block w-[170px] h-10 cursor-pointer"
+          >
             <img
               src="https://frontieratlas.pages.dev/logo.png"
               alt="Frontier Atlas"
               className="w-full h-full object-contain object-left"
             />
           </a>
+
+          {/* Close Button */}
           <button
             onClick={closeMenu}
             aria-label="Close menu"
@@ -362,7 +321,11 @@ export default function Navbar({
 
         {/* Drawer Content */}
         <div className="flex-1 overflow-y-auto py-2">
-          <Sidebar initialActive={activeSort} onItemSelect={onItemSelect} onItemClick={closeMenu} />
+          <Sidebar
+            initialActive={activeSort}
+            onItemSelect={onItemSelect}
+            onItemClick={closeMenu}
+          />
         </div>
       </div>
     </>

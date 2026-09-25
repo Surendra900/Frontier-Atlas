@@ -19,89 +19,181 @@ export default function HomeContent({
   initialError?: string;
   initialPeriod?: string;
 }) {
-  const [selectedTag, setSelectedTag] = useState<string | undefined>(undefined);
-  const [activeSort, setActiveSort] = useState<string>("Trending Papers");
-  const [selectedPeriod, setSelectedPeriod] = useState<string>(initialPeriod);
-  const [isFilterChanging, setIsFilterChanging] = useState(false);
+  const [selectedTag, setSelectedTag] = useState<string | undefined>(
+    undefined
+  );
 
-  // Idle prefetch for the most common alternate views so tab switching is instantaneous
+  const [activeSort, setActiveSort] =
+    useState<string>("Trending Papers");
+
+  const [selectedPeriod, setSelectedPeriod] =
+    useState<string>(initialPeriod);
+
+  const [isFilterChanging, setIsFilterChanging] =
+    useState(false);
+
+  // ---------------------------------------------------------------------------
+  // Prefetch commonly used paper views
+  // ---------------------------------------------------------------------------
+
   useEffect(() => {
     const timer = setTimeout(() => {
-      getPapers({ page: 1, sort: "trending", period: "week" }).catch(() => {});
-      getPapers({ page: 1, sort: "trending", period: "all" }).catch(() => {});
+      getPapers({
+        page: 1,
+        sort: "trending",
+        period: "week",
+      }).catch(() => {});
+
+      getPapers({
+        page: 1,
+        sort: "trending",
+        period: "all",
+      }).catch(() => {});
+
       prefetchMethods();
     }, 1500);
 
     return () => clearTimeout(timer);
   }, []);
 
-  // --- FILTER HANDLERS ---
- const handleSidebarSelect = (label: string) => {
-  if (
-    label === "Trending Papers" ||
-    label === "Latest Papers" ||
-    label === "Most GitHub Stars"
-  ) {
-    setIsFilterChanging(true);
-    setActiveSort(label);
-  }
-};
+  // ---------------------------------------------------------------------------
+  // Sidebar filter
+  // ---------------------------------------------------------------------------
+
+  const handleSidebarSelect = (label: string) => {
+    if (
+      label === "Trending Papers" ||
+      label === "Latest Papers" ||
+      label === "Most GitHub Stars"
+    ) {
+      setIsFilterChanging(true);
+      setActiveSort(label);
+    }
+  };
+
+  // ---------------------------------------------------------------------------
+  // Period filter
+  // ---------------------------------------------------------------------------
 
   const handlePeriodSelect = (period: string) => {
     setIsFilterChanging(true);
     setSelectedPeriod(period);
   };
 
-  // Custom handler to ensure `isFilterChanging` triggers when a pill is clicked
-  const handleTagSelect = (tag: string | undefined | ((prev: string | undefined) => string | undefined)) => {
+  // ---------------------------------------------------------------------------
+  // Tag filter
+  // ---------------------------------------------------------------------------
+
+  const handleTagSelect = (
+    tag:
+      | string
+      | undefined
+      | ((prev: string | undefined) => string | undefined)
+  ) => {
     setIsFilterChanging(true);
     setSelectedTag(tag);
   };
 
-  // Map the UI tab to API parameters
+  // ---------------------------------------------------------------------------
+  // Convert UI period to API period
+  // ---------------------------------------------------------------------------
+
   const apiPeriod =
-    selectedPeriod === "Today" ? "today" :
-      selectedPeriod === "This Week" ? "week" :
-        selectedPeriod === "This Month" ? "month" : "all";
+    selectedPeriod === "Today"
+      ? "today"
+      : selectedPeriod === "This Week"
+        ? "week"
+        : selectedPeriod === "This Month"
+          ? "month"
+          : "all";
 
-  const apiSort = activeSort === "Trending Papers" ? "trending" : activeSort === "Most GitHub Stars" ? "stars" : "latest";
+  // ---------------------------------------------------------------------------
+  // Convert UI sort to API sort
+  // ---------------------------------------------------------------------------
 
-  // Distinguish methods from tasks and ensure case-insensitivity
- const isMethod =
-  selectedTag?.toLowerCase() === "model-context-protocol-mcp";
-  const dynamicFilterParams: Record<string, string> = { sort: apiSort };
+  const apiSort =
+    activeSort === "Trending Papers"
+      ? "trending"
+      : activeSort === "Most GitHub Stars"
+        ? "stars"
+        : "latest";
+
+  // ---------------------------------------------------------------------------
+  // Detect MCP method filter
+  // ---------------------------------------------------------------------------
+
+  const isMethod =
+    selectedTag?.toLowerCase() === "model-context-protocol-mcp";
+
+  // ---------------------------------------------------------------------------
+  // Build dynamic API filters
+  // ---------------------------------------------------------------------------
+
+  const dynamicFilterParams: Record<string, string> = {
+    sort: apiSort,
+  };
 
   if (selectedTag) {
     if (isMethod) {
       dynamicFilterParams.method = selectedTag.toLowerCase();
     } else {
-      dynamicFilterParams.task = selectedTag.toLowerCase(); 
+      dynamicFilterParams.task = selectedTag.toLowerCase();
     }
   }
 
+  // ---------------------------------------------------------------------------
+  // IMPORTANT:
+  //
+  // Do NOT use:
+  //   h-screen
+  //   overflow-hidden
+  //   overflow-y-auto
+  //   flex-1 scrolling container
+  //
+  // The entire homepage must use the browser's normal document scroll.
+  // ---------------------------------------------------------------------------
+
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#F8F7F2] text-[#111111]">
-      <Navbar activeSort={activeSort} onItemSelect={handleSidebarSelect} />
-      <div
-        id="scroll-container"
-        className="flex-1 overflow-y-auto overflow-x-hidden hide-scroll flex flex-col"
-      >
-        {/* Hero Section Container */}
-        <div className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-10 pt-3">
+    <div className="w-full bg-[#F8F7F2] text-[#111111]">
+
+      <Navbar
+        activeSort={activeSort}
+        onItemSelect={handleSidebarSelect}
+      />
+
+      <div className="w-full">
+
+        {/* HERO SECTION */}
+
+        <section className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-10 pt-3">
           <HeroSection
             selectedTag={selectedTag}
             setSelectedTag={handleTagSelect as any}
           />
-        </div>
+        </section>
 
-        {/* 3-Column Layout */}
-        <div className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-10 pt-4 pb-2 flex items-start gap-5 lg:gap-8 xl:gap-10">
-          <div className="hidden lg:block w-[240px] shrink-0 sticky top-3 h-[calc(100vh-80px)]">
-            <Sidebar initialActive={activeSort} onItemSelect={handleSidebarSelect} />
-          </div>
+        {/* PAPERS AREA */}
+
+        <section className="w-full max-w-[1600px] mx-auto px-4 md:px-8 xl:px-10 pt-0 pb-0 flex items-start gap-5 lg:gap-8 xl:gap-10">
+
+          {/* DESKTOP SIDEBAR */}
+
+          <aside className="hidden lg:block w-[240px] shrink-0 sticky top-[68px] self-start">
+            <Sidebar
+              initialActive={activeSort}
+              onItemSelect={handleSidebarSelect}
+            />
+          </aside>
+
+          {/* MAIN PAPER CONTENT */}
 
           <main className="flex-1 min-w-0 max-w-[1380px]">
-            <PaperTabs selectedPeriod={selectedPeriod} onPeriodSelect={handlePeriodSelect} />
+
+            <PaperTabs
+              selectedPeriod={selectedPeriod}
+              onPeriodSelect={handlePeriodSelect}
+            />
+
             <PaperList
               selectedTag={isMethod ? undefined : selectedTag}
               period={apiPeriod}
@@ -111,8 +203,14 @@ export default function HomeContent({
               isFilterChanging={isFilterChanging}
               onFilterDone={() => setIsFilterChanging(false)}
             />
+
           </main>
-        </div>
+        </section>
+
+        {/* NO EXTRA BOTTOM SPACE */}
+
+        <div className="h-0 w-full" />
+
       </div>
     </div>
   );

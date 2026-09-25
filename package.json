@@ -11,6 +11,8 @@
     "lint": "npm run lint --workspace=frontend"
   },
   "dependencies": {
-    "@upstash/redis": "^1.38.0"
+    "@phosphor-icons/react": "^2.1.10",
+    "@upstash/redis": "^1.38.0",
+    "lucide-react": "^1.48.0"
   }
 }

@@ -119,7 +119,7 @@ function mapModelItem(m: BackendModelItem): ModelItem {
     name: m.name,
     slug: m.slug,
     vendor: m.vendor,
-    vendorLogoUrl: m.vendorLogoUrl,
+    vendorLogoUrl: m.vendorLogoUrl || (m as unknown as { vendor_logo_url?: string }).vendor_logo_url,
     releaseDate: m.releaseDate,
     parameterCount: m.parameterCount,
     modality: m.modality,
@@ -201,7 +201,7 @@ export function saveCachedModelDetail(slug: string, detail: ModelDetail): void {
 
 export function getCachedModelBySlug(slug: string): ModelDetail | null {
   const cleanSlug = slug.toLowerCase().trim();
-  
+
   // 1. Check direct detail cache
   const cachedDetail = getCached<ModelDetail>(`model_detail_${cleanSlug}`);
   if (cachedDetail) return cachedDetail;
@@ -265,6 +265,7 @@ export async function getModels(params?: string | Record<string, unknown>): Prom
   if (cached) return cached;
 
   const response = await fetchApi<GetModelsResponse>(`/api/v1/models${queryString}`);
+  // console.log(response)
   const items = Array.isArray(response?.data) ? response.data : [];
   const result = items.map(mapModelItem);
 
@@ -278,7 +279,7 @@ export async function getTrendingModels(limit = 20): Promise<ModelItem[]> {
 
 export async function getModelFacets(): Promise<ModelFacets> {
   const cacheKey = 'models_facets';
-  
+
   const cached = getCached<ModelFacets>(cacheKey);
   if (cached) return cached;
 
@@ -356,7 +357,7 @@ export function prefetchModelBySlug(slug: string): void {
   const cleanSlug = slug.toLowerCase().trim();
 
   if (!modelsCache.has(`model_detail_${cleanSlug}`)) {
-    getModelBySlug(cleanSlug).catch(() => {});
+    getModelBySlug(cleanSlug).catch(() => { });
   }
 
   getPapers({
@@ -364,7 +365,7 @@ export function prefetchModelBySlug(slug: string): void {
     model: cleanSlug,
     sort: 'popular',
     period: 'all',
-  }).catch(() => {});
+  }).catch(() => { });
 }
 
 if (typeof window !== 'undefined') {
