@@ -462,8 +462,9 @@ export default function Sidebar({
   // ============================================================
 
   return (
-    <aside className="flex flex-col w-full bg-transparent h-full">
-      <div className="flex-1 px-2 pt-1 pb-2 space-y-2">
+    <aside className="flex flex-col w-full bg-transparent">
+
+      <div className="px-2 pt-1 space-y-1">
 
         {/* ======================================================
             DISCOVER
@@ -541,6 +542,9 @@ export default function Sidebar({
             />
           ))}
         </SidebarSection>
+
+        {/* Controlled empty space below sidebar */}
+        <div className="h-[140px]" />
 
       </div>
     </aside>
