@@ -68,24 +68,57 @@ import Navbar from "@/components/Navbar";
 // Recently released will be loaded from backend
 // Popular collections will be derived from backend data
 
-function modelLogoUrl(logo?: string) {
-  if (!logo) return undefined;
 
-  try {
-    const url = new URL(logo);
+function modelLogoUrl(logo?: string, vendor?: string) {
+  const normalizedVendor = vendor?.toLowerCase().trim();
 
-    if (url.hostname === "logo.clearbit.com") {
-      const domain = url.pathname.replace(/^\//, "");
+  const vendorDomains: Record<string, string> = {
+    "01-ai": "01.ai",
+    "alibaba": "alibabagroup.com",
+    "alibaba cloud": "alibabacloud.com",
+    "amazon": "amazon.com",
+    "anthropic": "anthropic.com",
+    "apple": "apple.com",
+    "baidu": "baidu.com",
+    "bytedance": "bytedance.com",
+    "bytedance-seed": "bytedance.com",
+    "cohere": "cohere.com",
+    "databricks": "databricks.com",
+    "deepmind": "deepmind.google",
+    "facebook ai": "ai.meta.com",
+    "google": "google.com",
+    "horizonrobotics": "horizon.cc",
+    "ibm": "ibm.com",
+    "intel": "intel.com",
+    "meta": "meta.com",
+    "microsoft": "microsoft.com",
+    "microsoft research": "microsoft.com",
+    "minimax": "minimaxi.com",
+    "mistral": "mistral.ai",
+    "mistral ai": "mistral.ai",
+    "moonshot ai": "moonshot.cn",
+    "moonshot.ai": "moonshot.cn",
+    "nvidia": "nvidia.com",
+    "openai": "openai.com",
+    "paddlepaddle": "paddlepaddle.org.cn",
+    "qwen": "qwen.ai",
+    "salesforce": "salesforce.com",
+    "tencent": "tencent.com",
+    "xiaomi": "xiaomi.com",
+    "xai": "x.ai",
+    "zhipu ai": "zhipuai.cn",
+  };
 
-      return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(
-        domain
-      )}&sz=128`;
-    }
-  } catch {
-    return logo;
+  if (!normalizedVendor || !vendorDomains[normalizedVendor]) {
+    return undefined;
   }
 
-  return logo;
+  const domain = vendorDomains[normalizedVendor];
+
+  const imageUrl =
+    `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
+
+  return `/api/proxy-image?url=${encodeURIComponent(imageUrl)}`;
 }
 
 function getSkeletalIcon(index: number, name: string = "") {
