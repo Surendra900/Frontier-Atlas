@@ -42,6 +42,18 @@ export interface Paper {
   }[];
 }
 
+/**
+ * Returns true if the paper has at least one tag (tasks, methods, or SOTA benchmark claims).
+ * Used to filter feeds so that untagged papers are never visible on the frontend.
+ */
+export function paperHasTags(paper: Paper): boolean {
+  if (!paper) return false;
+  const hasTasks = Array.isArray(paper.tags) && paper.tags.some(t => typeof t === "string" && t.trim().length > 0);
+  const hasMethods = Array.isArray(paper.additionalTags) && paper.additionalTags.some(m => typeof m === "string" && m.trim().length > 0);
+  const hasSota = typeof paper.sota === "string" && paper.sota.trim().length > 0;
+  return hasTasks || hasMethods || hasSota;
+}
+
 export interface PapersResponse {
   status: string;
   count: number;
@@ -167,7 +179,9 @@ export function mapBackendPaper(raw: Record<string, unknown>): Paper {
   }
 
   let sotaString = "";
-  if (Array.isArray(raw.sotaClaims) && raw.sotaClaims.length > 0) {
+  if (typeof raw.sota === "string" && raw.sota.trim()) {
+    sotaString = raw.sota.trim();
+  } else if (Array.isArray(raw.sotaClaims) && raw.sotaClaims.length > 0) {
     sotaString = raw.sotaClaims.map((sc: unknown) => {
       if (typeof sc === 'object' && sc !== null && 'benchmark' in sc) {
         const benchmark = (sc as { benchmark: unknown }).benchmark;
@@ -176,8 +190,26 @@ export function mapBackendPaper(raw: Record<string, unknown>): Paper {
         }
       }
       return String(sc);
-    }).join(" • ");
+    }).filter(Boolean).join(" • ");
+  } else if (Array.isArray(raw.rankings) && raw.rankings.length > 0) {
+    sotaString = raw.rankings.map((r: any) => {
+      const bName = r?.benchmark?.name || r?.benchmarkName;
+      if (bName) {
+        return r.rank ? `#${r.rank} on ${bName}` : `Ranked on ${bName}`;
+      }
+      return "";
+    }).filter(Boolean).join(" • ");
   }
+
+  const rawTasks = Array.isArray(raw.tasks) ? raw.tasks : Array.isArray(raw.tags) ? raw.tags : [];
+  const cleanTags = rawTasks
+    .map(extractString)
+    .filter((t) => Boolean(t && t.trim() && t !== "undefined" && t !== "null"));
+
+  const rawMethods = Array.isArray(raw.methods) ? raw.methods : Array.isArray(raw.additionalTags) ? raw.additionalTags : [];
+  const cleanAdditionalTags = rawMethods
+    .map(extractString)
+    .filter((m) => Boolean(m && m.trim() && m !== "undefined" && m !== "null"));
 
   const rawThumb = String(raw.thumbnail_url || raw.thumbnailUrl || raw.thumbnail || "");
   let finalThumbnail = "";
@@ -217,8 +249,8 @@ export function mapBackendPaper(raw: Record<string, unknown>): Paper {
     rawDate: raw.publicationDate ? new Date(String(raw.publicationDate)).getTime() : 0,
     description: String(raw.abstract || ""),
     sota: sotaString,
-    tags: Array.isArray(raw.tasks) ? raw.tasks.map(extractString) : [],
-    additionalTags: Array.isArray(raw.methods) ? raw.methods.map(extractString) : [],
+    tags: cleanTags,
+    additionalTags: cleanAdditionalTags,
     upvotes: String(raw.githubStars || 0),
     github_hourly_increase: Number(raw.github_hourly_increase || 0),
     repo: String(raw.githubForks || 0),
@@ -307,7 +339,7 @@ export function resolveHfModelUrl(paper: Paper | any): string | null {
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 function getCacheKey(params: GetPapersParams): string {
-  return `papers:v7:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "trending"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
+  return `papers:v8:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "trending"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
 }
 
 // In-memory cache — fastest possible, zero deserialization cost
@@ -463,7 +495,7 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
 
         const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${query.toString()}`);
         const mappedPapers = response.data.papers.map(mapBackendPaper);
-        const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+        const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug) && paperHasTags(p));
         const freshResult: GetPapersResult = {
           papers: validPapers,
           total: response.data.total,
@@ -516,7 +548,6 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
         // --- 1. THIS WEEK COHORT ---
         if (period === "week") {
           if (sort === "latest") {
-            // Preprints published earlier this week (Aug 18 & 17, 2026 - starting at page 25 in DB)
             const targetPage = 24 + page;
             const weekQuery = new URLSearchParams();
             weekQuery.append("sort", "latest");
@@ -524,15 +555,26 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
             weekQuery.append("page", String(targetPage));
             weekQuery.append("limit", "20");
 
-            const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${weekQuery.toString()}`);
-            const mappedPapers = response.data.papers.map(mapBackendPaper);
-            const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+            const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${weekQuery.toString()}`).catch(() => null);
+            let mappedPapers = (response?.data?.papers || []).map(mapBackendPaper);
+            let validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug) && paperHasTags(p));
+
+            if (validPapers.length === 0) {
+              const fallbackQuery = new URLSearchParams();
+              fallbackQuery.append("sort", "latest");
+              fallbackQuery.append("period", "all");
+              fallbackQuery.append("page", String(page));
+              fallbackQuery.append("limit", "25");
+              const fbRes = await fetchApi<PapersResponse>(`/api/v1/research-papers?${fallbackQuery.toString()}`);
+              mappedPapers = (fbRes.data?.papers || []).map(mapBackendPaper);
+              validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug) && paperHasTags(p));
+            }
 
             const result: GetPapersResult = {
               papers: validPapers.slice(0, fetchLimit),
               total: 2244,
               page: page,
-              hasMore: response.data?.hasMore ?? true,
+              hasMore: response?.data?.hasMore ?? true,
             };
             writeCache(cacheKey, result);
             return result;
@@ -546,7 +588,7 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
             const combined = [
               ...(res1.data?.papers || []).map(mapBackendPaper),
               ...(res2.data?.papers || []).map(mapBackendPaper),
-            ].filter(p => Boolean(p.title && p.slug));
+            ].filter(p => Boolean(p.title && p.slug) && paperHasTags(p));
 
             // Weekly threshold: papers published on or after July 24, 2026 (1784851200000)
             const weekThreshold = 1784851200000;
@@ -597,7 +639,7 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
             const combined = [
               ...(res1.data?.papers || []).map(mapBackendPaper),
               ...(res2.data?.papers || []).map(mapBackendPaper),
-            ].filter(p => Boolean(p.title && p.slug));
+            ].filter(p => Boolean(p.title && p.slug) && paperHasTags(p));
 
             const weekThreshold = 1784851200000;
             const weeklyCohort = combined.filter(p => (p.rawDate || 0) >= weekThreshold);
@@ -617,11 +659,22 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
           todayQuery.append("sort", "latest");
           todayQuery.append("period", "today");
           todayQuery.append("page", String(page));
-          todayQuery.append("limit", "20");
+          todayQuery.append("limit", "25");
 
-          const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${todayQuery.toString()}`);
-          const mappedPapers = response.data.papers.map(mapBackendPaper);
-          const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+          const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${todayQuery.toString()}`).catch(() => null);
+          let mappedPapers = (response?.data?.papers || []).map(mapBackendPaper);
+          let validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug) && paperHasTags(p));
+
+          if (validPapers.length === 0) {
+            const fallbackQuery = new URLSearchParams();
+            fallbackQuery.append("sort", sort === "trending" ? "trending" : "latest");
+            fallbackQuery.append("period", "all");
+            fallbackQuery.append("page", String(page));
+            fallbackQuery.append("limit", "25");
+            const fbRes = await fetchApi<PapersResponse>(`/api/v1/research-papers?${fallbackQuery.toString()}`);
+            mappedPapers = (fbRes.data?.papers || []).map(mapBackendPaper);
+            validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug) && paperHasTags(p));
+          }
 
           if (sort === "trending") {
             // Rank today's papers by multi-factor trending momentum (official code repo, abstract depth, topics, citations)
@@ -638,13 +691,12 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
               return getScore(b) - getScore(a);
             });
           }
-          // For sort === "latest", keep chronological arXiv order (SPADE, PartialBiGrasp, ADEPT...)
 
           const result: GetPapersResult = {
             papers: validPapers.slice(0, fetchLimit),
-            total: response.data?.total || 634,
+            total: response?.data?.total || validPapers.length || 634,
             page: page,
-            hasMore: response.data?.hasMore ?? true,
+            hasMore: response?.data?.hasMore ?? true,
           };
           writeCache(cacheKey, result);
           return result;
@@ -657,11 +709,11 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
             monthQuery.append("sort", "stars");
             monthQuery.append("period", "month");
             monthQuery.append("page", String(page));
-            monthQuery.append("limit", "20");
+            monthQuery.append("limit", "25");
 
             const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${monthQuery.toString()}`);
             const mappedPapers = response.data.papers.map(mapBackendPaper);
-            const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+            const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug) && paperHasTags(p));
             validPapers.sort((a, b) => (b.rawDate || 0) - (a.rawDate || 0));
 
             const result: GetPapersResult = {
@@ -678,11 +730,11 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
             monthQuery.append("sort", backendSort);
             monthQuery.append("period", "month");
             monthQuery.append("page", String(page));
-            monthQuery.append("limit", "20");
+            monthQuery.append("limit", "25");
 
             const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${monthQuery.toString()}`);
             const mappedPapers = response.data.papers.map(mapBackendPaper);
-            const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+            const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug) && paperHasTags(p));
 
             if (sort === "stars") {
               validPapers.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0));
@@ -710,11 +762,11 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
         allQuery.append("sort", backendSort);
         allQuery.append("period", "all");
         allQuery.append("page", String(page));
-        allQuery.append("limit", "20");
+        allQuery.append("limit", "25");
 
         const response = await fetchApi<PapersResponse>(`/api/v1/research-papers?${allQuery.toString()}`);
         const mappedPapers = response.data.papers.map(mapBackendPaper);
-        const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+        const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug) && paperHasTags(p));
 
         if (sort === "stars") {
           validPapers.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0));
@@ -743,7 +795,7 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
           `/api/v1/research-papers?${query.toString()}`
         );
         const mappedPapers = response.data.papers.map(mapBackendPaper);
-        const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+        const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug) && paperHasTags(p));
 
         if (sort === "stars") {
           validPapers.sort((a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0) || (b.citations || 0) - (a.citations || 0));
@@ -784,14 +836,14 @@ export async function searchPapers(query: string): Promise<Paper[]> {
     }>(
       `/api/v1/research-papers/search?q=${encodeURIComponent(query)}`
     );
-    return response.data.papers.map(mapBackendPaper);
+    return response.data.papers.map(mapBackendPaper).filter(paperHasTags);
   } catch (error) {
     console.warn('Backend search unavailable, falling back to client-side filtering', error);
     // Fallback: fetch all and filter locally
     try {
       const result = await getPapers({ limit: 100 });
       const lowerQuery = query.toLowerCase();
-      return result.papers.filter((paper) => {
+      return result.papers.filter(paperHasTags).filter((paper) => {
         return (
           paper.title.toLowerCase().includes(lowerQuery) ||
           paper.authors.map(a => a.name).join(' ').toLowerCase().includes(lowerQuery) ||

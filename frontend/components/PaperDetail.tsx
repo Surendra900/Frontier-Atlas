@@ -24,7 +24,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, useMemo, type ReactNode } from "react";
 import type { PaperDetail as PaperDetailType, PaperRanking, PaperSotaClaim } from "@/lib/papers";
-import { getPapers, getArxivAbsUrl, getArxivPdfUrl, resolveHfModelUrl, type Paper } from "@/lib/paperApi";
+import { getPapers, getArxivAbsUrl, getArxivPdfUrl, resolveHfModelUrl, paperHasTags, type Paper } from "@/lib/paperApi";
 import { atlasUiFont } from "@/lib/fonts";
 import { fetchWithAuthRetry } from "@/lib/auth-client";
 import { useToast } from "@/components/ToastProvider";
@@ -656,6 +656,7 @@ function BenchmarksSection({
 
 export function RelatedPaperCard({ paper }: { paper: Paper }) {
   const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  if (!paperHasTags(paper)) return null;
   const showThumbnail = !!paper.thumbnail && !thumbnailFailed;
 
   const displayAuthors = (() => {

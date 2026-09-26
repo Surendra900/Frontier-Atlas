@@ -30,6 +30,7 @@ import {
   getArxivAbsUrl,
   getArxivPdfUrl,
   resolveHfModelUrl,
+  paperHasTags,
   type GetPapersParams,
   type GetPapersResult,
   type Paper,
@@ -499,6 +500,10 @@ export const PaperCard = memo(({ paper, onOpenCite }: { paper: Paper; onOpenCite
     router.prefetch(`/papers/${paper.slug}`);
     prefetchPaperBySlug(paper.slug);
   }, [router, paper.slug]);
+
+  if (!paperHasTags(paper)) {
+    return null;
+  }
   
   return (
     <div
@@ -831,12 +836,13 @@ export default function PaperList({
 }: PaperListProps) {
   const [papers, setPapers] = useState<Paper[]>(() => {
     if (initialPapers?.papers) {
+      const tagged = initialPapers.papers.filter(paperHasTags);
       if (filterParams?.sort === "stars") {
-        return [...initialPapers.papers].sort(
+        return [...tagged].sort(
           (a, b) => Number(b.upvotes || 0) - Number(a.upvotes || 0) || (b.citations || 0) - (a.citations || 0)
         );
       }
-      return initialPapers.papers;
+      return tagged;
     }
     return [];
   });
@@ -860,11 +866,12 @@ export default function PaperList({
     [searchQuery],
   );
   const filteredPapers = useMemo(() => {
+    const tagged = papers.filter(paperHasTags);
     if (!selectedFilter || selectedFilter === "All") {
-      return papers;
+      return tagged;
     }
  
-    return papers.filter((paper) => {
+    return tagged.filter((paper) => {
       const text = [
         paper.title,
         paper.description,
@@ -1039,9 +1046,10 @@ export default function PaperList({
         setError(null);
 
         const result = await fetchPage(pageNumber, limit);
-        let visiblePapers = normalizedSearchQuery
-          ? result.papers.filter(matchesSearch)
-          : result.papers;
+        let visiblePapers = result.papers.filter(paperHasTags);
+        if (normalizedSearchQuery) {
+          visiblePapers = visiblePapers.filter(matchesSearch);
+        }
 
         if (filterParams?.sort === "stars") {
           visiblePapers = [...visiblePapers].sort(
@@ -1091,8 +1099,12 @@ const isInitialMount = useRef(true);
     initialPapers.papers.length > 0 &&
     !normalizedSearchQuery
   ) {
-    cacheRef.current.set(getCacheKey(initialPapers.page, itemsPerPage), initialPapers);
-    setTotalPapers(initialPapers.total);
+    const taggedInitial = {
+      ...initialPapers,
+      papers: initialPapers.papers.filter(paperHasTags),
+    };
+    cacheRef.current.set(getCacheKey(initialPapers.page, itemsPerPage), taggedInitial);
+    setTotalPapers(taggedInitial.papers.length || initialPapers.total);
     if (initialPapers.hasMore) {
       prefetchPage(initialPapers.page + 1);
     }
