@@ -20,9 +20,11 @@ const formatAuthors = (authors: PaperAuthor[]) => {
 export default function HeroSection({
   selectedTag,
   setSelectedTag,
+  onPeriodSelect,
 }: {
   selectedTag?: string;
   setSelectedTag: React.Dispatch<React.SetStateAction<string | undefined>>;
+   onPeriodSelect?: (period: string) => void;
 }) {
   const router = useRouter();
   const [query, setQuery] = useState("");
@@ -213,11 +215,12 @@ export default function HeroSection({
                 key={tag.slug}
                 onMouseEnter={() => handleChipHover(tag.slug)}
                 onTouchStart={() => handleChipHover(tag.slug)}
-                onClick={() =>
+                onClick={() => {
                   setSelectedTag(
                     selectedTag === tag.slug ? undefined : tag.slug
-                  )
-                }
+                  );
+                  onPeriodSelect?.("All time");
+                }}
                 className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 min-h-[24px] transition-all duration-200 ease-out cursor-pointer select-none
                   ${
                     selectedTag === tag.slug
