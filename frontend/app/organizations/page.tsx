@@ -114,7 +114,7 @@ export default function OrganizationsPage() {
   const [stars, setStars] = useState<Record<string, number>>({});
   const [trendingScores, setTrendingScores] = useState<Record<string, number>>({});
   const [sort, setSort] = useState<SortMode>("trending");
-  const [loading, setLoading] = useState(() => !(cachedModels && cachedFacets));
+  const [loading, setLoading] = useState(() => !(getCachedModels() && getCachedModelFacets()));
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
@@ -135,6 +135,9 @@ export default function OrganizationsPage() {
         setModels(Array.isArray(directory?.models) ? directory.models : []);
         setFacets(directory?.facets || null);
         setPaperCounts(directory?.paperCounts || {});
+        setCitations(directory?.citations || {});
+        setStars(directory?.stars || {});
+        setTrendingScores(directory?.trendingScores || {});
       })
       .catch((error) => console.error("Unable to load organizations", error))
       .finally(() => {
@@ -151,20 +154,39 @@ export default function OrganizationsPage() {
     models.forEach((model) => {
       if (!model || typeof model.vendor !== "string" || !model.vendor.trim()) return;
       const vendorName = model.vendor.trim();
-      const previous = grouped.get(vendorName) ?? [];
+      const canonicalKey = vendorName.toLowerCase();
+      const previous = grouped.get(canonicalKey) ?? [];
       previous.push(model);
-      grouped.set(vendorName, previous);
+      grouped.set(canonicalKey, previous);
     });
 
-    const source = facets?.vendors?.length
-      ? facets.vendors
-          .filter((v) => v && typeof v.name === "string")
-          .map((vendor) => ({ name: vendor.name, count: typeof vendor.count === "number" ? vendor.count : 0 }))
-      : [...grouped.entries()].map(([name, entries]) => ({ name, count: entries.length }));
+    const vendorMap = new Map<string, { name: string; count: number }>();
+
+    if (facets?.vendors?.length) {
+      facets.vendors.forEach((v) => {
+        if (v && typeof v.name === "string" && v.name.trim()) {
+          const originalName = v.name.trim();
+          const key = originalName.toLowerCase();
+          if (!vendorMap.has(key)) {
+            vendorMap.set(key, { name: originalName, count: typeof v.count === "number" ? v.count : 0 });
+          }
+        }
+      });
+    }
+
+    grouped.forEach((entries, key) => {
+      if (!vendorMap.has(key)) {
+        const preferredName = entries[0]?.vendor?.trim() || key;
+        vendorMap.set(key, { name: preferredName, count: entries.length });
+      }
+    });
+
+    const source = Array.from(vendorMap.values());
 
     return source
       .map((organization) => {
-        const organizationModels = grouped.get(organization.name) ?? [];
+        const key = organization.name.toLowerCase();
+        const organizationModels = grouped.get(key) ?? [];
         const sortedByTrending = [...organizationModels].sort((a, b) => {
           const scoreA = typeof a.trendingScore === "number" ? a.trendingScore : 0;
           const scoreB = typeof b.trendingScore === "number" ? b.trendingScore : 0;
@@ -173,9 +195,12 @@ export default function OrganizationsPage() {
 
         return {
           ...organization,
-          logo: organizationLogoUrl(organizationModels.find((model) => model && model.vendorLogoUrl)?.vendorLogoUrl),
+          logo: undefined,
           featuredModel: sortedByTrending[0],
-          paperCount: paperCounts[organization.name] ?? 0,
+          paperCount: paperCounts[key] ?? paperCounts[organization.name] ?? organization.count,
+          citations: citations[key] ?? citations[organization.name] ?? 0,
+          stars: stars[key] ?? stars[organization.name] ?? 0,
+          trendingScore: trendingScores[key] ?? trendingScores[organization.name] ?? 0,
           momentum: organizationModels.reduce((total, model) => {
             const score = typeof model.trendingScore === "number" ? model.trendingScore : 0;
             return total + score;
@@ -201,7 +226,6 @@ export default function OrganizationsPage() {
         if (sort === "stars-asc") {
           return (Number(a.stars || 0) - Number(b.stars || 0)) || a.name.localeCompare(b.name);
         }
-        // Trending: deterministic numeric ranking on momentum / trendingScore, then paperCount, then model count, then name
         return (
           (Number(b.trendingScore || 0) - Number(a.trendingScore || 0)) ||
           (Number(b.paperCount || 0) - Number(a.paperCount || 0)) ||
@@ -210,14 +234,6 @@ export default function OrganizationsPage() {
         );
       });
   }, [facets?.vendors, models, paperCounts, citations, stars, trendingScores, sort]);
-
-  const handleCitationsClick = () => {
-    setSort((current) => (current === "citations" ? "citations-asc" : "citations"));
-  };
-
-  const handleStarsClick = () => {
-    setSort((current) => (current === "stars" ? "stars-asc" : "stars"));
-  };
 
   const orgCount = isMounted ? (facets?.vendors?.length ?? organizations.length) : "...";
 
@@ -272,7 +288,7 @@ export default function OrganizationsPage() {
             </div>
           </div>
 
-          {(!mounted || loading) ? (
+          {(!isMounted || loading) ? (
             <div className="mt-6 grid max-w-[1140px] grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
               {Array.from({ length: 8 }).map((_, index) => (
                 <div key={index} className="h-[224px] animate-pulse rounded-md border border-[#E7E4DD] bg-white" />

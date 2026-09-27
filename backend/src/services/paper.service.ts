@@ -620,3 +620,65 @@ export const searchPapers = async (
     query: searchTerm,
   };
 };
+/**
+ * Retrieves aggregated organization metrics (paper counts, citations, stars, trending scores).
+ */
+export async function getOrganizationMetrics(queryRouter: QueryRouter, organization?: string) {
+  return queryRouter.routeQuery(async (prisma: PrismaClient) => {
+    // Fetch all papers with their associated models and vendors to aggregate metrics
+    const papers = await prisma.paper.findMany({
+      select: {
+        citationCount: true,
+        githubStars: true,
+        github_hourly_increase: true,
+        models: {
+          select: {
+            model: {
+              select: {
+                vendor: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const metricsMap = new Map<string, { paperCount: number; citations: number; stars: number; trendingScore: number }>();
+
+    papers.forEach((paper) => {
+      const vendors = new Set<string>();
+      paper.models?.forEach((m) => {
+        if (m?.model?.vendor && typeof m.model.vendor === "string") {
+          const v = m.model.vendor.trim();
+          if (v) vendors.add(v);
+        }
+      });
+
+      vendors.forEach((vendor) => {
+        const key = vendor.toLowerCase();
+        const current = metricsMap.get(key) || { paperCount: 0, citations: 0, stars: 0, trendingScore: 0 };
+        
+        current.paperCount += 1;
+        current.citations += Number(paper.citationCount || 0);
+        current.stars += Number(paper.githubStars || 0);
+        current.trendingScore += Number(paper.github_hourly_increase || 0);
+        
+        metricsMap.set(key, current);
+      });
+    });
+
+    const data = Array.from(metricsMap.entries()).map(([orgKey, stats]) => ({
+      organization: orgKey,
+      paperCount: stats.paperCount,
+      citations: stats.citations,
+      stars: stats.stars,
+      trendingScore: stats.trendingScore,
+    }));
+
+    return {
+      status: "success",
+      count: data.length,
+      data,
+    };
+  });
+}
