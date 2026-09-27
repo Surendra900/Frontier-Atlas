@@ -26,7 +26,8 @@ import {
   getArxivAbsUrl,
   getArxivPdfUrl,
   paperHasTags,
-  resolveHfModelUrl,
+  getPreferredModelPlatform,
+  type ModelPlatformInfo,
   type GetPapersParams,
   type GetPapersResult,
   type Paper,
@@ -499,7 +500,20 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
     (repo: any) => repo.url?.includes("github.com")
   );
 
- 
+  const [preferredPlatform, setPreferredPlatform] = useState<ModelPlatformInfo | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    getPreferredModelPlatform(paper).then((platformInfo) => {
+      if (active) {
+        setPreferredPlatform(platformInfo);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [paper]);
+
   const handlePrefetch = useCallback(() => {
     router.prefetch(`/papers/${paper.slug}`);
     prefetchPaperBySlug(paper.slug);
@@ -592,7 +606,7 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
           </div>
  
           {/* Action Buttons */}
-          <div className="grid grid-cols-5 md:grid md:grid-cols-5 gap-1 sm:gap-2 md:gap-3 mt-1.5">
+          <div className="flex flex-wrap md:flex-nowrap items-center gap-1 sm:gap-2 md:gap-3 mt-1.5">
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -668,49 +682,37 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
               <ArrowUpRight size={14} strokeWidth={1.5} className="text-[#9CA3AF] hidden lg:block xl:hidden" />
             </button>
 
-            <button
-              onClick={async (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const newWindow = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null;
-                try {
-                  const hfUrl = await resolveHfModelUrl(paper);
-                  if (hfUrl) {
-                    if (newWindow) {
-                      newWindow.location.href = hfUrl;
-                    } else {
-                      window.open(hfUrl, "_blank");
-                    }
-                  } else {
-                    if (newWindow) newWindow.close();
-                    alert("Hugging Face model will be available soon.");
-                  }
-                } catch {
-                  if (newWindow) newWindow.close();
-                }
-              }}
-              className="relative overflow-hidden flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-0.5 min-[375px]:px-1 md:px-2 lg:px-4 xl:px-2 h-[24px] md:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#B7791F] border-[1.5px] border-[#eab308]/50 hover:border-[#eab308] hover:bg-[#eab308]/10 rounded-[6px] transition-all duration-300"
-            >
-              {/* Mobile Content */}
-              <div className="absolute inset-0 flex sm:hidden items-center justify-center pointer-events-none">
-                <div className="flex items-center gap-0.5 transform scale-[0.60] min-[375px]:scale-[0.70] whitespace-nowrap">
-                  <img src="https://cdn.simpleicons.org/huggingface" alt="Hugging Face" className="w-[10px] h-[10px]" />
-                  <span className="font-medium text-[10px] tracking-tight">Hugging Face</span>
+            {preferredPlatform && (
+              <button
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  window.open(preferredPlatform.url, "_blank");
+                }}
+                className={`relative overflow-hidden flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-0.5 min-[375px]:px-1 md:px-2 lg:px-4 xl:px-2 h-[24px] md:h-[28px] lg:h-[58px] xl:h-[28px] bg-white ${preferredPlatform.colorClass} border-[1.5px] ${preferredPlatform.borderColorClass} ${preferredPlatform.bgHoverClass} rounded-[6px] transition-all duration-300`}
+              >
+                {/* Mobile Content */}
+                <div className="absolute inset-0 flex sm:hidden items-center justify-center pointer-events-none">
+                  <div className="flex items-center gap-0.5 transform scale-[0.60] min-[375px]:scale-[0.70] whitespace-nowrap">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={preferredPlatform.iconUrl} alt={preferredPlatform.name} className="w-[10px] h-[10px]" />
+                    <span className="font-medium text-[10px] tracking-tight">{preferredPlatform.name}</span>
+                  </div>
                 </div>
-              </div>
 
-              {/* Desktop Content */}
-              <div className="hidden sm:flex items-center gap-1.5 lg:gap-3 xl:gap-1.5">
-                <div className="w-[20px] h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="https://cdn.simpleicons.org/huggingface" alt="Hugging Face" className="w-[12px] h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
+                {/* Desktop Content */}
+                <div className="hidden sm:flex items-center gap-1.5 lg:gap-3 xl:gap-1.5">
+                  <div className="w-[20px] h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={preferredPlatform.iconUrl} alt={preferredPlatform.name} className="w-[12px] h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
+                  </div>
+                  <span className="font-semibold xl:font-medium text-[9.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tight">
+                    {preferredPlatform.name}
+                  </span>
                 </div>
-                <span className="font-semibold xl:font-medium text-[9.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tight">
-                  Hugging Face
-                </span>
-              </div>
-              <ArrowUpRight size={14} strokeWidth={1.5} className="text-[#9CA3AF] hidden lg:block xl:hidden" />
-            </button>
+                <ArrowUpRight size={14} strokeWidth={1.5} className="text-[#9CA3AF] hidden lg:block xl:hidden" />
+              </button>
+            )}
 
             <button
               onClick={(e) => {

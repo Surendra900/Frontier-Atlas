@@ -119,6 +119,19 @@ const paperSelect = {
       },
     },
   },
+  models: {
+    select: {
+      model: {
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          repositoryUrl: true,
+          apiUrl: true,
+        },
+      },
+    },
+  },
 } satisfies Prisma.PaperSelect;
 const parseAuthors = (authors?: string | null) => {
   if (!authors) return [];
@@ -482,6 +495,7 @@ export const getPapers = async (
       repositories: paper.repositories.map(
         ({ repository }: any) => repository
       ),
+      models: paper.models?.map(({ model }: any) => model) || [],
 
       authors: parseAuthors(paper.authors),
       tasks: paper.tasks.map(({ task }: any) => task),

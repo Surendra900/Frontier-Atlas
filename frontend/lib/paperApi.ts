@@ -26,6 +26,9 @@ export interface Paper {
   hfUrl?: string;
   huggingface_url?: string;
   hf_model_url?: string;
+  kaggleUrl?: string;
+  replicateUrl?: string;
+  ngcUrl?: string;
   models?: any[];
   trendingScore?: number;
   hfUpvotes?: number;
@@ -260,6 +263,9 @@ export function mapBackendPaper(raw: Record<string, unknown>): Paper {
     hfUrl: raw.hfUrl ? String(raw.hfUrl) : undefined,
     huggingface_url: raw.huggingface_url ? String(raw.huggingface_url) : undefined,
     hf_model_url: (raw.hf_model_url || raw.hfModelUrl) ? String(raw.hf_model_url || raw.hfModelUrl) : undefined,
+    kaggleUrl: raw.kaggleUrl ? String(raw.kaggleUrl) : (raw.kaggle_url ? String(raw.kaggle_url) : undefined),
+    replicateUrl: raw.replicateUrl ? String(raw.replicateUrl) : (raw.replicate_url ? String(raw.replicate_url) : undefined),
+    ngcUrl: raw.ngcUrl ? String(raw.ngcUrl) : (raw.ngc_url ? String(raw.ngc_url) : (raw.nvidia_url ? String(raw.nvidia_url) : undefined)),
     trendingScore: raw.trendingScore != null ? Number(raw.trendingScore) : undefined,
     hfUpvotes: raw.hfUpvotes != null ? Number(raw.hfUpvotes) : undefined,
     arxivId: cleanArxivId,
@@ -337,8 +343,47 @@ export async function resolveHfModelUrl(paper: Paper | any): Promise<string | nu
     }
   }
 
-  // Collect candidates from associated models, benchmarks, code repositories, and paper title
-  const candidates: string[] = [];
+  // 5. Check if models are tagged with this paper's arXiv ID on Hugging Face (e.g. arxiv:2609.24984 -> WorldCrafter)
+  const cleanArxivId = (paper.arxivId || "").replace(/^arxiv:/i, "").trim();
+  if (cleanArxivId) {
+    try {
+      const res = await fetch(`https://huggingface.co/api/models?filter=arxiv:${cleanArxivId}&limit=20`, {
+        signal: AbortSignal.timeout(2000),
+      });
+      if (res.ok) {
+        const models = await res.json();
+        if (Array.isArray(models) && models.length > 0) {
+          if (models.length === 1) {
+            const resolved = `https://huggingface.co/${models[0].id}`;
+            if (cacheKey) hfModelExistsCache.set(cacheKey, resolved);
+            return resolved;
+          }
+
+          // Check if there is an exact primary model matching the paper's repo or model name
+          const repoName = paper.githubUrl ? paper.githubUrl.split('/').pop()?.replace(/\.git$/, '').toLowerCase() : null;
+          const exact = models.find((m: any) => {
+            const idLower = m.id.toLowerCase();
+            return (
+              (repoName && (idLower.endsWith(`/${repoName}`) || idLower === repoName)) ||
+              (paper.title && idLower.endsWith(`/${paper.title.split(/[:—–(]/)[0].trim().toLowerCase()}`))
+            );
+          });
+          if (exact) {
+            const resolved = `https://huggingface.co/${exact.id}`;
+            if (cacheKey) hfModelExistsCache.set(cacheKey, resolved);
+            return resolved;
+          }
+
+          // Multiple models for this exact paper -> tagged collection format (Image 1)
+          const resolved = `https://huggingface.co/models?other=arxiv:${cleanArxivId}`;
+          if (cacheKey) hfModelExistsCache.set(cacheKey, resolved);
+          return resolved;
+        }
+      }
+    } catch {
+      // ignore network errors or timeouts
+    }
+  }
 
   const isModelLike = (str: string) => {
     if (!str || typeof str !== 'string') return false;
@@ -348,22 +393,18 @@ export async function resolveHfModelUrl(paper: Paper | any): Promise<string | nu
     return true;
   };
 
-  // 1. Associated models from paper metadata
+  // 6. Check for exact model name match from paper.models or GitHub repo (e.g. Marco-o1)
+  const modelCandidates: string[] = [];
   if (Array.isArray(paper.models) && paper.models.length > 0) {
     for (const m of paper.models) {
       const modelObj = m?.model || m;
-      if (modelObj?.name || modelObj?.slug) {
-        const name = String(modelObj.name || modelObj.slug).trim();
-        if (name && isModelLike(name) && !candidates.includes(name)) {
-          candidates.push(name);
-        }
+      const name = String(modelObj?.name || modelObj?.slug || "").trim();
+      if (name && isModelLike(name) && !modelCandidates.includes(name)) {
+        modelCandidates.push(name);
       }
     }
   }
 
-  // 2. GitHub repository name
-  let ghRepoName: string | null = null;
-  let ghOwnerRepo: string | null = null;
   const ghUrl = paper.githubUrl || (Array.isArray(paper.repositories) ? paper.repositories.find((r: any) => r?.url?.includes('github.com'))?.url : null);
   if (ghUrl && typeof ghUrl === 'string') {
     const ghMatch = ghUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
@@ -371,53 +412,15 @@ export async function resolveHfModelUrl(paper: Paper | any): Promise<string | nu
       const owner = ghMatch[1];
       const repo = ghMatch[2].replace(/\.git$/, '');
       if (repo && isModelLike(repo)) {
-        ghRepoName = repo;
-        ghOwnerRepo = `${owner}/${repo}`;
+        if (!modelCandidates.includes(repo)) modelCandidates.push(repo);
+        if (!modelCandidates.includes(`${owner}/${repo}`)) modelCandidates.push(`${owner}/${repo}`);
       }
     }
   }
 
-  // Identify whether this paper is a survey/collection vs a model release
-  const isSurveyOrList = !ghRepoName || (paper.title && /\b(survey|overview|review|roadmap|awesome)\b/i.test(paper.title));
-
-  if (!isSurveyOrList) {
-    if (ghRepoName && !candidates.includes(ghRepoName)) candidates.push(ghRepoName);
-    if (ghOwnerRepo && !candidates.includes(ghOwnerRepo)) candidates.push(ghOwnerRepo);
-  }
-
-  // 3. Evaluated benchmarks / SOTA claims (e.g. SWE-bench, GSM8K, MATH)
-  if (Array.isArray(paper.sotaClaims)) {
-    for (const sc of paper.sotaClaims) {
-      const bName = sc?.benchmark?.name || sc?.benchmarkName;
-      if (bName && !candidates.includes(bName)) {
-        candidates.push(bName);
-      }
-    }
-  }
-  if (paper.sota && typeof paper.sota === 'string') {
-    const bName = paper.sota.replace(/^SOTA\s*(🏆\s*)?on\s*/i, '').replace(/^#\d+\s+on\s+/i, '').split('•')[0].trim();
-    if (bName && !candidates.includes(bName)) {
-      candidates.push(bName);
-    }
-  }
-
-  if (isSurveyOrList) {
-    if (ghRepoName && !candidates.includes(ghRepoName)) candidates.push(ghRepoName);
-  }
-
-  // 4. Concise title (only if model-like and not a long survey title)
-  if (paper.title && typeof paper.title === 'string') {
-    const cleanTitle = paper.title.split(/[:—–(]/)[0].trim().replace(/\s+v\d+(\.\d+)*$/i, '').trim();
-    if (cleanTitle && cleanTitle.length >= 3 && cleanTitle.length <= 40 && isModelLike(cleanTitle) && !candidates.includes(cleanTitle)) {
-      candidates.push(cleanTitle);
-    }
-  }
-
-  // Use Hugging Face's public search endpoint across candidates in parallel for low latency
-  const searchPromises = candidates.slice(0, 3).map(async (candidate) => {
+  for (const candidate of modelCandidates) {
     try {
       const res = await fetch(`https://huggingface.co/api/models?search=${encodeURIComponent(candidate)}&limit=5`, {
-        method: 'GET',
         signal: AbortSignal.timeout(1500),
       });
       if (res.ok) {
@@ -427,30 +430,272 @@ export async function resolveHfModelUrl(paper: Paper | any): Promise<string | nu
             m.id?.toLowerCase() === candidate.toLowerCase() ||
             m.id?.toLowerCase().endsWith(`/${candidate.toLowerCase()}`)
           );
-          return {
-            candidate,
-            url: exact ? `https://huggingface.co/${exact.id}` : `https://huggingface.co/models?search=${encodeURIComponent(candidate)}`
-          };
+          if (exact) {
+            const resolved = `https://huggingface.co/${exact.id}`;
+            if (cacheKey) hfModelExistsCache.set(cacheKey, resolved);
+            return resolved;
+          }
         }
       }
     } catch {
-      // ignore network errors or timeouts
+      // ignore
     }
-    return null;
-  });
-
-  const results = await Promise.all(searchPromises);
-  const found = results.find(Boolean);
-  if (found) {
-    if (cacheKey) hfModelExistsCache.set(cacheKey, found.url);
-    return found.url;
   }
 
-  // Safe fallback to Hugging Face models search
-  const fallbackQuery = candidates[0] || (paper.title ? paper.title.split(/[:—–(]/)[0].trim() : 'models');
-  const fallbackUrl = `https://huggingface.co/models?search=${encodeURIComponent(fallbackQuery)}`;
-  if (cacheKey) hfModelExistsCache.set(cacheKey, fallbackUrl);
-  return fallbackUrl;
+  // 7. No generic benchmark or random keyword fallback to avoid showing 100+ unrelated models
+  if (cacheKey) hfModelExistsCache.set(cacheKey, null);
+  return null;
+}
+
+export type ModelPlatformType = "huggingface" | "kaggle" | "replicate" | "ngc";
+
+export interface ModelPlatformInfo {
+  platform: ModelPlatformType;
+  name: string;
+  url: string;
+  iconUrl: string;
+  colorClass: string;
+  borderColorClass: string;
+  bgHoverClass: string;
+}
+
+function normalizeExternalUrl(url: string): string {
+  const trimmed = url.trim();
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
+/**
+ * Checks if a URL is a verified Kaggle model / notebook / code implementation page.
+ * Strictly excludes generic search URLs, root homepages, and GitHub repositories.
+ */
+export function isVerifiedKaggleUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim().toLowerCase();
+  if (!trimmed.includes('kaggle.com')) return false;
+  if (trimmed.includes('github.com')) return false;
+  if (trimmed.includes('/search')) return false;
+
+  try {
+    const parsed = new URL(normalizeExternalUrl(trimmed));
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+    const segments = pathname.split('/').filter(Boolean);
+    // Needs at least 2 segments (e.g. /models/owner/name or /code/owner/notebook)
+    if (segments.length < 2) return false;
+    const disallowedFirst = [
+      'about', 'terms', 'privacy', 'contact', 'docs', 'search',
+      'discussions', 'competitions', 'rankings', 'datasets'
+    ];
+    if (segments.length === 2 && disallowedFirst.includes(segments[0])) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Checks if a URL is a verified Replicate model implementation page.
+ * Strictly excludes explore/docs/pricing pages, search URLs, and GitHub repositories.
+ */
+export function isVerifiedReplicateUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim().toLowerCase();
+  if (!trimmed.includes('replicate.com')) return false;
+  if (trimmed.includes('github.com')) return false;
+  if (trimmed.includes('/search')) return false;
+
+  try {
+    const parsed = new URL(normalizeExternalUrl(trimmed));
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+    const segments = pathname.split('/').filter(Boolean);
+    // Replicate models have format: /owner/model or /owner/model/versions/...
+    if (segments.length < 2) return false;
+    const disallowedFirst = [
+      'about', 'terms', 'privacy', 'pricing', 'blog', 'docs',
+      'explore', 'signin', 'signup', 'account', 'showcase'
+    ];
+    if (disallowedFirst.includes(segments[0])) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Checks if a URL is a verified NVIDIA NGC resource/model implementation page.
+ * Strictly excludes generic NVIDIA homepages, search URLs, and GitHub repositories.
+ */
+export function isVerifiedNgcUrl(url?: string | null): boolean {
+  if (!url || typeof url !== 'string') return false;
+  const trimmed = url.trim().toLowerCase();
+  if (!trimmed.includes('ngc.nvidia.com')) return false;
+  if (trimmed.includes('github.com')) return false;
+  if (trimmed.includes('/search')) return false;
+
+  try {
+    const parsed = new URL(normalizeExternalUrl(trimmed));
+    const pathname = parsed.pathname.replace(/\/+$/, '');
+    const segments = pathname.split('/').filter(Boolean);
+    // e.g. catalog.ngc.nvidia.com/orgs/<org>/models/<model>
+    if (segments.length < 2) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function extractVerifiedPlatformUrl(
+  paper: Paper | any,
+  verifier: (url?: string | null) => boolean,
+  explicitKeys: string[]
+): string | null {
+  if (!paper) return null;
+
+  // 1. Explicit keys on paper object
+  for (const key of explicitKeys) {
+    const val = paper[key];
+    if (typeof val === 'string' && verifier(val)) {
+      return normalizeExternalUrl(val);
+    }
+  }
+
+  // 2. Repositories list
+  if (Array.isArray(paper.repositories)) {
+    for (const repo of paper.repositories) {
+      const url = repo?.url || (typeof repo === 'string' ? repo : null);
+      if (typeof url === 'string' && verifier(url)) {
+        return normalizeExternalUrl(url);
+      }
+    }
+  }
+
+  // 3. Associated models list
+  if (Array.isArray(paper.models) && paper.models.length > 0) {
+    for (const m of paper.models) {
+      const modelObj = m?.model || m;
+      const candidates = [
+        modelObj?.repositoryUrl,
+        modelObj?.repository_url,
+        modelObj?.apiUrl,
+        modelObj?.api_url,
+        modelObj?.url,
+      ];
+      for (const cand of candidates) {
+        if (typeof cand === 'string' && verifier(cand)) {
+          return normalizeExternalUrl(cand);
+        }
+      }
+    }
+  }
+
+  // 4. Project URL (only if direct link to this platform)
+  if (typeof paper.projectUrl === 'string' && verifier(paper.projectUrl)) {
+    return normalizeExternalUrl(paper.projectUrl);
+  }
+  if (typeof paper.project_url === 'string' && verifier(paper.project_url)) {
+    return normalizeExternalUrl(paper.project_url);
+  }
+
+  // 5. Source URL
+  if (typeof paper.sourceUrl === 'string' && verifier(paper.sourceUrl)) {
+    return normalizeExternalUrl(paper.sourceUrl);
+  }
+  if (typeof paper.source_url === 'string' && verifier(paper.source_url)) {
+    return normalizeExternalUrl(paper.source_url);
+  }
+
+  return null;
+}
+
+const preferredPlatformCache = new Map<string, ModelPlatformInfo | null>();
+
+/**
+ * Returns the preferred model platform according to strict priority:
+ * 1. Hugging Face
+ * 2. Kaggle
+ * 3. Replicate
+ * 4. NVIDIA NGC
+ * 
+ * Rules:
+ * - Only verified mappings are returned.
+ * - Code/GitHub is separate and NEVER used as a fallback.
+ * - Returns null when no verified mapping exists.
+ */
+export async function getPreferredModelPlatform(paper: Paper | any): Promise<ModelPlatformInfo | null> {
+  if (!paper) return null;
+
+  const cacheKey = paper.slug || paper.id || paper.title || "";
+  if (cacheKey && preferredPlatformCache.has(cacheKey)) {
+    return preferredPlatformCache.get(cacheKey) ?? null;
+  }
+
+  // Priority 1: Hugging Face
+  const hfUrl = await resolveHfModelUrl(paper);
+  if (hfUrl && !hfUrl.includes('github.com')) {
+    const info: ModelPlatformInfo = {
+      platform: "huggingface",
+      name: "Hugging Face",
+      url: hfUrl,
+      iconUrl: "https://cdn.simpleicons.org/huggingface",
+      colorClass: "text-[#B7791F]",
+      borderColorClass: "border-[#eab308]/50 hover:border-[#eab308]",
+      bgHoverClass: "hover:bg-[#eab308]/10",
+    };
+    if (cacheKey) preferredPlatformCache.set(cacheKey, info);
+    return info;
+  }
+
+  // Priority 2: Kaggle
+  const kaggleUrl = extractVerifiedPlatformUrl(paper, isVerifiedKaggleUrl, ["kaggleUrl", "kaggle_url"]);
+  if (kaggleUrl && !kaggleUrl.includes('github.com')) {
+    const info: ModelPlatformInfo = {
+      platform: "kaggle",
+      name: "Kaggle",
+      url: kaggleUrl,
+      iconUrl: "https://cdn.simpleicons.org/kaggle/20BEFF",
+      colorClass: "text-[#20BEFF]",
+      borderColorClass: "border-[#20BEFF]/50 hover:border-[#20BEFF]",
+      bgHoverClass: "hover:bg-[#20BEFF]/10",
+    };
+    if (cacheKey) preferredPlatformCache.set(cacheKey, info);
+    return info;
+  }
+
+  // Priority 3: Replicate
+  const replicateUrl = extractVerifiedPlatformUrl(paper, isVerifiedReplicateUrl, ["replicateUrl", "replicate_url"]);
+  if (replicateUrl && !replicateUrl.includes('github.com')) {
+    const info: ModelPlatformInfo = {
+      platform: "replicate",
+      name: "Replicate",
+      url: replicateUrl,
+      iconUrl: "https://cdn.simpleicons.org/replicate",
+      colorClass: "text-[#000000]",
+      borderColorClass: "border-[#000000]/40 hover:border-[#000000]",
+      bgHoverClass: "hover:bg-[#000000]/5",
+    };
+    if (cacheKey) preferredPlatformCache.set(cacheKey, info);
+    return info;
+  }
+
+  // Priority 4: NVIDIA NGC
+  const ngcUrl = extractVerifiedPlatformUrl(paper, isVerifiedNgcUrl, ["ngcUrl", "ngc_url", "nvidiaUrl", "nvidia_url"]);
+  if (ngcUrl && !ngcUrl.includes('github.com')) {
+    const info: ModelPlatformInfo = {
+      platform: "ngc",
+      name: "NVIDIA NGC",
+      url: ngcUrl,
+      iconUrl: "https://cdn.simpleicons.org/nvidia/76B900",
+      colorClass: "text-[#76B900]",
+      borderColorClass: "border-[#76B900]/50 hover:border-[#76B900]",
+      bgHoverClass: "hover:bg-[#76B900]/10",
+    };
+    if (cacheKey) preferredPlatformCache.set(cacheKey, info);
+    return info;
+  }
+
+  // Priority 5: None — never fallback to GitHub or fake URLs
+  if (cacheKey) preferredPlatformCache.set(cacheKey, null);
+  return null;
 }
 
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes

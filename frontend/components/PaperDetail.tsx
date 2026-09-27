@@ -20,7 +20,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { PaperDetail as PaperDetailType, PaperRanking, PaperSotaClaim } from "@/lib/papers";
-import { getPapers, getArxivAbsUrl, getArxivPdfUrl, paperHasTags, resolveHfModelUrl, type Paper } from "@/lib/paperApi";
+import { getPapers, getArxivAbsUrl, getArxivPdfUrl, paperHasTags, getPreferredModelPlatform, type ModelPlatformInfo, type Paper } from "@/lib/paperApi";
 import { atlasUiFont } from "@/lib/fonts";
 
 
@@ -908,13 +908,13 @@ const { addRecentPaper } = useRecentPapers();
       addRecentPaper(paper); // Just pass the entire paper object directly!
     }
   }, [paper]);
-  const [hfModelUrl, setHfModelUrl] = useState<string | null>(null);
+  const [preferredPlatform, setPreferredPlatform] = useState<ModelPlatformInfo | null>(null);
 
   useEffect(() => {
     let active = true;
-    resolveHfModelUrl(paper).then((url) => {
-      if (active && url) {
-        setHfModelUrl(url);
+    getPreferredModelPlatform(paper).then((platformInfo) => {
+      if (active && platformInfo) {
+        setPreferredPlatform(platformInfo);
       }
     });
     return () => {
@@ -922,26 +922,14 @@ const { addRecentPaper } = useRecentPapers();
     };
   }, [paper]);
 
-  const huggingFaceRepo = paper.repositories?.find(
-    (repo: any) => repo.url?.includes("huggingface.co") && !repo.url?.includes("/papers/")
-  );
   const githubRepo = paper.repositories?.find(
     (repo: any) => repo.url?.includes("github.com")
   );
   const resolvedGithubUrl = paper.githubUrl || githubRepo?.url || null;
-  const hfResolvedUrl =
-    hfModelUrl ||
-    ((paper as any).hf_model_url && !(paper as any).hf_model_url.includes("/papers/") ? (paper as any).hf_model_url : null) ||
-    (huggingFaceRepo?.url || null) ||
-    (paper.hfUrl && !paper.hfUrl.includes("/papers/") ? paper.hfUrl : null) ||
-    (paper.huggingface_url && !paper.huggingface_url.includes("/papers/") ? paper.huggingface_url : null) ||
-    (paper.models?.[0]?.name ? `https://huggingface.co/models?search=${encodeURIComponent(paper.models[0].name)}` : null) ||
-    (paper.sotaClaims?.[0]?.benchmark?.name ? `https://huggingface.co/models?search=${encodeURIComponent(paper.sotaClaims[0].benchmark.name)}` : null) ||
-    (paper.title ? `https://huggingface.co/models?search=${encodeURIComponent(paper.title.split(/[:—–(]/)[0].trim())}` : null);
   const rawProjectPageUrl = formatExternalUrl(paper.projectUrl);
   const projectPageUrl = rawProjectPageUrl && !rawProjectPageUrl.includes("huggingface.co") ? rawProjectPageUrl : null;
   const previewHref =
-    pdfUrl || arxivUrl || paper.paperUrl || doiUrl || paper.sourceUrl || projectPageUrl || hfResolvedUrl;
+    pdfUrl || arxivUrl || paper.paperUrl || doiUrl || paper.sourceUrl || projectPageUrl || preferredPlatform?.url;
 
   const handleShare = useCallback(async () => {
     if (navigator.share) {
@@ -1208,17 +1196,17 @@ const { addRecentPaper } = useRecentPapers();
                       )}
                     </a>
                   )}
-                  {hfResolvedUrl && (
+                  {preferredPlatform && (
                     <a
-                      href={hfResolvedUrl}
+                      href={preferredPlatform.url}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="ds-button-ghost inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[#E0DDD6] bg-transparent px-5 py-2 text-[13px] font-medium text-[#444444] no-underline transition-all hover:bg-[rgba(255,90,31,0.06)] hover:text-[#FF5A1F] hover:border-[rgba(255,90,31,0.3)] active:scale-[0.97]"
                     >
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src="https://cdn.simpleicons.org/huggingface" alt="Hugging Face" className="w-[16px] h-[16px]" />
-                      Hugging Face
-                      {paper.hfUpvotes != null && paper.hfUpvotes > 0 && (
+                      <img src={preferredPlatform.iconUrl} alt={preferredPlatform.name} className="w-[16px] h-[16px]" />
+                      {preferredPlatform.name}
+                      {preferredPlatform.platform === "huggingface" && paper.hfUpvotes != null && paper.hfUpvotes > 0 && (
                         <span className="text-[#8B8B8B] font-bold">{formatCompactNumber(paper.hfUpvotes)}</span>
                       )}
                     </a>
@@ -1442,7 +1430,7 @@ const { addRecentPaper } = useRecentPapers();
           {deferred ? (
             <aside className="space-y-5 xl:sticky xl:top-6 self-start order-2 xl:row-span-2">
               <RepositoryPanel paper={paper} resolvedGithubUrl={resolvedGithubUrl} />
-              {hfResolvedUrl && <HuggingFacePanel paper={paper} hfUrl={hfResolvedUrl} />}
+              {preferredPlatform?.platform === "huggingface" && <HuggingFacePanel paper={paper} hfUrl={preferredPlatform.url} />}
               <CitationPanel
                 paper={paper}
                 selectedFormat={selectedCitationFormat}
