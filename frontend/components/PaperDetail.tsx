@@ -20,7 +20,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { PaperDetail as PaperDetailType, PaperRanking, PaperSotaClaim } from "@/lib/papers";
-import { getPapers, getArxivAbsUrl, getArxivPdfUrl, paperHasTags, type Paper } from "@/lib/paperApi";
+import { getPapers, getArxivAbsUrl, getArxivPdfUrl, paperHasTags, resolveHfModelUrl, type Paper } from "@/lib/paperApi";
 import { atlasUiFont } from "@/lib/fonts";
 
 
@@ -286,7 +286,7 @@ function HuggingFacePanel({ paper, hfUrl }: { paper: PaperDetailType; hfUrl: str
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0 flex flex-col gap-1.5">
             <p className="font-mono text-[15px] font-extrabold text-[#171717] m-0 truncate">
-              {repoName || (paper.arxivId ? `hf.co/papers/${paper.arxivId}` : "Hugging Face Model")}
+              {repoName || (paper.sotaClaims?.[0]?.benchmark?.name ? `${paper.sotaClaims[0].benchmark.name} Models` : "Hugging Face Models")}
             </p>
             {paper.hfUpvotes != null && paper.hfUpvotes > 0 && (
               <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#FF5A1F]">
@@ -908,20 +908,36 @@ const { addRecentPaper } = useRecentPapers();
       addRecentPaper(paper); // Just pass the entire paper object directly!
     }
   }, [paper]);
+  const [hfModelUrl, setHfModelUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    resolveHfModelUrl(paper).then((url) => {
+      if (active && url) {
+        setHfModelUrl(url);
+      }
+    });
+    return () => {
+      active = false;
+    };
+  }, [paper]);
+
   const huggingFaceRepo = paper.repositories?.find(
-    (repo: any) => repo.url?.includes("huggingface.co")
+    (repo: any) => repo.url?.includes("huggingface.co") && !repo.url?.includes("/papers/")
   );
   const githubRepo = paper.repositories?.find(
     (repo: any) => repo.url?.includes("github.com")
   );
   const resolvedGithubUrl = paper.githubUrl || githubRepo?.url || null;
   const hfResolvedUrl =
-    paper.hfUrl ||
-    paper.huggingface_url ||
-    huggingFaceRepo?.url ||
-    (paper.paperUrl?.includes("huggingface.co") ? paper.paperUrl : null) ||
-    (paper.sourceUrl?.includes("huggingface.co") ? paper.sourceUrl : null) ||
-    (paper.arxivId ? `https://huggingface.co/papers/${paper.arxivId}` : null);
+    hfModelUrl ||
+    ((paper as any).hf_model_url && !(paper as any).hf_model_url.includes("/papers/") ? (paper as any).hf_model_url : null) ||
+    (huggingFaceRepo?.url || null) ||
+    (paper.hfUrl && !paper.hfUrl.includes("/papers/") ? paper.hfUrl : null) ||
+    (paper.huggingface_url && !paper.huggingface_url.includes("/papers/") ? paper.huggingface_url : null) ||
+    (paper.models?.[0]?.name ? `https://huggingface.co/models?search=${encodeURIComponent(paper.models[0].name)}` : null) ||
+    (paper.sotaClaims?.[0]?.benchmark?.name ? `https://huggingface.co/models?search=${encodeURIComponent(paper.sotaClaims[0].benchmark.name)}` : null) ||
+    (paper.title ? `https://huggingface.co/models?search=${encodeURIComponent(paper.title.split(/[:—–(]/)[0].trim())}` : null);
   const rawProjectPageUrl = formatExternalUrl(paper.projectUrl);
   const projectPageUrl = rawProjectPageUrl && !rawProjectPageUrl.includes("huggingface.co") ? rawProjectPageUrl : null;
   const previewHref =

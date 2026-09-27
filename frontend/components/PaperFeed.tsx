@@ -26,6 +26,7 @@ import {
   getArxivAbsUrl,
   getArxivPdfUrl,
   paperHasTags,
+  resolveHfModelUrl,
   type GetPapersParams,
   type GetPapersResult,
   type Paper,
@@ -497,10 +498,7 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
   const githubRepo = paper.repositories?.find(
     (repo: any) => repo.url?.includes("github.com")
   );
-  const resolvedGithubUrl = paper.githubUrl || githubRepo?.url || null;
-  const huggingFaceRepo = paper.repositories?.find(
-    (repo: any) => repo.url?.includes("huggingface.co")
-  );
+
  
   const handlePrefetch = useCallback(() => {
     router.prefetch(`/papers/${paper.slug}`);
@@ -671,18 +669,24 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
             </button>
 
             <button
-              onClick={(e) => {
+              onClick={async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const hfUrl =
-                  huggingFaceRepo?.url ||
-                  (paper as any).hfUrl ||
-                  (paper as any).huggingface_url ||
-                  (paper.arxivId ? `https://huggingface.co/papers/${paper.arxivId}` : null);
-                if (hfUrl) {
-                  window.open(hfUrl, "_blank");
-                } else {
-                  alert("Hugging Face model will be available soon.");
+                const newWindow = typeof window !== "undefined" ? window.open("about:blank", "_blank") : null;
+                try {
+                  const hfUrl = await resolveHfModelUrl(paper);
+                  if (hfUrl) {
+                    if (newWindow) {
+                      newWindow.location.href = hfUrl;
+                    } else {
+                      window.open(hfUrl, "_blank");
+                    }
+                  } else {
+                    if (newWindow) newWindow.close();
+                    alert("Hugging Face model will be available soon.");
+                  }
+                } catch {
+                  if (newWindow) newWindow.close();
                 }
               }}
               className="relative overflow-hidden flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-0.5 min-[375px]:px-1 md:px-2 lg:px-4 xl:px-2 h-[24px] md:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#B7791F] border-[1.5px] border-[#eab308]/50 hover:border-[#eab308] hover:bg-[#eab308]/10 rounded-[6px] transition-all duration-300"

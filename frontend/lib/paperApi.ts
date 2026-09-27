@@ -273,14 +273,22 @@ export function mapBackendPaper(raw: Record<string, unknown>): Paper {
   };
 }
 
-export function resolveHfModelUrl(paper: Paper | any): string | null {
+const hfModelExistsCache = new Map<string, string | null>();
+
+export async function resolveHfModelUrl(paper: Paper | any): Promise<string | null> {
   if (!paper) return null;
+
+  const cacheKey = paper.slug || paper.id || paper.title || "";
+  if (cacheKey && hfModelExistsCache.has(cacheKey)) {
+    return hfModelExistsCache.get(cacheKey)!;
+  }
 
   const isValidModelUrl = (url?: string | null): boolean => {
     if (!url || typeof url !== 'string') return false;
     const trimmed = url.trim();
     if (!trimmed) return false;
     if (trimmed.includes('/papers/')) return false;
+    if (trimmed.replace(/\/+$/, '') === 'https://huggingface.co' || trimmed.replace(/\/+$/, '') === 'http://huggingface.co') return false;
     return trimmed.includes('huggingface.co') || /^[\w.-]+\/[\w.-]+$/.test(trimmed);
   };
 
@@ -293,47 +301,156 @@ export function resolveHfModelUrl(paper: Paper | any): string | null {
   };
 
   if (isValidModelUrl(paper.hf_model_url)) {
-    return formatHfUrl(paper.hf_model_url);
+    const resolved = formatHfUrl(paper.hf_model_url);
+    if (cacheKey) hfModelExistsCache.set(cacheKey, resolved);
+    return resolved;
   }
 
   if (Array.isArray(paper.repositories)) {
     const hfRepo = paper.repositories.find((r: any) => isValidModelUrl(r?.url));
     if (hfRepo?.url) {
-      return formatHfUrl(hfRepo.url);
+      const resolved = formatHfUrl(hfRepo.url);
+      if (cacheKey) hfModelExistsCache.set(cacheKey, resolved);
+      return resolved;
     }
   }
 
   if (isValidModelUrl(paper.hfUrl)) {
-    return formatHfUrl(paper.hfUrl);
+    const resolved = formatHfUrl(paper.hfUrl);
+    if (cacheKey) hfModelExistsCache.set(cacheKey, resolved);
+    return resolved;
   }
   if (isValidModelUrl(paper.huggingface_url)) {
-    return formatHfUrl(paper.huggingface_url);
+    const resolved = formatHfUrl(paper.huggingface_url);
+    if (cacheKey) hfModelExistsCache.set(cacheKey, resolved);
+    return resolved;
   }
 
   if (Array.isArray(paper.models) && paper.models.length > 0) {
     for (const m of paper.models) {
       const modelObj = m?.model || m;
       if (isValidModelUrl(modelObj?.repository_url)) {
-        return formatHfUrl(modelObj.repository_url);
+        const resolved = formatHfUrl(modelObj.repository_url);
+        if (cacheKey) hfModelExistsCache.set(cacheKey, resolved);
+        return resolved;
       }
+    }
+  }
+
+  // Collect candidates from associated models, benchmarks, code repositories, and paper title
+  const candidates: string[] = [];
+
+  const isModelLike = (str: string) => {
+    if (!str || typeof str !== 'string') return false;
+    const lower = str.toLowerCase();
+    if (lower.startsWith('awesome-') || lower.startsWith('awesome_') || lower.includes('awesome')) return false;
+    if (lower.includes('survey') || lower.includes('overview') || lower.includes('review') || lower.includes('roadmap')) return false;
+    return true;
+  };
+
+  // 1. Associated models from paper metadata
+  if (Array.isArray(paper.models) && paper.models.length > 0) {
+    for (const m of paper.models) {
+      const modelObj = m?.model || m;
       if (modelObj?.name || modelObj?.slug) {
-        const modelName = String(modelObj.name || modelObj.slug).trim();
-        if (modelName) {
-          return `https://huggingface.co/models?search=${encodeURIComponent(modelName)}`;
+        const name = String(modelObj.name || modelObj.slug).trim();
+        if (name && isModelLike(name) && !candidates.includes(name)) {
+          candidates.push(name);
         }
       }
     }
   }
 
-  if (paper.title && typeof paper.title === 'string') {
-    const cleanTitle = paper.title.split(/[:—–(]/)[0].trim();
-    const query = cleanTitle.length >= 3 ? cleanTitle : paper.title.trim();
-    if (query) {
-      return `https://huggingface.co/models?search=${encodeURIComponent(query)}`;
+  // 2. GitHub repository name
+  let ghRepoName: string | null = null;
+  let ghOwnerRepo: string | null = null;
+  const ghUrl = paper.githubUrl || (Array.isArray(paper.repositories) ? paper.repositories.find((r: any) => r?.url?.includes('github.com'))?.url : null);
+  if (ghUrl && typeof ghUrl === 'string') {
+    const ghMatch = ghUrl.match(/github\.com\/([^\/]+)\/([^\/]+)/);
+    if (ghMatch) {
+      const owner = ghMatch[1];
+      const repo = ghMatch[2].replace(/\.git$/, '');
+      if (repo && isModelLike(repo)) {
+        ghRepoName = repo;
+        ghOwnerRepo = `${owner}/${repo}`;
+      }
     }
   }
 
-  return null;
+  // Identify whether this paper is a survey/collection vs a model release
+  const isSurveyOrList = !ghRepoName || (paper.title && /\b(survey|overview|review|roadmap|awesome)\b/i.test(paper.title));
+
+  if (!isSurveyOrList) {
+    if (ghRepoName && !candidates.includes(ghRepoName)) candidates.push(ghRepoName);
+    if (ghOwnerRepo && !candidates.includes(ghOwnerRepo)) candidates.push(ghOwnerRepo);
+  }
+
+  // 3. Evaluated benchmarks / SOTA claims (e.g. SWE-bench, GSM8K, MATH)
+  if (Array.isArray(paper.sotaClaims)) {
+    for (const sc of paper.sotaClaims) {
+      const bName = sc?.benchmark?.name || sc?.benchmarkName;
+      if (bName && !candidates.includes(bName)) {
+        candidates.push(bName);
+      }
+    }
+  }
+  if (paper.sota && typeof paper.sota === 'string') {
+    const bName = paper.sota.replace(/^SOTA\s*(🏆\s*)?on\s*/i, '').replace(/^#\d+\s+on\s+/i, '').split('•')[0].trim();
+    if (bName && !candidates.includes(bName)) {
+      candidates.push(bName);
+    }
+  }
+
+  if (isSurveyOrList) {
+    if (ghRepoName && !candidates.includes(ghRepoName)) candidates.push(ghRepoName);
+  }
+
+  // 4. Concise title (only if model-like and not a long survey title)
+  if (paper.title && typeof paper.title === 'string') {
+    const cleanTitle = paper.title.split(/[:—–(]/)[0].trim().replace(/\s+v\d+(\.\d+)*$/i, '').trim();
+    if (cleanTitle && cleanTitle.length >= 3 && cleanTitle.length <= 40 && isModelLike(cleanTitle) && !candidates.includes(cleanTitle)) {
+      candidates.push(cleanTitle);
+    }
+  }
+
+  // Use Hugging Face's public search endpoint across candidates in parallel for low latency
+  const searchPromises = candidates.slice(0, 3).map(async (candidate) => {
+    try {
+      const res = await fetch(`https://huggingface.co/api/models?search=${encodeURIComponent(candidate)}&limit=5`, {
+        method: 'GET',
+        signal: AbortSignal.timeout(1500),
+      });
+      if (res.ok) {
+        const models = await res.json();
+        if (Array.isArray(models) && models.length > 0) {
+          const exact = models.find((m: any) =>
+            m.id?.toLowerCase() === candidate.toLowerCase() ||
+            m.id?.toLowerCase().endsWith(`/${candidate.toLowerCase()}`)
+          );
+          return {
+            candidate,
+            url: exact ? `https://huggingface.co/${exact.id}` : `https://huggingface.co/models?search=${encodeURIComponent(candidate)}`
+          };
+        }
+      }
+    } catch {
+      // ignore network errors or timeouts
+    }
+    return null;
+  });
+
+  const results = await Promise.all(searchPromises);
+  const found = results.find(Boolean);
+  if (found) {
+    if (cacheKey) hfModelExistsCache.set(cacheKey, found.url);
+    return found.url;
+  }
+
+  // Safe fallback to Hugging Face models search
+  const fallbackQuery = candidates[0] || (paper.title ? paper.title.split(/[:—–(]/)[0].trim() : 'models');
+  const fallbackUrl = `https://huggingface.co/models?search=${encodeURIComponent(fallbackQuery)}`;
+  if (cacheKey) hfModelExistsCache.set(cacheKey, fallbackUrl);
+  return fallbackUrl;
 }
 
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
