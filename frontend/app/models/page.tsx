@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useEffect, useMemo } from "react";
 import PageHero from "@/components/shared/PageHero";
@@ -1103,23 +1103,23 @@ useEffect(() => {
           title="All"
           highlight="Models"
           description={`Discover the full landscape of AI foundation models through ${
-            facets?.modelFamilies?.length ?? "—"
+            facets?.modelFamilies?.length ?? "â€”"
           } model families spanning reasoning, vision, code, audio, robotics, healthcare, and more.`}
           stats={[
             {
               value: loading
-                ? "…"
-                : facets?.capabilities?.length ?? "—",
+                ? "â€¦"
+                : facets?.capabilities?.length ?? "â€”",
               label: "Capabilities",
             },
             {
               value:
-                facets?.modelFamilies?.length ?? "—",
+                facets?.modelFamilies?.length ?? "â€”",
               label: "Model Families",
             },
             {
               value:
-                facets?.totalModels ?? "—",
+                facets?.totalModels ?? "â€”",
               label: "Verified Models",
             },
           ]}
@@ -1217,7 +1217,7 @@ useEffect(() => {
 
                 <span className="models-block-count text-[11px] font-normal uppercase tracking-wider text-gray-400">
                   {loading
-                    ? "…"
+                    ? "â€¦"
                     : facets?.capabilities?.length}{" "}
                   Tasks &amp; Modalities
                 </span>
@@ -1338,7 +1338,7 @@ useEffect(() => {
 
                   <span className="models-block-count text-[11px] font-normal uppercase tracking-wider text-gray-400">
                     {facets?.modelFamilies?.length ??
-                      "—"}{" "}
+                      "â€”"}{" "}
                     Model Families
                   </span>
                 </div>
@@ -2317,7 +2317,7 @@ useEffect(() => {
                                 }}
                               >
                                 {model.trendingScore
-                                  ? `⚡ ${model.trendingScore} Elo`
+                                  ? `âš¡ ${model.trendingScore} Elo`
                                   : model.benchmarkScore &&
                                     Object.keys(
                                       model.benchmarkScore
@@ -2727,7 +2727,7 @@ useEffect(() => {
                               fontWeight: 400,
                             }}
                           >
-                            ⚡ SOTA Leader ·{" "}
+                            âš¡ SOTA Leader Â·{" "}
                             {
                               topModelForSelection.vendor
                             }{" "}
@@ -3267,7 +3267,7 @@ useEffect(() => {
                                 }}
                               >
                                 {model.trendingScore
-                                  ? `⚡ ${model.trendingScore} Elo`
+                                  ? `âš¡ ${model.trendingScore} Elo`
                                   : model.benchmarkScore &&
                                     Object.keys(
                                       model.benchmarkScore
@@ -3392,7 +3392,7 @@ useEffect(() => {
     >
       Showing{" "}
       {(currentPage - 1) * MODELS_PER_PAGE + 1}
-      {"–"}
+      {"â€“"}
       {Math.min(
         currentPage * MODELS_PER_PAGE,
         rankedCatalogModels.length
@@ -3415,7 +3415,7 @@ useEffect(() => {
         }
         disabled={currentPage === 1}
       >
-        ← Previous
+        â† Previous
       </button>
 
       <span
@@ -3436,7 +3436,7 @@ useEffect(() => {
         }
         disabled={currentPage === totalPages}
       >
-        Next →
+        Next â†’
       </button>
     </div>
   </div>
