@@ -25,6 +25,7 @@ import {
   getPapersSync,
   getArxivAbsUrl,
   getArxivPdfUrl,
+  paperHasTags,
   type GetPapersParams,
   type GetPapersResult,
   type Paper,
@@ -505,6 +506,10 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
     router.prefetch(`/papers/${paper.slug}`);
     prefetchPaperBySlug(paper.slug);
   }, [router, paper.slug]);
+
+  if (!paperHasTags(paper)) {
+    return null;
+  }
   
   return (
     <div
@@ -849,7 +854,7 @@ export default function PaperList({
 }: PaperListProps) {
   const [papers, setPapers] = useState<Paper[]>(() => {
     if (initialPapers?.papers) {
-      return initialPapers.papers;
+      return initialPapers.papers.filter(paperHasTags);
     }
     return [];
   });
@@ -1058,9 +1063,9 @@ export default function PaperList({
       if (cached && cached.papers && cached.papers.length > 0) {
         setTotalPapers(cached.total);
         setHasMore(cached.hasMore);
-        const visibleCached = normalizedSearchQuery
+        const visibleCached = (normalizedSearchQuery
           ? cached.papers.filter(matchesSearch)
-          : cached.papers;
+          : cached.papers).filter(paperHasTags);
         setPapers(visibleCached);
         setLoading(false);
         setError(null);
@@ -1081,9 +1086,9 @@ export default function PaperList({
           return;
         }
 
-        const visiblePapers = normalizedSearchQuery
+        const visiblePapers = (normalizedSearchQuery
           ? result.papers.filter(matchesSearch)
-          : result.papers;
+          : result.papers).filter(paperHasTags);
 
         setPage(pageNumber);
         setTotalPapers(result.total);
@@ -1160,7 +1165,7 @@ export default function PaperList({
       setPage(1);
       setTotalPapers(cached.total);
       setHasMore(cached.hasMore);
-      const visible = normalizedSearchQuery ? cached.papers.filter(matchesSearch) : cached.papers;
+      const visible = (normalizedSearchQuery ? cached.papers.filter(matchesSearch) : cached.papers).filter(paperHasTags);
       setPapers(visible);
       setLoading(false);
       void loadPage(1, itemsPerPage, true);

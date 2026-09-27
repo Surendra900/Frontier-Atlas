@@ -68,6 +68,13 @@ export default function HomeContent({
     ) {
       setIsFilterChanging(true);
       setActiveSort(label);
+      if (label === "Latest Papers") {
+        setSelectedPeriod("Today");
+      } else if (label === "Most GitHub Stars") {
+        setSelectedPeriod("All time");
+      } else if (label === "Trending Papers") {
+        setSelectedPeriod("All time");
+      }
     }
   };
 
