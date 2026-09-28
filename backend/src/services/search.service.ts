@@ -1,12 +1,13 @@
 import type { PrismaClient } from "../generated/prisma/client.js";
 import { QueryRouter } from "../routing/index.js";
+import { redisManager } from "../lib/redis.js";
 
 export const globalSearch = async (
   queryRouter: QueryRouter,
   query: string,
   limit: number = 5
 ) => {
-  const searchTerm = query.trim();
+  const searchTerm = query.trim().toLowerCase();
 
   if (!searchTerm) {
     return {
@@ -18,11 +19,24 @@ export const globalSearch = async (
     };
   }
 
-  return queryRouter.routeQuery(async (prisma: PrismaClient) => {
-    console.log("🔥 GLOBAL SEARCH HIT", searchTerm);
+  const redis = redisManager.getClient();
+  const cacheKey = `search:global:${searchTerm}:${limit}`;
+
+  // 1. Check Redis cache first for instant response
+  try {
+    const cachedData = await redis.get(cacheKey);
+    if (cachedData) {
+      console.log("⚡ GLOBAL SEARCH CACHE HIT", searchTerm);
+      return typeof cachedData === "string" ? JSON.parse(cachedData) : cachedData;
+    }
+  } catch (err) {
+    console.warn("⚠️ Redis get failed, falling back to database:", err);
+  }
+
+  const results = await queryRouter.routeQuery(async (prisma: PrismaClient) => {
+    console.log("🔥 GLOBAL SEARCH DB HIT", searchTerm);
     const [papers, methods, tasks, models, datasets] =
       await Promise.all([
-        
         // Search papers by title, authors, linked models, tasks, methods, datasets
         prisma.paper.findMany({
           where: {
@@ -45,8 +59,6 @@ export const globalSearch = async (
                   mode: "insensitive",
                 },
               },
-
-              // Search paper's linked models
               {
                 models: {
                   some: {
@@ -59,8 +71,6 @@ export const globalSearch = async (
                   },
                 },
               },
-
-              // Search paper's linked tasks
               {
                 tasks: {
                   some: {
@@ -73,8 +83,6 @@ export const globalSearch = async (
                   },
                 },
               },
-
-              // Search paper's linked methods
               {
                 methods: {
                   some: {
@@ -87,8 +95,6 @@ export const globalSearch = async (
                   },
                 },
               },
-
-              // Search paper's linked datasets
               {
                 datasets: {
                   some: {
@@ -103,9 +109,7 @@ export const globalSearch = async (
               },
             ],
           },
-
-          take: limit*3,
-
+          take: limit * 3,
           select: {
             id: true,
             slug: true,
@@ -178,34 +182,26 @@ export const globalSearch = async (
           },
         }),
       ]);
-      
 
-console.log(
-  papers.map((p) => ({
-    id: p.id,
-    slug: p.slug,
-    title: p.title,
-  }))
-);
-const uniquePapers = Array.from(
-  new Map(
-    papers.map((paper) => [
-      paper.slug,
-      paper,
-    ])
-  ).values()
-);
+    const uniquePapers = Array.from(
+      new Map(
+        papers.map((paper) => [
+          paper.slug,
+          paper,
+        ])
+      ).values()
+    );
 
     return {
-  papers: uniquePapers.slice(0, limit).map((p) => ({
-    type: "papers",
-    id: p.id,
-    title: p.title,
-    slug: p.slug,
-    subtitle: p.authors
-      ? `${p.authors} • ${p.citationCount} citations`
-      : `${p.citationCount} citations`,
-  })),
+      papers: uniquePapers.slice(0, limit).map((p) => ({
+        type: "papers",
+        id: p.id,
+        title: p.title,
+        slug: p.slug,
+        subtitle: p.authors
+          ? `${p.authors} • ${p.citationCount} citations`
+          : `${p.citationCount} citations`,
+      })),
 
       methods: methods.map((m) => ({
         type: "methods",
@@ -236,4 +232,13 @@ const uniquePapers = Array.from(
       })),
     };
   });
+
+  // 2. Save the formatted results to Redis cache with a 5-minute TTL
+  try {
+    await redis.set(cacheKey, JSON.stringify(results), { ex: 300 });
+  } catch (err) {
+    console.warn("⚠️ Redis set failed:", err);
+  }
+
+  return results;
 };
