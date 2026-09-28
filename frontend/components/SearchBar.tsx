@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
@@ -17,6 +16,9 @@ interface SearchBarProps {
   layoutIdPrefix?: string;
 }
 
+// Simple in-memory cache to make repeated searches instant
+const searchCache = new Map<string, SearchResult[]>();
+
 export default function SearchBar({
   placeholder = "Search papers, authors, methods, tasks, models, datasets...",
   autoFocus = false,
@@ -32,30 +34,48 @@ export default function SearchBar({
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const fetchSuggestions = useCallback(async (q: string) => {
-    if (!q.trim()) {
+    const trimmedQuery = q.trim();
+    if (!trimmedQuery) {
       setSuggestions([]);
       return;
     }
 
+    // Check client-side cache first for instant loading
+    if (searchCache.has(trimmedQuery)) {
+      setSuggestions(searchCache.get(trimmedQuery)!);
+      setLoading(false);
+      return;
+    }
+
+    // Cancel any ongoing request to prevent network congestion
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setLoading(true);
     try {
-      // Fetch a larger pool of results to ensure we capture the research fields
-      const papers = await searchPapers(q);
+      const papers = await searchPapers(trimmedQuery);
 
-const results: SearchResult[] = papers.slice(0, 6).map((paper) => ({
-  type: "papers",
-  id: String(paper.id),
-  title: paper.title,
-  slug: paper.slug,
-  subtitle: `${paper.citations} citation${paper.citations !== 1 ? "s" : ""}`,
-}));
+      const results: SearchResult[] = papers.slice(0, 6).map((paper) => ({
+        type: "papers",
+        id: String(paper.id),
+        title: paper.title,
+        slug: paper.slug,
+        subtitle: `${paper.citations} citation${paper.citations !== 1 ? "s" : ""}`,
+      }));
 
-setSuggestions(results);
-    } catch (error) {
-      console.error("Failed to fetch suggestions:", error);
-      setSuggestions([]);
+      // Save to cache
+      searchCache.set(trimmedQuery, results);
+      setSuggestions(results);
+    } catch (error: any) {
+      if (error.name !== "AbortError") {
+        console.error("Failed to fetch suggestions:", error);
+        setSuggestions([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -69,7 +89,7 @@ setSuggestions(results);
       } else {
         setSuggestions([]);
       }
-    }, 80);
+    }, 60); // Slightly tightened debounce for snappier response
 
     return () => clearTimeout(timer);
   }, [query, fetchSuggestions]);
@@ -167,39 +187,37 @@ setSuggestions(results);
     return labels[type] || "Result";
   };
 
-  // Determine if we should show suggestions
   const shouldShowSuggestions = showSuggestions && suggestions.length > 0;
-
   const isHomepagePresentation = variant === "homepage";
 
   return (
     <div
-  ref={containerRef}
- className={`relative ${
-  variant === "compact"
-    ? "w-full max-w-[360px]"
-    : "w-full max-w-[640px] mx-auto"
-}`}
->
-        <motion.form
-          layoutId={layoutIdPrefix ? `${layoutIdPrefix}-container` : undefined}
+      ref={containerRef}
+      className={`relative ${
+        variant === "compact"
+          ? "w-full max-w-[360px]"
+          : "w-full max-w-[640px] mx-auto"
+      }`}
+    >
+      <motion.form
+        layoutId={layoutIdPrefix ? `${layoutIdPrefix}-container` : undefined}
+        transition={{ type: "spring", stiffness: 250, damping: 25 }}
+        onSubmit={handleSubmit}
+        className={`relative flex items-center px-3 md:px-5 bg-white border border-[#E5E5E0] h-10 md:h-12
+        shadow-[0_8px_30px_rgb(0,0,0,0.06)]
+        hover:shadow-[0_12px_32px_rgb(0,0,0,0.10)]
+        focus-within:border-[#FF5A1F]/40
+        focus-within:shadow-[0_0_0_3px_rgba(255,90,31,0.08)]
+        transition-all duration-200
+        rounded-full`}
+      >
+        <motion.div
+          layoutId={layoutIdPrefix ? `${layoutIdPrefix}-icon` : undefined}
           transition={{ type: "spring", stiffness: 250, damping: 25 }}
-          onSubmit={handleSubmit}
-          className={`relative flex items-center px-3 md:px-5 bg-white border border-[#E5E5E0] h-10 md:h-12
-  shadow-[0_8px_30px_rgb(0,0,0,0.06)]
-  hover:shadow-[0_12px_32px_rgb(0,0,0,0.10)]
-  focus-within:border-[#FF5A1F]/40
-  focus-within:shadow-[0_0_0_3px_rgba(255,90,31,0.08)]
-  transition-all duration-200
-  rounded-full`}
+          className={`flex items-center text-[#737373] shrink-0 ${
+            isHomepagePresentation ? "mr-2 md:mr-3" : "mr-2 md:mr-3"
+          }`}
         >
-          <motion.div
-            layoutId={layoutIdPrefix ? `${layoutIdPrefix}-icon` : undefined}
-            transition={{ type: "spring", stiffness: 250, damping: 25 }}
-            className={`flex items-center text-[#737373] shrink-0 ${
-              isHomepagePresentation ? "mr-2 md:mr-3" : "mr-2 md:mr-3"
-            }`}
-          >
           <Search
             size={variant === "compact" ? 16 : 18}
             className={isHomepagePresentation ? "md:w-[20px] md:h-[20px]" : undefined}
@@ -216,9 +234,11 @@ setSuggestions(results);
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           className={`bg-transparent outline-none flex-1 text-[#111111] placeholder:text-[#737373] min-w-0 pr-10 text-left h-full ${
-           variant === "compact"
-  ? "text-[12px] md:text-[13px]"
-  : isHomepagePresentation ? "text-[12px] md:text-[14px] truncate mr-2" : "text-[13px] md:text-[15px]"
+            variant === "compact"
+              ? "text-[12px] md:text-[13px]"
+              : isHomepagePresentation
+              ? "text-[12px] md:text-[14px] truncate mr-2"
+              : "text-[13px] md:text-[15px]"
           }`}
           aria-label="Search"
           aria-autocomplete="list"
@@ -229,7 +249,6 @@ setSuggestions(results);
           }
         />
 
-        {/* Loading Spinner */}
         {loading && (
           <Loader2
             size={variant === "compact" ? 16 : 18}
@@ -237,7 +256,6 @@ setSuggestions(results);
           />
         )}
 
-        {/* Clear Button */}
         {query && (
           <button
             type="button"
@@ -248,10 +266,8 @@ setSuggestions(results);
             <X size={variant === "compact" ? 16 : 18} />
           </button>
         )}
-        
       </motion.form>
 
-      {/* Suggestions Dropdown */}
       {shouldShowSuggestions && (
         <motion.ul
           initial={{ opacity: 0, y: -5 }}
@@ -261,22 +277,17 @@ setSuggestions(results);
           id="search-suggestions"
           role="listbox"
           className={`
-absolute
-${isHomepagePresentation ? "left-[-40px] w-[440px] max-w-[calc(100vw-2rem)]" : "left-0 right-0"}
-${isHomepagePresentation ? "top-[calc(100%+8px)]" : "top-[calc(100%+12px)]"}
-
-bg-white
-
-${isHomepagePresentation ? "rounded-xl border border-[#E5E5E0] py-2" : "rounded-[28px] border border-[#ECEAE4]"}
-
-${isHomepagePresentation ? "shadow-[0_8px_30px_rgb(0,0,0,0.12)]" : "shadow-[0_24px_80px_rgba(0,0,0,0.10)]"}
-
-overflow-hidden
-z-50
-
-${isHomepagePresentation ? "max-h-[400px]" : "max-h-[420px]"}
-overflow-y-auto
-`}
+            absolute
+            ${isHomepagePresentation ? "left-[-40px] w-[440px] max-w-[calc(100vw-2rem)]" : "left-0 right-0"}
+            ${isHomepagePresentation ? "top-[calc(100%+8px)]" : "top-[calc(100%+12px)]"}
+            bg-white
+            ${isHomepagePresentation ? "rounded-xl border border-[#E5E5E0] py-2" : "rounded-[28px] border border-[#ECEAE4]"}
+            ${isHomepagePresentation ? "shadow-[0_8px_30px_rgb(0,0,0,0.12)]" : "shadow-[0_24px_80px_rgba(0,0,0,0.10)]"}
+            overflow-hidden
+            z-50
+            ${isHomepagePresentation ? "max-h-[400px]" : "max-h-[420px]"}
+            overflow-y-auto
+          `}
         >
           {suggestions.map((suggestion, index) => {
             const href = `/${suggestion.type === "papers" ? "papers" : suggestion.type}/${suggestion.slug}`;
@@ -293,7 +304,11 @@ overflow-y-auto
               >
                 <Link
                   href={href}
-                  onClick={() => setShowSuggestions(false)}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    setShowSuggestions(false);
+                    router.push(href);
+                  }}
                   className={`flex items-start gap-3 cursor-pointer transition-colors block w-full h-full ${
                     isHomepagePresentation ? "px-4 md:px-5 py-3" : "px-4 py-3"
                   }`}
@@ -311,51 +326,26 @@ overflow-y-auto
                     </div>
                   ) : (
                     <>
-                      <div
-  className="
-    w-10
-    h-10
-    rounded-xl
-    bg-[#F7F6F2]
-    flex
-    items-center
-    justify-center
-    shrink-0
-  "
->
-  <span className="text-base">
-    {getSuggestionIcon(suggestion.type)}
-  </span>
-</div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-3">
-  <span className="flex-1 text-[15px] font-semibold text-[#111111] leading-6 truncate">
-    {suggestion.title}
-  </span>
-
-  <span
-    className="
-      shrink-0
-      rounded-full
-      bg-[#F5F5F4]
-      px-2.5
-      py-1
-      text-[10px]
-      font-semibold
-      uppercase
-      tracking-wide
-      text-[#737373]
-    "
-  >
-    {getSuggestionTypeLabel(suggestion.type)}
-  </span>
-</div>
-                    {suggestion.subtitle && (
-                      <p className="mt-1 text-[13px] text-[#6B7280] leading-5">
-  {suggestion.subtitle}
-</p>
-                    )}
-                  </div>
+                      <div className="w-10 h-10 rounded-xl bg-[#F7F6F2] flex items-center justify-center shrink-0">
+                        <span className="text-base">
+                          {getSuggestionIcon(suggestion.type)}
+                        </span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-3">
+                          <span className="flex-1 text-[15px] font-semibold text-[#111111] leading-6 truncate">
+                            {suggestion.title}
+                          </span>
+                          <span className="shrink-0 rounded-full bg-[#F5F5F4] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[#737373]">
+                            {getSuggestionTypeLabel(suggestion.type)}
+                          </span>
+                        </div>
+                        {suggestion.subtitle && (
+                          <p className="mt-1 text-[13px] text-[#6B7280] leading-5">
+                            {suggestion.subtitle}
+                          </p>
+                        )}
+                      </div>
                     </>
                   )}
                 </Link>
