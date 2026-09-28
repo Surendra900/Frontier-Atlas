@@ -484,24 +484,16 @@ export default function Sidebar({
 
 
         <SidebarSection title="Discover">
-          {discover.map((item) => (
-            <SidebarItem
-              key={item.label}
-              item={item}
-              isActive={activeItem === item.label}
-              onClick={() =>
-                handleItemClick(item.label)
-              }
-              href={
-                pathname === "/"
-                  ? "#"
-                  : item.slug === "trending"
-                    ? "/"
-                    : `/category/${item.slug}`
-              }
-            />
-          ))}
-        </SidebarSection>
+  {discover.map((item) => (
+    <SidebarItem
+      key={item.label}
+      item={item}
+      isActive={activeItem === item.label}
+      onClick={() => handleItemClick(item.label)}
+      href="/#all-time"
+    />
+  ))}
+</SidebarSection>
 
         {/* ======================================================
             TASKS
