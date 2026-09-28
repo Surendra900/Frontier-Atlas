@@ -292,12 +292,16 @@ overflow-y-auto
                 }`}
               >
                 <Link
-                  href={href}
-                  onClick={() => setShowSuggestions(false)}
-                  className={`flex items-start gap-3 cursor-pointer transition-colors block w-full h-full ${
-                    isHomepagePresentation ? "px-4 md:px-5 py-3" : "px-4 py-3"
-                  }`}
-                >
+  href={href}
+  onMouseDown={(e) => {
+    e.preventDefault(); // Prevents input blur/closing race condition
+    setShowSuggestions(false);
+    router.push(href);
+  }}
+  className={`flex items-start gap-3 cursor-pointer transition-colors block w-full h-full ${
+    isHomepagePresentation ? "px-4 md:px-5 py-3" : "px-4 py-3"
+  }`}
+>
                   {isHomepagePresentation ? (
                     <div className="flex flex-col gap-1 text-left">
                       <h4 className="text-[14px] font-semibold text-[#111111] leading-snug line-clamp-2">
