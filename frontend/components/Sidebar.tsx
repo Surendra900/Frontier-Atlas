@@ -438,7 +438,6 @@ export default function Sidebar({
       "/methods/lora",
       "/methods/rlhf",
       "/methods",
-      "/submit",
     ];
 
     routes.forEach((route) => {
@@ -464,17 +463,6 @@ export default function Sidebar({
     <aside className="flex flex-col w-full bg-transparent">
 
       <div className="px-2 pt-1 space-y-1">
-
-        {/* SUBMIT */}
-        <SidebarItem
-          item={{ label: "Submit", slug: "submit", icon: PaperPlaneTilt, color: "#F55036" }}
-          isActive={pathname === "/submit"}
-          onClick={() => {
-            setActiveItem("Submit");
-            onItemClick?.();
-          }}
-          href="/submit"
-        />
 
 
         {/* ======================================================
