@@ -589,7 +589,7 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
           <div className="w-full">
             <SotaDisplay sota={paper.sota} />
           </div>
- 
+
           {/* Tasks (Row 2) */}
           <div className="flex flex-wrap items-center gap-1.5 mb-1.5 w-full">
             {paper.tags?.slice(0, 4).map((t) => {
@@ -597,16 +597,16 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
               return <Pill key={t} label={t} colorKey={colorKey} />;
             })}
           </div>
- 
+
           {/* Methods (Row 3) */}
           <div className="flex flex-wrap items-center gap-1.5 w-full">
             {paper.additionalTags?.slice(0, 4).map((t) => {
               return <Pill key={t} label={t} colorKey="gray" />;
             })}
           </div>
- 
+
           {/* Action Buttons */}
-          <div className="flex flex-wrap md:flex-nowrap items-center gap-1 sm:gap-2 md:gap-3 mt-1.5">
+          <div className="flex flex-wrap md:flex-nowrap items-center gap-1.5 sm:gap-2 md:gap-3 mt-2">
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -614,21 +614,21 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                 const url = paper.arxivUrl || getArxivAbsUrl(paper.arxivId, paper.paperUrl) || "https://arxiv.org";
                 window.open(url, "_blank");
               }}
-              className="flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-0.5 min-[375px]:px-1 md:px-2 lg:px-4 xl:px-2 h-[24px] md:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#b31b1b] border-[1.5px] border-[#b31b1b]/40 hover:border-[#b31b1b] hover:bg-[#b31b1b]/5 rounded-[6px] transition-all duration-300"
+              className="flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-2 min-[375px]:px-2.5 sm:px-3 md:px-2 lg:px-4 xl:px-2 h-[26px] min-[375px]:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#b31b1b] border-[1.5px] border-[#b31b1b]/40 hover:border-[#b31b1b] hover:bg-[#b31b1b]/5 rounded-[6px] transition-all duration-300"
             >
-              <div className="flex items-center gap-0.5 min-[375px]:gap-1 md:gap-1.5 lg:gap-3 xl:gap-1.5">
-                <div className="w-[12px] h-[12px] min-[375px]:w-[14px] min-[375px]:h-[14px] md:w-[20px] md:h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[4px] md:rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center">
+              <div className="flex items-center gap-1 min-[375px]:gap-1.5 md:gap-1.5 lg:gap-3 xl:gap-1.5">
+                <div className="w-[12px] h-[12px] min-[375px]:w-[14px] min-[375px]:h-[14px] md:w-[20px] md:h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[4px] md:rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="https://cdn.simpleicons.org/arxiv/b31b1b" alt="arXiv" className="w-[9px] h-[9px] min-[375px]:w-[10px] min-[375px]:h-[10px] md:w-[12px] md:h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
+                  <img src="https://cdn.simpleicons.org/arxiv/b31b1b" alt="arXiv" className="w-[9px] h-[9px] min-[375px]:w-[11px] min-[375px]:h-[11px] md:w-[12px] md:h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-medium lg:font-semibold xl:font-medium text-[7.5px] min-[375px]:text-[8.5px] sm:text-[9.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tighter min-[375px]:tracking-tight">arXiv</span>
+                  <span className="font-medium lg:font-semibold xl:font-medium text-[8.5px] min-[375px]:text-[9.5px] sm:text-[10.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tight">arXiv</span>
                   <span className="hidden lg:block text-[12px] text-[#666] xl:hidden">Original preprint</span>
                 </div>
               </div>
               <ArrowUpRight size={14} strokeWidth={1.5} className="hidden lg:block xl:hidden" />
             </button>
- 
+
             <button
               onClick={(e) => {
                 e.preventDefault();
@@ -636,14 +636,14 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                 const url = paper.pdfUrl || getArxivPdfUrl((paper as any).pdfUrl, paper.paperUrl, paper.arxivId) || "https://arxiv.org";
                 window.open(url, "_blank");
               }}
-              className="flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-0.5 min-[375px]:px-1 md:px-2 lg:px-4 xl:px-2 h-[24px] md:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#E54D59] border-[1.5px] border-[#E54D59]/40 hover:border-[#E54D59] hover:bg-[#E54D59]/5 rounded-[6px] transition-all duration-300"
+              className="flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-2 min-[375px]:px-2.5 sm:px-3 md:px-2 lg:px-4 xl:px-2 h-[26px] min-[375px]:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#E54D59] border-[1.5px] border-[#E54D59]/40 hover:border-[#E54D59] hover:bg-[#E54D59]/5 rounded-[6px] transition-all duration-300"
             >
-              <div className="flex items-center gap-0.5 min-[375px]:gap-1 md:gap-1.5 lg:gap-3 xl:gap-1.5">
-                <div className="w-[12px] h-[12px] min-[375px]:w-[14px] min-[375px]:h-[14px] md:w-[20px] md:h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[4px] md:rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center">
-                  <FileText className="text-[#E54D59] w-[9px] h-[9px] min-[375px]:w-[10px] min-[375px]:h-[10px] md:w-[12px] md:h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
+              <div className="flex items-center gap-1 min-[375px]:gap-1.5 md:gap-1.5 lg:gap-3 xl:gap-1.5">
+                <div className="w-[12px] h-[12px] min-[375px]:w-[14px] min-[375px]:h-[14px] md:w-[20px] md:h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[4px] md:rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center shrink-0">
+                  <FileText className="text-[#E54D59] w-[9px] h-[9px] min-[375px]:w-[11px] min-[375px]:h-[11px] md:w-[12px] md:h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-medium lg:font-semibold xl:font-medium text-[7.5px] min-[375px]:text-[8.5px] sm:text-[9.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tighter min-[375px]:tracking-tight">PDF</span>
+                  <span className="font-medium lg:font-semibold xl:font-medium text-[8.5px] min-[375px]:text-[9.5px] sm:text-[10.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tight">PDF</span>
                   <span className="hidden lg:block text-[12px] text-[#666] xl:hidden">Full paper</span>
                 </div>
               </div>
@@ -664,15 +664,15 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                   window.open("https://github.com", "_blank");
                 }
               }}
-              className="flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-0.5 min-[375px]:px-1 md:px-2 lg:px-4 xl:px-2 h-[24px] md:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#24292f] border-[1.5px] border-[#24292f]/30 hover:border-[#24292f] hover:bg-[#24292f]/5 rounded-[6px] transition-all duration-300"
+              className="flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-2 min-[375px]:px-2.5 sm:px-3 md:px-2 lg:px-4 xl:px-2 h-[26px] min-[375px]:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#24292f] border-[1.5px] border-[#24292f]/30 hover:border-[#24292f] hover:bg-[#24292f]/5 rounded-[6px] transition-all duration-300"
             >
-              <div className="flex items-center gap-0.5 min-[375px]:gap-1 md:gap-1.5 lg:gap-3 xl:gap-1.5">
-                <div className="w-[12px] h-[12px] min-[375px]:w-[14px] min-[375px]:h-[14px] md:w-[20px] md:h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[4px] md:rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center">
+              <div className="flex items-center gap-1 min-[375px]:gap-1.5 md:gap-1.5 lg:gap-3 xl:gap-1.5">
+                <div className="w-[12px] h-[12px] min-[375px]:w-[14px] min-[375px]:h-[14px] md:w-[20px] md:h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[4px] md:rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="https://cdn.simpleicons.org/github/24292f" alt="GitHub" className="w-[9px] h-[9px] min-[375px]:w-[10px] min-[375px]:h-[10px] md:w-[12px] md:h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
+                  <img src="https://cdn.simpleicons.org/github/24292f" alt="GitHub" className="w-[9px] h-[9px] min-[375px]:w-[11px] min-[375px]:h-[11px] md:w-[12px] md:h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
                 </div>
                 <div className="flex flex-col items-start">
-                  <span className="font-medium lg:font-semibold xl:font-medium text-[7.5px] min-[375px]:text-[8.5px] sm:text-[9.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tighter min-[375px]:tracking-tight">Code</span>
+                  <span className="font-medium lg:font-semibold xl:font-medium text-[8.5px] min-[375px]:text-[9.5px] sm:text-[10.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tight">Code</span>
                   <span className="hidden lg:block text-[12px] text-[#666] xl:hidden">
                     {upvotesNum > 0 ? `${upvotesNum >= 1000 ? (upvotesNum / 1000).toFixed(1) + "k" : upvotesNum} stars` : "0 stars"}
                   </span>
@@ -689,26 +689,19 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                   e.stopPropagation();
                   window.open(preferredPlatform.url, "_blank");
                 }}
-                className={`relative overflow-hidden flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-0.5 min-[375px]:px-1 md:px-2 lg:px-4 xl:px-2 h-[24px] md:h-[28px] lg:h-[58px] xl:h-[28px] bg-white ${preferredPlatform.colorClass} border-[1.5px] ${preferredPlatform.borderColorClass} ${preferredPlatform.bgHoverClass} rounded-[6px] transition-all duration-300`}
+                className={`flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-2 min-[375px]:px-2.5 sm:px-3 md:px-2 lg:px-4 xl:px-2 h-[26px] min-[375px]:h-[28px] lg:h-[58px] xl:h-[28px] bg-white ${preferredPlatform.colorClass} border-[1.5px] ${preferredPlatform.borderColorClass} ${preferredPlatform.bgHoverClass} rounded-[6px] transition-all duration-300`}
               >
-                {/* Mobile Content */}
-                <div className="absolute inset-0 flex sm:hidden items-center justify-center pointer-events-none">
-                  <div className="flex items-center gap-0.5 transform scale-[0.60] min-[375px]:scale-[0.70] whitespace-nowrap">
+                <div className="flex items-center gap-1 min-[375px]:gap-1.5 md:gap-1.5 lg:gap-3 xl:gap-1.5">
+                  <div className="w-[12px] h-[12px] min-[375px]:w-[14px] min-[375px]:h-[14px] md:w-[20px] md:h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[4px] md:rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center shrink-0">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={preferredPlatform.iconUrl} alt={preferredPlatform.name} className="w-[10px] h-[10px]" />
-                    <span className="font-medium text-[10px] tracking-tight">{preferredPlatform.name}</span>
+                    <img src={preferredPlatform.iconUrl} alt={preferredPlatform.name} className="w-[10px] h-[10px] min-[375px]:w-[12px] min-[375px]:h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
                   </div>
-                </div>
-
-                {/* Desktop Content */}
-                <div className="hidden sm:flex items-center gap-1.5 lg:gap-3 xl:gap-1.5">
-                  <div className="w-[20px] h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={preferredPlatform.iconUrl} alt={preferredPlatform.name} className="w-[12px] h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium lg:font-semibold xl:font-medium text-[8.5px] min-[375px]:text-[9.5px] sm:text-[10.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tight">
+                      {preferredPlatform.name}
+                    </span>
+                    <span className="hidden lg:block text-[12px] text-[#666] xl:hidden">Model</span>
                   </div>
-                  <span className="font-semibold xl:font-medium text-[9.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tight">
-                    {preferredPlatform.name}
-                  </span>
                 </div>
                 <ArrowUpRight size={14} strokeWidth={1.5} className="text-[#9CA3AF] hidden lg:block xl:hidden" />
               </button>
@@ -726,26 +719,20 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                   window.open(ghUrl, "_blank");
                 }
               }}
-              className="relative overflow-hidden flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-0.5 min-[375px]:px-1 md:px-2 lg:px-4 xl:px-2 h-[24px] md:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#24292f] border-[1.5px] border-[#24292f]/30 hover:border-[#24292f] hover:bg-[#24292f]/5 rounded-[6px] transition-all duration-300"
+              className="flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-2 min-[375px]:px-2.5 sm:px-3 md:px-2 lg:px-4 xl:px-2 h-[26px] min-[375px]:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#24292f] border-[1.5px] border-[#24292f]/30 hover:border-[#24292f] hover:bg-[#24292f]/5 rounded-[6px] transition-all duration-300"
             >
-              {/* Mobile Content */}
-              <div className="absolute inset-0 flex sm:hidden items-center justify-center pointer-events-none">
-                <div className="flex items-center gap-0.5 transform scale-[0.60] min-[375px]:scale-[0.70] whitespace-nowrap">
-                  <img src="https://cdn.simpleicons.org/github/24292f" alt="GitHub" className="w-[10px] h-[10px]" />
-                  <span className="font-medium text-[10px] tracking-tight">{paper.github_hourly_increase?.toFixed(2) ?? "0.00"} stars/hr</span>
-                </div>
-              </div>
-
-              {/* Desktop Content */}
-              <div className="hidden sm:flex items-center gap-1.5 lg:gap-3 xl:gap-1.5">
-                <div className="w-[20px] h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center">
+              <div className="flex items-center gap-1 min-[375px]:gap-1.5 md:gap-1.5 lg:gap-3 xl:gap-1.5">
+                <div className="w-[12px] h-[12px] min-[375px]:w-[14px] min-[375px]:h-[14px] md:w-[20px] md:h-[20px] lg:w-8 lg:h-8 xl:w-[20px] xl:h-[20px] rounded-[4px] md:rounded-[6px] lg:rounded-[10px] xl:rounded-[6px] bg-transparent flex items-center justify-center shrink-0">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="https://cdn.simpleicons.org/github/24292f" alt="GitHub" className="w-[12px] h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
+                  <img src="https://cdn.simpleicons.org/github/24292f" alt="GitHub" className="w-[9px] h-[9px] min-[375px]:w-[11px] min-[375px]:h-[11px] md:w-[12px] md:h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px]" />
                 </div>
-                <ArrowUp className="w-[12px] h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px] text-[#24292f]" strokeWidth={2.5} />
-                <span className="font-semibold xl:font-medium text-[9.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tight">
-                  {paper.github_hourly_increase?.toFixed(2) ?? "0.00"} stars / hour
-                </span>
+                <ArrowUp className="w-[9px] h-[9px] min-[375px]:w-[10px] min-[375px]:h-[10px] md:w-[12px] md:h-[12px] lg:w-4 lg:h-4 xl:w-[12px] xl:h-[12px] text-[#24292f] shrink-0" strokeWidth={2.5} />
+                <div className="flex flex-col items-start">
+                  <span className="font-medium lg:font-semibold xl:font-medium text-[8.5px] min-[375px]:text-[9.5px] sm:text-[10.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tight">
+                    {paper.github_hourly_increase?.toFixed(2) ?? "0.00"} stars / hour
+                  </span>
+                  <span className="hidden lg:block text-[12px] text-[#666] xl:hidden">Trending</span>
+                </div>
               </div>
               <ArrowUpRight size={14} strokeWidth={1.5} className="text-[#9CA3AF] hidden lg:block xl:hidden" />
             </button>
