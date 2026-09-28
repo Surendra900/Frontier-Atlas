@@ -2,7 +2,14 @@ import OrganizationDetailClient from "@/components/domain/organizations/Organiza
 
 export const runtime = "edge";
 
-export default async function OrganizationPage({ params }: { params: Promise<{ slug: string }> }) {
-  const { slug } = await params;
-  return <OrganizationDetailClient slug={slug} />;
+export default async function OrganizationPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>;
+}) {
+  const resolvedParams = await params;
+  const rawSlug = resolvedParams?.slug;
+  const safeSlug = typeof rawSlug === "string" ? rawSlug.trim() : "";
+
+  return <OrganizationDetailClient slug={safeSlug} />;
 }
