@@ -50,21 +50,7 @@ interface BackendTaskDetail {
   name: string;
   slug: string;
   color: string | null;
-  papers: { paper: TaskPaper }[];
-}
-
-export async function getTasks(): Promise<TaskItem[]> {
-  const response = await fetchApi<GetTasksResponse>('/api/v1/tasks?limit=100');
-  const tasks = Array.isArray(response?.data) ? response.data : [];
-  const counts = await getTaskPaperCounts();
-
-return tasks.map((t) => ({
-    id: t.id,
-    name: t.name,
-    slug: t.slug,
-    color: t.color,
-    paperCount: counts[t.slug] ?? 0,
-}));
+  papers?: { paper: TaskPaper }[];
 }
 
 const DEFAULT_TASK_COUNTS: TaskPaperCounts = {
@@ -174,10 +160,31 @@ const DEFAULT_TASK_COUNTS: TaskPaperCounts = {
   "federated-learning": 85,
 };
 
+export async function getTasks(): Promise<TaskItem[]> {
+  try {
+    const response = await fetchApi<GetTasksResponse>('/api/v1/tasks?limit=100');
+    const tasks = Array.isArray(response?.data) ? response.data : [];
+    const counts = await getTaskPaperCounts();
+
+    return tasks
+      .filter((t): t is BackendTaskItem => Boolean(t && typeof t === 'object' && t.id && t.slug))
+      .map((t) => ({
+        id: t.id,
+        name: t.name || '',
+        slug: t.slug,
+        color: t.color ?? null,
+        paperCount: counts[t.slug] ?? 0,
+      }));
+  } catch (err) {
+    console.error('Failed to fetch tasks:', err);
+    return [];
+  }
+}
+
 export async function getTaskPaperCounts(): Promise<TaskPaperCounts> {
   try {
     const counts = await fetchApi<TaskPaperCounts>('/api/v1/tasks/counts');
-    if (counts && typeof counts === 'object' && Object.keys(counts).length > 0) {
+    if (counts && typeof counts === 'object' && !Array.isArray(counts) && Object.keys(counts).length > 0) {
       return counts;
     }
   } catch (err) {
@@ -187,16 +194,58 @@ export async function getTaskPaperCounts(): Promise<TaskPaperCounts> {
 }
 
 export async function getTaskBySlug(slug: string): Promise<TaskDetail> {
-  const response = await fetchApi<GetTaskBySlugResponse>(`/api/v1/tasks/${encodeURIComponent(slug)}`);
-  const data = response.data;
-  return {
-    id: data.id,
-    name: data.name,
-    slug: data.slug,
-    color: data.color,
-    paperCount: data.papers?.length ?? 0,
-    papers: (data.papers ?? []).map(({ paper }) => paper),
-  };
+  if (!slug || typeof slug !== 'string' || slug.trim().length === 0) {
+    return {
+      id: '',
+      name: '',
+      slug: '',
+      color: null,
+      paperCount: 0,
+      papers: [],
+    };
+  }
+
+  const cleanSlug = slug.trim();
+
+  try {
+    const response = await fetchApi<GetTaskBySlugResponse>(`/api/v1/tasks/${encodeURIComponent(cleanSlug)}`);
+    const data = response?.data;
+
+    if (!data || typeof data !== 'object') {
+      return {
+        id: '',
+        name: cleanSlug,
+        slug: cleanSlug,
+        color: null,
+        paperCount: 0,
+        papers: [],
+      };
+    }
+
+    const rawPapers = Array.isArray(data.papers) ? data.papers : [];
+    const validPapers: TaskPaper[] = rawPapers
+      .map((item) => item?.paper)
+      .filter((p): p is TaskPaper => Boolean(p && typeof p === 'object' && p.id));
+
+    return {
+      id: data.id || '',
+      name: data.name || cleanSlug,
+      slug: data.slug || cleanSlug,
+      color: data.color ?? null,
+      paperCount: validPapers.length,
+      papers: validPapers,
+    };
+  } catch (err) {
+    console.error(`Failed to fetch task by slug [${cleanSlug}]:`, err);
+    return {
+      id: '',
+      name: cleanSlug,
+      slug: cleanSlug,
+      color: null,
+      paperCount: 0,
+      papers: [],
+    };
+  }
 }
 
 export { slugify };

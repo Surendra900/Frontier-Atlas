@@ -64,34 +64,35 @@ export interface GetBenchmarkBySlugResponse {
 }
 
 let syncBenchmarkList: BenchmarkItem[] | null = null;
+let syncBenchmarkListTimestamp = 0;
+const BENCHMARKS_LIST_TTL = 10 * 60 * 1000;
+
 if (typeof window !== 'undefined') {
   try {
     const raw = localStorage.getItem('atlas_benchmarks_list');
     if (raw) {
       const parsed = JSON.parse(raw) as { data: BenchmarkItem[]; timestamp: number };
-      if (parsed && Date.now() - parsed.timestamp < 10 * 60 * 1000) {
+      if (parsed && Date.now() - parsed.timestamp < BENCHMARKS_LIST_TTL) {
         syncBenchmarkList = parsed.data;
+        syncBenchmarkListTimestamp = parsed.timestamp;
         benchmarksCache = Promise.resolve(parsed.data);
       }
     }
   } catch {}
 }
 
-export function getCachedBenchmarksSync(): BenchmarkItem[] | null {
-  return syncBenchmarkList;
-}
-
 export async function getBenchmarks(): Promise<BenchmarkItem[]> {
-  if (syncBenchmarkList && syncBenchmarkList.length > 0) {
+  const isFresh = syncBenchmarkList && (Date.now() - syncBenchmarkListTimestamp < BENCHMARKS_LIST_TTL);
+
+  if (isFresh && syncBenchmarkList!.length > 0) {
     if (!benchmarksCache) {
-      benchmarksCache = Promise.resolve(syncBenchmarkList);
+      benchmarksCache = Promise.resolve(syncBenchmarkList!);
     }
-    return syncBenchmarkList;
+    return syncBenchmarkList!;
   }
 
-  if (benchmarksCache) {
-    return benchmarksCache;
-  }
+  // stale or missing — clear so it actually refetches
+  benchmarksCache = null;
 
   try {
     benchmarksCache = fetchApi<GetBenchmarksResponse>('/api/v1/benchmarks?limit=5000', { signal: AbortSignal.timeout(5000) })
@@ -99,6 +100,7 @@ export async function getBenchmarks(): Promise<BenchmarkItem[]> {
         const items = Array.isArray(response?.data) ? response.data : [];
         if (items.length > 0) {
           syncBenchmarkList = items;
+          syncBenchmarkListTimestamp = Date.now();
           try {
             if (typeof window !== 'undefined') {
               localStorage.setItem('atlas_benchmarks_list', JSON.stringify({ data: items, timestamp: Date.now() }));
@@ -118,6 +120,13 @@ export async function getBenchmarks(): Promise<BenchmarkItem[]> {
     benchmarksCache = null;
     return MOCK_BENCHMARKS;
   }
+}
+
+export function getCachedBenchmarksSync(): BenchmarkItem[] | null {
+  if (syncBenchmarkList && (Date.now() - syncBenchmarkListTimestamp < BENCHMARKS_LIST_TTL)) {
+    return syncBenchmarkList;
+  }
+  return null;
 }
 
 export async function getBenchmarkBySlug(slug: string): Promise<BenchmarkDetail | null> {

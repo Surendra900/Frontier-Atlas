@@ -1,9 +1,19 @@
 import { Context } from 'hono';
-import * as benchmarkService from '../services/benchmark.service.js';
-import { redisManager } from '../lib/redis.js';
+import * as benchmarkService from '../services/benchmark.service';
+import { redisManager } from '../lib/redis';
 
 const localBenchmarkCache = new Map<string, { data: any; expiresAt: number }>();
 const LOCAL_BENCHMARK_TTL = 15 * 60 * 1000; // 15 minutes
+
+const getFromLocalCache = (key: string) => {
+  const item = localBenchmarkCache.get(key);
+  if (!item) return null;
+  if (Date.now() > item.expiresAt) {
+    localBenchmarkCache.delete(key);
+    return null;
+  }
+  return item.data;
+};
 
 export const getBenchmarks = async (c: Context) => {
   const prisma = c.var.prisma;
@@ -15,23 +25,33 @@ export const getBenchmarks = async (c: Context) => {
   c.header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
 
   try {
-    const localHit = localBenchmarkCache.get(cacheKey);
-    if (localHit && Date.now() < localHit.expiresAt) {
-      return c.json(localHit.data, 200);
+    const localHit = getFromLocalCache(cacheKey);
+    if (localHit) {
+      return c.json(localHit, 200);
     }
 
-    const redis = redisManager.getClient();
-    let cached = null;
-
+    let redis: ReturnType<typeof redisManager.getClient> | null = null;
     try {
-      cached = await redis.get(cacheKey);
+      redis = redisManager.getClient();
     } catch (err) {
-      console.error('Redis GET failed:', err);
+      console.error('Redis client unavailable:', err);
+    }
+
+    let cached: any = null;
+    if (redis) {
+      try {
+        const raw = await redis.get(cacheKey);
+        if (raw) {
+          cached = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        }
+      } catch (err) {
+        console.error('Redis GET failed:', err);
+      }
     }
 
     if (cached) {
       localBenchmarkCache.set(cacheKey, { data: cached, expiresAt: Date.now() + LOCAL_BENCHMARK_TTL });
-      return c.json(cached as any, 200);
+      return c.json(cached, 200);
     }
 
     const benchmarks = await benchmarkService.getBenchmarks(prisma, limit, skip);
@@ -39,10 +59,12 @@ export const getBenchmarks = async (c: Context) => {
 
     localBenchmarkCache.set(cacheKey, { data: response, expiresAt: Date.now() + LOCAL_BENCHMARK_TTL });
 
-    try {
-      await redis.set(cacheKey, response, { ex: 1800 }); // 30 minutes — benchmarks are very stable
-    } catch (err) {
-      console.error('Redis SET failed:', err);
+    if (redis) {
+      try {
+        await redis.set(cacheKey, JSON.stringify(response), { ex: 1800 }); // 30 minutes
+      } catch (err) {
+        console.error('Redis SET failed:', err);
+      }
     }
 
     return c.json(response, 200);
@@ -54,29 +76,44 @@ export const getBenchmarks = async (c: Context) => {
 
 export const getBenchmarkBySlug = async (c: Context) => {
   const prisma = c.var.prisma;
-  const slug = c.req.param('slug') as string;
+  const slug = c.req.param('slug');
+
+  if (!slug) {
+    return c.json({ status: 'error', message: 'Benchmark slug is required' }, 400);
+  }
+
   const cacheKey = `benchmark:${slug}`;
 
   c.header('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=600');
 
   try {
-    const localHit = localBenchmarkCache.get(cacheKey);
-    if (localHit && Date.now() < localHit.expiresAt) {
-      return c.json(localHit.data, 200);
+    const localHit = getFromLocalCache(cacheKey);
+    if (localHit) {
+      return c.json(localHit, 200);
     }
 
-    const redis = redisManager.getClient();
-    let cached = null;
-
+    let redis: ReturnType<typeof redisManager.getClient> | null = null;
     try {
-      cached = await redis.get(cacheKey);
+      redis = redisManager.getClient();
     } catch (err) {
-      console.error('Redis GET failed:', err);
+      console.error('Redis client unavailable:', err);
+    }
+
+    let cached: any = null;
+    if (redis) {
+      try {
+        const raw = await redis.get(cacheKey);
+        if (raw) {
+          cached = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        }
+      } catch (err) {
+        console.error('Redis GET failed:', err);
+      }
     }
 
     if (cached) {
       localBenchmarkCache.set(cacheKey, { data: cached, expiresAt: Date.now() + LOCAL_BENCHMARK_TTL });
-      return c.json(cached as any, 200);
+      return c.json(cached, 200);
     }
 
     const benchmark = await benchmarkService.getBenchmarkBySlug(prisma, slug);
@@ -86,10 +123,12 @@ export const getBenchmarkBySlug = async (c: Context) => {
 
     localBenchmarkCache.set(cacheKey, { data: response, expiresAt: Date.now() + LOCAL_BENCHMARK_TTL });
 
-    try {
-      await redis.set(cacheKey, response, { ex: 900 }); // 15 minutes
-    } catch (err) {
-      console.error('Redis SET failed:', err);
+    if (redis) {
+      try {
+        await redis.set(cacheKey, JSON.stringify(response), { ex: 900 }); // 15 minutes
+      } catch (err) {
+        console.error('Redis SET failed:', err);
+      }
     }
 
     return c.json(response, 200);

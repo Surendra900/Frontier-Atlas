@@ -5,18 +5,16 @@ import { QueryRouter } from "../routing/index.js";
 
 // ---------------------------------------------------------------------------
 // Version-counter helpers
-// Instead of redis.keys("papers:*") O(N) scan, we maintain a lightweight
-// integer version in Redis. On any mutation, we INCR the version.
-// All list cache keys embed the version, so old keys expire by TTL silently.
+// Maintains a lightweight integer version in Redis for list cache invalidation.
 // ---------------------------------------------------------------------------
 
 const getPapersVersion = async (): Promise<string> => {
   try {
     const redis = redisManager.getClient();
     const v = await redis.get("papers:version");
-    return v ? String(v) : "0";
+    return v ? `4_${String(v)}` : "4_0";
   } catch {
-    return "0";
+    return "4_0";
   }
 };
 
@@ -30,6 +28,28 @@ const bumpPapersVersion = async (): Promise<void> => {
 };
 
 // ---------------------------------------------------------------------------
+// In-memory Cache Protection
+// ---------------------------------------------------------------------------
+
+const localMemoryCache = new Map<string, { data: unknown; expiresAt: number }>();
+const LOCAL_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const MAX_LOCAL_CACHE_SIZE = 500;
+
+export const clearPaperLocalCache = (): void => {
+  localMemoryCache.clear();
+};
+
+const setLocalCache = (key: string, data: unknown): void => {
+  if (localMemoryCache.size >= MAX_LOCAL_CACHE_SIZE) {
+    const oldestKey = localMemoryCache.keys().next().value;
+    if (oldestKey) {
+      localMemoryCache.delete(oldestKey);
+    }
+  }
+  localMemoryCache.set(key, { data, expiresAt: Date.now() + LOCAL_TTL_MS });
+};
+
+// ---------------------------------------------------------------------------
 // Handlers
 // ---------------------------------------------------------------------------
 
@@ -37,10 +57,16 @@ export const ingestPaper = async (c: Context) => {
   const queryRouter = c.var.queryRouter as QueryRouter;
   const body = await c.req.json();
 
+  if (!body || !body.content) {
+    return c.json({ status: "error", message: "Paper content is required" }, 400);
+  }
+
   const newPaper = await paperService.ingestPaper(queryRouter, body.content);
 
-  // Invalidate list cache via version bump (replaces the old redis.keys scan)
+  // Invalidate list cache via version bump
   await bumpPapersVersion();
+  clearPaperLocalCache();
+
   try {
     const redis = redisManager.getClient();
     await redis.del(`paper:${newPaper.slug}`);
@@ -59,9 +85,6 @@ export const ingestPaper = async (c: Context) => {
   );
 };
 
-const localMemoryCache = new Map<string, { data: any; expiresAt: number }>();
-const LOCAL_TTL_MS = 10 * 60 * 1000; // 10 minutes
-
 export const getPapers = async (c: Context) => {
   const queryRouter = c.var.queryRouter as QueryRouter;
   const sort = c.req.query("sort") || "trending";
@@ -78,7 +101,7 @@ export const getPapers = async (c: Context) => {
     const version = await getPapersVersion();
     const cacheKey = `papers:v${version}:${JSON.stringify({ sort, task, method, model, organization, period, page, limit, cursor })}`;
 
-    // 1. Check zero-latency in-memory cache (0.1ms response)
+    // 1. Check zero-latency in-memory cache
     const localHit = localMemoryCache.get(cacheKey);
     if (localHit && Date.now() < localHit.expiresAt) {
       return c.json(localHit.data, 200);
@@ -86,7 +109,7 @@ export const getPapers = async (c: Context) => {
 
     // 2. Check Redis cache
     const redis = redisManager.getClient();
-    let cached = null;
+    let cached: unknown = null;
     try {
       cached = await redis.get(cacheKey);
     } catch (err) {
@@ -94,8 +117,8 @@ export const getPapers = async (c: Context) => {
     }
 
     if (cached) {
-      localMemoryCache.set(cacheKey, { data: cached, expiresAt: Date.now() + LOCAL_TTL_MS });
-      return c.json(cached as any, 200);
+      setLocalCache(cacheKey, cached);
+      return c.json(cached, 200);
     }
 
     const result = await paperService.getPapers(queryRouter, {
@@ -112,11 +135,11 @@ export const getPapers = async (c: Context) => {
 
     const response = {
       status: "success",
-      count: result.papers.length,
+      count: Array.isArray(result?.papers) ? result.papers.length : 0,
       data: result,
     };
 
-    localMemoryCache.set(cacheKey, { data: response, expiresAt: Date.now() + LOCAL_TTL_MS });
+    setLocalCache(cacheKey, response);
 
     try {
       await redis.set(cacheKey, response, { ex: 600 }); // 10 minutes
@@ -125,7 +148,7 @@ export const getPapers = async (c: Context) => {
     }
 
     return c.json(response, 200);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Error in getPapers controller:", error);
     const message = error instanceof Error ? error.message : String(error);
     const status =
@@ -144,31 +167,35 @@ export const getPapers = async (c: Context) => {
 
 export const getPaperBySlug = async (c: Context) => {
   const queryRouter = c.var.queryRouter as QueryRouter;
-  const slug = c.req.param("slug") as string;
+  const slug = c.req.param("slug") || "";
+  if (!slug) {
+    return c.json({ status: "error", message: "Slug is required" }, 400);
+  }
+
   const cacheKey = `paper:${slug}`;
 
   try {
     const redis = redisManager.getClient();
-    let cached = null;
+    let cached: Record<string, unknown> | null = null;
 
     try {
-      cached = await redis.get(cacheKey);
+      cached = (await redis.get(cacheKey)) as Record<string, unknown> | null;
     } catch (err) {
       console.error("Redis GET failed:", err);
     }
 
     if (cached) {
-      if ((cached as any).is404) {
-        return c.json(cached as any, 404);
+      if (cached.is404) {
+        return c.json(cached, 404);
       }
-      return c.json(cached as any, 200);
+      return c.json(cached, 200);
     }
 
     const paper = await paperService.getPaperBySlug(queryRouter, slug);
     if (!paper) {
       const response404 = { status: "error", message: "Paper not found", is404: true };
       try {
-        await redis.set(cacheKey, response404, { ex: 60 }); // Cache 404 for 60 seconds
+        await redis.set(cacheKey, response404, { ex: 60 });
       } catch (err) {
         console.error("Redis SET 404 failed:", err);
       }
@@ -184,13 +211,13 @@ export const getPaperBySlug = async (c: Context) => {
     }
 
     return c.json(response, 200);
-  } catch (error: any) {
-    return c.json({ status: "error", detail: error.message }, 500);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ status: "error", detail: message }, 500);
   }
 };
 
 export const getPaperById = async (c: Context) => {
-  
   const queryRouter = c.var.queryRouter as QueryRouter;
   const id = c.req.param("id");
 
@@ -198,31 +225,30 @@ export const getPaperById = async (c: Context) => {
     return c.json({ status: "error", message: "ID is required" }, 400);
   }
 
-  // Cache the full paper response.
   const cacheKey = `paper:id:${id}`;
 
   try {
     const redis = redisManager.getClient();
 
-    let cached = null;
+    let cached: Record<string, unknown> | null = null;
     try {
-      cached = await redis.get(cacheKey);
+      cached = (await redis.get(cacheKey)) as Record<string, unknown> | null;
     } catch (err) {
       console.error("Redis GET failed:", err);
     }
 
     if (cached) {
-      if ((cached as any).is404) {
-        return c.json(cached as any, 404);
+      if (cached.is404) {
+        return c.json(cached, 404);
       }
-      return c.json(cached as any, 200);
+      return c.json(cached, 200);
     }
 
     const paper = await paperService.getPaperById(queryRouter, id);
     if (!paper) {
       const response404 = { status: "error", message: "Paper not found", is404: true };
       try {
-        await redis.set(cacheKey, response404, { ex: 60 }); // Cache 404 for 60 seconds
+        await redis.set(cacheKey, response404, { ex: 60 });
       } catch (err) {
         console.error("Redis SET 404 failed:", err);
       }
@@ -232,21 +258,22 @@ export const getPaperById = async (c: Context) => {
     const response = { status: "success", data: paper };
 
     try {
-      await redis.set(cacheKey, response, { ex: 300 }); // 5 minutes
+      await redis.set(cacheKey, response, { ex: 300 });
     } catch (err) {
       console.error("Redis SET failed:", err);
     }
 
     return c.json(response, 200);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[getPaperById] Error:", error);
-    return c.json({ status: "error", detail: error.message }, 500);
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ status: "error", detail: message }, 500);
   }
 };
 
 export const updatePaper = async (c: Context) => {
   const queryRouter = c.var.queryRouter as QueryRouter;
-  const slug = c.req.param("slug") as string;
+  const slug = c.req.param("slug") || "";
   const body = await c.req.json();
 
   try {
@@ -260,34 +287,36 @@ export const updatePaper = async (c: Context) => {
       return c.json({ status: "error", message: "Paper not found" }, 404);
     }
 
-    // Bump version (invalidates all versioned list keys silently via TTL)
     await bumpPapersVersion();
+    clearPaperLocalCache();
+
     try {
       const redis = redisManager.getClient();
       await redis.del(`paper:${slug}`);
-      // Also invalidate the by-id cache if we know the id
-      if ((updatedPaper as any).id) {
-        await redis.del(`paper:id:${(updatedPaper as any).id}`);
+      if (updatedPaper && typeof updatedPaper === "object" && "id" in updatedPaper) {
+        await redis.del(`paper:id:${updatedPaper.id}`);
       }
     } catch (err) {
       console.error("Cache invalidation failed:", err);
     }
 
     return c.json({ status: "success", data: updatedPaper }, 200);
-  } catch (error: any) {
-    return c.json({ status: "error", detail: error.message }, 500);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ status: "error", detail: message }, 500);
   }
 };
 
 export const deletePaper = async (c: Context) => {
   const queryRouter = c.var.queryRouter as QueryRouter;
-  const slug = c.req.param("slug") as string;
+  const slug = c.req.param("slug") || "";
 
   try {
     await paperService.deletePaper(queryRouter, slug);
 
-    // Bump version (invalidates all versioned list keys silently via TTL)
     await bumpPapersVersion();
+    clearPaperLocalCache();
+
     try {
       const redis = redisManager.getClient();
       await redis.del(`paper:${slug}`);
@@ -296,8 +325,9 @@ export const deletePaper = async (c: Context) => {
     }
 
     return c.json({ status: "success", message: "Paper deleted" }, 200);
-  } catch (error: any) {
-    return c.json({ status: "error", detail: error.message }, 500);
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ status: "error", detail: message }, 500);
   }
 };
 
@@ -311,7 +341,6 @@ export const searchPapers = async (c: Context) => {
 
   const searchQuery = { q, sort, page, limit };
 
-  // Only attempt caching for non-empty queries
   if (q) {
     const normalizedQ = q.toLowerCase();
     const cacheKey = `search:${normalizedQ}:${sort}:${page}:${limit}`;
@@ -319,7 +348,7 @@ export const searchPapers = async (c: Context) => {
     try {
       const redis = redisManager.getClient();
 
-      let cached = null;
+      let cached: unknown = null;
       try {
         cached = await redis.get(cacheKey);
       } catch (err) {
@@ -327,46 +356,39 @@ export const searchPapers = async (c: Context) => {
       }
 
       if (cached) {
-        return c.json(cached as any, 200);
+        return c.json(cached, 200);
       }
 
       const result = await paperService.searchPapers(queryRouter, searchQuery);
-      console.log("Controller result:", result);
       const response = { status: "success", data: result };
 
-      // Only cache results that actually returned data (avoid caching empty hits)
-      if (result.papers.length > 0) {
+      if (Array.isArray(result?.papers) && result.papers.length > 0) {
         try {
-          await redis.set(cacheKey, response, { ex: 300 }); // 5 minutes
+          await redis.set(cacheKey, response, { ex: 300 });
         } catch (err) {
           console.error("Redis SET failed:", err);
         }
       }
 
       return c.json(response, 200);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("Search error:", error);
-      return c.json(
-        { status: "error", message: error.message || "Search failed" },
-        500,
-      );
+      const message = error instanceof Error ? error.message : "Search failed";
+      return c.json({ status: "error", message }, 500);
     }
   }
 
-  // Empty query path — skip cache entirely
   try {
     const result = await paperService.searchPapers(queryRouter, searchQuery);
     return c.json({ status: "success", data: result }, 200);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("Search error:", error);
-    return c.json(
-      { status: "error", message: error.message || "Search failed" },
-      500,
-    );
+    const message = error instanceof Error ? error.message : "Search failed";
+    return c.json({ status: "error", message }, 500);
   }
 };
 
-export const checkSavedPaper = async (c: any) => {
+export const checkSavedPaper = async (c: Context) => {
   const prisma = c.get("prisma");
   const userId = c.get("userId") || c.get("user")?.id || c.get("user");
   const paper_id = c.req.query("paper_id");
@@ -392,7 +414,7 @@ export const checkSavedPaper = async (c: any) => {
   }
 };
 
-export const toggleSavePaper = async (c: any) => {
+export const toggleSavePaper = async (c: Context) => {
   const prisma = c.get("prisma");
   const userId = c.get("userId") || c.get("user")?.id || c.get("user");
 
@@ -402,11 +424,12 @@ export const toggleSavePaper = async (c: any) => {
 
   try {
     const body = await c.req.json();
-    const paper_id = body.paper_id;
+    const paper_id = body?.paper_id;
 
     if (!paper_id) {
       return c.json({ error: "Paper ID is required" }, 400);
     }
+
     const existingSave = await prisma.savedPaper.findUnique({
       where: {
         user_id_paper_id: {
@@ -427,7 +450,6 @@ export const toggleSavePaper = async (c: any) => {
       });
       return c.json({ isSaved: false });
     } else {
-      // If it doesn't exist, save it
       await prisma.savedPaper.create({
         data: {
           user_id: userId,
@@ -442,7 +464,7 @@ export const toggleSavePaper = async (c: any) => {
   }
 };
 
-export const getSavedPapers = async (c: any) => {
+export const getSavedPapers = async (c: Context) => {
   const prisma = c.get("prisma");
   const userId = c.get("userId") || c.get("user")?.id || c.get("user");
 
@@ -451,19 +473,90 @@ export const getSavedPapers = async (c: any) => {
   }
 
   try {
-    // Fetch the saved records AND include the actual paper data
     const savedRecords = await prisma.savedPaper.findMany({
       where: { user_id: userId },
-      include: { paper: true }, 
-      orderBy: { created_at: "desc" }, // Newest saves first
+      include: { paper: true },
+      orderBy: { created_at: "desc" },
     });
 
-    // Extract just the paper objects from the relationship
-    const papers = savedRecords.map((record: any) => record.paper);
+    const papers = Array.isArray(savedRecords)
+      ? savedRecords.map((record: { paper: unknown }) => record.paper)
+      : [];
 
     return c.json({ papers });
   } catch (error) {
     console.error("Error fetching saved papers:", error);
     return c.json({ error: "Failed to fetch saved papers" }, 500);
+  }
+};
+
+export const getOrganizationMetrics = async (c: Context) => {
+  const queryRouter = c.var.queryRouter as QueryRouter;
+  const organization = c.req.query("organization");
+
+  try {
+    const version = await getPapersVersion();
+    const cacheKey = `org_metrics:v${version}:${organization || "all"}`;
+
+    const localHit = localMemoryCache.get(cacheKey);
+    if (localHit && Date.now() < localHit.expiresAt) {
+      return c.json(localHit.data, 200);
+    }
+
+    const redis = redisManager.getClient();
+    let cached = null;
+    try {
+      cached = await redis.get(cacheKey);
+    } catch (err) {
+      console.error("Redis GET failed:", err);
+    }
+
+    if (cached) {
+      localMemoryCache.set(cacheKey, { data: cached, expiresAt: Date.now() + LOCAL_TTL_MS });
+      return c.json(cached as any, 200);
+    }
+
+    const metrics = await paperService.getOrganizationMetrics(queryRouter, organization);
+
+    const counts: Record<string, number> = {};
+    const citations: Record<string, number> = {};
+    const stars: Record<string, number> = {};
+    const trendingScores: Record<string, number> = {};
+
+    for (const item of metrics) {
+      counts[item.organization] = item.paperCount;
+      citations[item.organization] = item.citations;
+      stars[item.organization] = item.stars;
+      trendingScores[item.organization] = item.trendingScore;
+    }
+
+    const response = {
+      status: "success",
+      count: metrics.length,
+      data: metrics,
+      counts,
+      citations,
+      stars,
+      trendingScores,
+    };
+
+    localMemoryCache.set(cacheKey, { data: response, expiresAt: Date.now() + LOCAL_TTL_MS });
+
+    try {
+      await redis.set(cacheKey, response, { ex: 600 });
+    } catch (err) {
+      console.error("Redis SET failed:", err);
+    }
+
+    return c.json(response, 200);
+  } catch (error: any) {
+    console.error("Error in getOrganizationMetrics controller:", error);
+    return c.json(
+      {
+        status: "error",
+        detail: error instanceof Error ? error.message : String(error),
+      },
+      500,
+    );
   }
 };

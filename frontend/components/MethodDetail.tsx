@@ -17,9 +17,12 @@ import { useState } from "react";
 import type { MethodDetail as MethodDetailType } from "@/lib/methods";
 import { slugify } from "@/lib/methods";
 
-function formatDate(dateStr: string): string {
+function formatDate(dateStr?: string): string {
+  if (!dateStr) return "";
   try {
-    return new Date(dateStr).toLocaleDateString("en-US", {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return dateStr;
+    return date.toLocaleDateString("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -34,38 +37,51 @@ function PaperCard({
 }: {
   paper: MethodDetailType["papers"][number];
 }) {
-  const authorNames = paper.authors;
+  const authorNames = Array.isArray(paper?.authors) ? paper.authors : [];
+  const citationCount = Number(paper?.citationCount) || 0;
+  const githubStars = Number(paper?.githubStars) || 0;
+  const paperSlug = paper?.slug ? encodeURIComponent(paper.slug) : "";
 
   return (
     <div className="ds-card p-5 flex flex-col gap-3">
-      <Link
-        href={`/papers/${paper.slug}`}
-        className="text-[16px] font-semibold text-[#111111] hover:text-[#F55036] transition-colors leading-snug no-underline"
-      >
-        {paper.title}
-      </Link>
+      {paperSlug ? (
+        <Link
+          href={`/papers/${paperSlug}`}
+          className="text-[16px] font-semibold text-[#111111] hover:text-[#F55036] transition-colors leading-snug no-underline"
+        >
+          {paper.title || "Untitled Paper"}
+        </Link>
+      ) : (
+        <h3 className="text-[16px] font-semibold text-[#111111] leading-snug">
+          {paper?.title || "Untitled Paper"}
+        </h3>
+      )}
 
       {authorNames.length > 0 && (
         <div className="flex items-start gap-1.5 text-[13px] text-[#555555]">
           <Users size={14} className="mt-0.5 shrink-0 text-[#8B8B8B]" />
           <span className="line-clamp-2">
-            {authorNames.map((a, i) => (
-              <span key={a.name}>
-                {i > 0 && <span className="text-[#DCDCD7]">, </span>}
-                <Link
-                  href={`/authors/${slugify(a.name)}`}
-                  className="hover:text-[#F55036] transition-colors no-underline"
-                >
-                  {a.name}
-                </Link>
-              </span>
-            ))}
+            {authorNames.map((a, i) => {
+              const name = a?.name || "Unknown Author";
+              const authorSlug = encodeURIComponent(slugify(name));
+              return (
+                <span key={`${name}-${i}`}>
+                  {i > 0 && <span className="text-[#DCDCD7]">, </span>}
+                  <Link
+                    href={`/authors/${authorSlug}`}
+                    className="hover:text-[#F55036] transition-colors no-underline"
+                  >
+                    {name}
+                  </Link>
+                </span>
+              );
+            })}
           </span>
         </div>
       )}
 
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-[13px] text-[#555555]">
-        {paper.publicationDate && (
+        {paper?.publicationDate && (
           <span className="flex items-center gap-1.5">
             <Calendar size={14} className="text-[#8B8B8B]" />
             {formatDate(paper.publicationDate)}
@@ -73,23 +89,25 @@ function PaperCard({
         )}
         <span className="flex items-center gap-1.5">
           <Quote size={14} className="text-[#8B8B8B]" />
-          {paper.citationCount} citation{paper.citationCount !== 1 ? "s" : ""}
+          {citationCount.toLocaleString()} citation{citationCount !== 1 ? "s" : ""}
         </span>
         <span className="flex items-center gap-1.5">
           <Star size={14} className="text-[#8B8B8B]" />
-          {paper.githubStars} star{paper.githubStars !== 1 ? "s" : ""}
+          {githubStars.toLocaleString()} star{githubStars !== 1 ? "s" : ""}
         </span>
       </div>
 
-      <div className="pt-1">
-        <Link
-          href={`/papers/${paper.slug}`}
-          className="inline-flex items-center gap-1.5 ds-button-ghost text-[12px] px-3 py-1.5 no-underline"
-        >
-          <ExternalLink size={13} />
-          Open Paper
-        </Link>
-      </div>
+      {paperSlug && (
+        <div className="pt-1">
+          <Link
+            href={`/papers/${paperSlug}`}
+            className="inline-flex items-center gap-1.5 ds-button-ghost text-[12px] px-3 py-1.5 no-underline"
+          >
+            <ExternalLink size={13} />
+            Open Paper
+          </Link>
+        </div>
+      )}
     </div>
   );
 }
@@ -102,29 +120,37 @@ export default function MethodDetail({
   const [copied, setCopied] = useState(false);
 
   const handleCopyLink = async () => {
+    if (typeof window === "undefined" || !navigator?.clipboard) return;
     try {
       await navigator.clipboard.writeText(window.location.href);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      // ignore
+      // Ignore copy errors
     }
   };
 
   const handleShare = async () => {
-    if (navigator.share) {
+    if (typeof window === "undefined") return;
+    if (navigator?.share) {
       try {
         await navigator.share({
-          title: method.name,
+          title: method?.name || "Method Detail",
           url: window.location.href,
         });
       } catch {
-        // ignore
+        // Ignore share errors
       }
     } else {
       handleCopyLink();
     }
   };
+
+  const methodName = method?.name || "Unnamed Method";
+  const methodSlug = method?.slug || "";
+  const papers = Array.isArray(method?.papers) ? method.papers : [];
+  const rawPaperCount = Number(method?.paperCount);
+  const paperCount = !isNaN(rawPaperCount) ? rawPaperCount : papers.length;
 
   return (
     <div className="min-h-screen bg-[#F8F7F2] text-[#111111]">
@@ -139,7 +165,7 @@ export default function MethodDetail({
           </Link>
           <span>/</span>
           <span className="text-[#555555] font-medium truncate max-w-[200px]">
-            {method.name}
+            {methodName}
           </span>
         </nav>
 
@@ -147,18 +173,20 @@ export default function MethodDetail({
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
             <div className="flex-1 min-w-0">
               <h1 className="text-[28px] md:text-[32px] font-bold tracking-tight mb-2">
-                {method.name}
+                {methodName}
               </h1>
-              <span className="inline-block ds-chip text-[11px] mb-3">
-                {method.slug}
-              </span>
+              {methodSlug && (
+                <span className="inline-block ds-chip text-[11px] mb-3">
+                  {methodSlug}
+                </span>
+              )}
               <div className="flex items-center gap-2 text-[14px] text-[#555555]">
                 <FileText size={16} className="text-[#8B8B8B]" />
                 <span>
                   <strong className="font-semibold text-[#111111]">
-                    {method.paperCount}
+                    {paperCount.toLocaleString()}
                   </strong>{" "}
-                  {method.paperCount === 1 ? "paper" : "papers"}
+                  {paperCount === 1 ? "paper" : "papers"}
                 </span>
               </div>
             </div>
@@ -184,20 +212,18 @@ export default function MethodDetail({
           </div>
         </div>
 
-        {method.papers.length > 0 && (
+        {papers.length > 0 ? (
           <section className="mb-10">
             <h2 className="text-[20px] font-bold tracking-tight mb-4">
-              Papers ({method.paperCount})
+              Papers ({paperCount.toLocaleString()})
             </h2>
             <div className="flex flex-col gap-4">
-              {method.papers.map((paper) => (
-                <PaperCard key={paper.id} paper={paper} />
+              {papers.map((paper, idx) => (
+                <PaperCard key={paper?.id || `paper-${idx}`} paper={paper} />
               ))}
             </div>
           </section>
-        )}
-
-        {method.papers.length === 0 && (
+        ) : (
           <section className="mb-10">
             <h2 className="text-[20px] font-bold tracking-tight mb-4">Papers</h2>
             <div className="flex flex-col items-center justify-center py-16 gap-3 ds-card">

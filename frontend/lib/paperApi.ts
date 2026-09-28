@@ -158,6 +158,26 @@ function mapBackendPaper(raw: Record<string, unknown>): Paper {
     }).join(" • ");
   }
 
+  let rankingsString = "";
+  if (Array.isArray(raw.rankings) && raw.rankings.length > 0) {
+    rankingsString = raw.rankings.map((r: unknown) => {
+      if (typeof r === 'object' && r !== null && 'rank' in r && 'benchmark' in r) {
+        const rank = (r as { rank: unknown }).rank;
+        const benchmark = (r as { benchmark: unknown }).benchmark;
+        if (rank && typeof benchmark === 'object' && benchmark !== null && 'name' in benchmark) {
+          return `#${rank} on ${(benchmark as { name: string }).name}`;
+        }
+      }
+      return "";
+    }).filter(Boolean).join(" • ");
+  }
+
+  if (sotaString && rankingsString) {
+    sotaString = `${sotaString} • ${rankingsString}`;
+  } else if (rankingsString) {
+    sotaString = rankingsString;
+  }
+
   const rawThumb = String(raw.thumbnail_url || raw.thumbnailUrl || raw.thumbnail || "");
   let finalThumbnail = "";
 
@@ -221,7 +241,7 @@ function mapBackendPaper(raw: Record<string, unknown>): Paper {
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 function getCacheKey(params: GetPapersParams): string {
-  return `papers:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "none"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
+  return `papers_v4:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "none"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
 }
 
 // In-memory cache — fastest possible, zero deserialization cost
@@ -233,12 +253,13 @@ if (typeof window !== "undefined") {
   try {
     for (let i = localStorage.length - 1; i >= 0; i--) {
       const k = localStorage.key(i);
-      if (k && k.startsWith("papers:")) {
+      // Clean up old papers: prefix as well
+      if (k && (k.startsWith("papers_v4:") || k.startsWith("papers_v3:") || k.startsWith("papers_v2:") || k.startsWith("papers:"))) {
         const item = localStorage.getItem(k);
         if (item) {
           try {
             const parsed = JSON.parse(item);
-            if (!parsed?.data?.papers || parsed.data.papers.length === 0) {
+            if (k.startsWith("papers:") || k.startsWith("papers_v2:") || k.startsWith("papers_v3:") || !parsed?.data?.papers || parsed.data.papers.length === 0) {
               localStorage.removeItem(k);
             }
           } catch {
@@ -317,7 +338,7 @@ function findFuzzyCache(params: GetPapersParams): GetPapersResult | null {
   try {
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (!k || !k.startsWith("papers:")) continue;
+      if (!k || !k.startsWith("papers_v4:")) continue;
       if (params.task && k.toLowerCase().includes(params.task.toLowerCase())) {
         const item = readCache<GetPapersResult>(k);
         if (item?.data?.papers?.length) return item.data;

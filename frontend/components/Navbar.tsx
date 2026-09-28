@@ -28,7 +28,6 @@ export default function Navbar({
   const isOrganizationsActive = pathname.startsWith("/organizations");
   const isSubmitActive = pathname.startsWith("/submit");
   const isLoginActive = pathname.startsWith("/login");
-
   const isHomePage = pathname === "/";
   const isCategoryPage = pathname.startsWith("/category/");
 
@@ -283,6 +282,18 @@ export default function Navbar({
     <circle cx="12" cy="7" r="4" />
   </svg>
 </Link>
+=======
+                        <Link
+              href="/submit"
+              data-text="Submit"
+              className={`text-[13px] transition-colors no-underline before:content-[attr(data-text)] before:block before:font-bold before:h-0 before:overflow-hidden before:invisible before:select-none text-center flex flex-col justify-center ${
+                isSubmitActive
+                  ? "text-[#F55036] font-bold"
+                  : "text-[#555555] font-medium hover:text-[#F55036]"
+              }`}
+            >
+              Submit
+            </Link>
           </div>
         </div>
       </nav>

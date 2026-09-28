@@ -1,8 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import Link from "next/link";
-import Image from "next/image";
+import React, { useState, useMemo } from "react";
 import { TrendingUp, Clock, Star } from "lucide-react";
 import { PaperCard } from "../../PaperFeed";
 import type { Paper as ApiPaper } from "@/lib/paperApi";
@@ -10,7 +8,15 @@ import { getArxivAbsUrl, getArxivPdfUrl } from "@/lib/paperApi";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Task {
-  task?: { name: string; };
+  task?: { name: string };
+}
+
+interface SotaClaim {
+  benchmark?: { name: string };
+}
+
+interface MethodRelation {
+  method?: { name: string };
 }
 
 interface Paper {
@@ -27,6 +33,10 @@ interface Paper {
   thumbnailUrl?: string;
   arxivId?: string;
   githubUrl?: string;
+  paperUrl?: string;
+  pdfUrl?: string;
+  sotaClaims?: SotaClaim[];
+  methods?: MethodRelation[];
   tasks?: Task[];
 }
 
@@ -36,8 +46,6 @@ interface Props {
 }
 
 // ─── Filter chip definitions ──────────────────────────────────────────────────
-// Filters search the paper's title + abstract for these keywords.
-// tasks[] is not returned per-paper by the API, so we use text matching.
 const FILTER_CHIPS: { label: string; key: string; keywords: string[] }[] = [
   { label: "All",          key: "all",          keywords: [] },
   { label: "Architecture", key: "architecture", keywords: ["architecture", "transformer", "encoder", "decoder", "network", "layer"] },
@@ -50,7 +58,7 @@ const FILTER_CHIPS: { label: string; key: string; keywords: string[] }[] = [
 
 type SortKey = "popular" | "recent" | "citations";
 
-const SORT_OPTIONS: { label: string; key: SortKey; Icon: React.ComponentType<any> }[] = [
+const SORT_OPTIONS: { label: string; key: SortKey; Icon: React.ComponentType<{ className?: string }> }[] = [
   { label: "Popular",   key: "popular",   Icon: TrendingUp },
   { label: "Recent",    key: "recent",    Icon: Clock },
   { label: "Citations", key: "citations", Icon: Star },
@@ -59,185 +67,84 @@ const SORT_OPTIONS: { label: string; key: SortKey; Icon: React.ComponentType<any
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 function matchesFilter(paper: Paper, key: string, keywords: string[]): boolean {
   if (key === "all") return true;
-  
-  // Strictly check the title and official task tags, completely ignoring the abstract
-  // to prevent massive false-positives from generic words like "performance" or "language model".
+
   const title = (paper.title ?? "").toLowerCase();
-  const taskNames = paper.tasks?.map((t) => (t.task?.name ?? '').toLowerCase()).join(" ") ?? "";
+  const tasks = Array.isArray(paper.tasks) ? paper.tasks : [];
+  const taskNames = tasks.map((t) => (t.task?.name ?? "").toLowerCase()).join(" ");
   const combined = `${title} ${taskNames}`;
-  
-  // For 'evaluation', also strictly check if it has sotaClaims, as that implies evaluation/benchmarking
-  if (key === "evaluation" && (paper as any).sotaClaims?.length > 0) return true;
+
+  if (key === "evaluation" && Array.isArray(paper.sotaClaims) && paper.sotaClaims.length > 0) {
+    return true;
+  }
 
   return keywords.some((kw) => combined.includes(kw.toLowerCase()));
+}
+
+function parsePublicationTime(dateStr?: string): number {
+  if (!dateStr) return 0;
+  const time = new Date(dateStr).getTime();
+  return isNaN(time) ? 0 : time;
 }
 
 function sortPapers(papers: Paper[], sort: SortKey): Paper[] {
   const copy = [...papers];
   if (sort === "recent") {
     return copy.sort(
-      (a, b) =>
-        new Date(b.publicationDate ?? 0).getTime() -
-        new Date(a.publicationDate ?? 0).getTime()
+      (a, b) => parsePublicationTime(b.publicationDate) - parsePublicationTime(a.publicationDate)
     );
   }
   if (sort === "citations") {
     return copy.sort(
       (a, b) =>
-        (b.citationCount ?? b.githubStars ?? 0) -
-        (a.citationCount ?? a.githubStars ?? 0)
+        ((b.citationCount ?? b.githubStars) || 0) -
+        ((a.citationCount ?? a.githubStars) || 0)
     );
   }
-  return copy.sort((a, b) => (b.githubStars ?? 0) - (a.githubStars ?? 0));
+  return copy.sort((a, b) => (b.githubStars || 0) - (a.githubStars || 0));
 }
 
-// ─── Thumbnail placeholder — deterministic color from paper title ─────────────
-const PLACEHOLDER_COLORS = [
-  ["#fff5f2", "#ff4d20"],
-  ["#eff6ff", "#2563eb"],
-  ["#f0fdf4", "#16a34a"],
-  ["#faf5ff", "#7c3aed"],
-  ["#fff7ed", "#ea580c"],
-  ["#ecfeff", "#0891b2"],
-  ["#fdf4ff", "#a21caf"],
-];
-
-function PaperThumbnail({ paper }: { paper: Paper }) {
-  const [srcIndex, setSrcIndex] = useState(0);
-  const imgRef = useRef<HTMLImageElement>(null);
-
-  const rawArxiv = useMemo(() => {
-    if (!paper.arxivId) return null;
-    const match = paper.arxivId.match(/(?:arxiv\.org\/(?:abs|pdf)\/|arxiv:\s*|^)([a-z\-]+(?:\.[a-z\-]+)?\/\d+|\d{4}\.\d{4,5}(?:v\d+)?)/i);
-    return match && match[1] ? match[1].replace(/\.pdf$/i, "") : paper.arxivId.replace(/^arxiv:/i, "");
-  }, [paper.arxivId]);
-
-  const cleanArxiv = useMemo(() => {
-    return rawArxiv ? rawArxiv.replace(/v\d+$/i, "") : null;
-  }, [rawArxiv]);
-
-  const candidates = useMemo(() => {
-    const list: string[] = [];
-    if (paper.thumbnailUrl && !paper.thumbnailUrl.includes("cloudinary.com/xipefqle") && paper.thumbnailUrl !== "FAILED_404") {
-      list.push(paper.thumbnailUrl);
-    }
-    if (cleanArxiv) {
-      list.push(`https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${cleanArxiv}.webp`);
-      list.push(`https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${cleanArxiv}v1.webp`);
-    }
-    if (rawArxiv && rawArxiv !== cleanArxiv) {
-      list.push(`https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${rawArxiv}.webp`);
-    }
-    if (paper.slug) list.push(`/thumbnails/${paper.slug}.jpg`);
-    if (cleanArxiv) list.push(`/thumbnails/${cleanArxiv}.jpg`);
-    if (cleanArxiv) list.push(`https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${cleanArxiv}.png`);
-    return Array.from(new Set(list));
-  }, [paper.thumbnailUrl, cleanArxiv, rawArxiv, paper.slug]);
-
-  const currentSrc = candidates[srcIndex];
-  const isExternal = currentSrc && currentSrc.startsWith("http");
-  const isR2 = currentSrc && currentSrc.includes("r2.dev");
-  const imageSource = isExternal && !isR2 ? `/api/proxy-image?url=${encodeURIComponent(currentSrc)}` : currentSrc;
-
-  const handleImgError = useCallback(() => {
-    setSrcIndex(prev => (prev + 1 < candidates.length ? prev + 1 : candidates.length));
-  }, [candidates.length]);
-
-  useEffect(() => {
-    if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth === 0) {
-      handleImgError();
-    }
-  }, [imageSource, handleImgError]);
-
-  if (currentSrc && srcIndex < candidates.length) {
-    return (
-      <img
-        ref={imgRef}
-        key={imageSource}
-        src={imageSource}
-        alt={paper.title}
-        loading="lazy"
-        className="w-full h-full object-cover"
-        onError={handleImgError}
-      />
-    );
+function formatPublicationDate(dateStr?: string): string {
+  if (!dateStr) return "Unknown Date";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  } catch {
+    return dateStr;
   }
-
-  // Deterministic color pick from first char of title
-  const colorIdx = (paper.title?.charCodeAt(0) ?? 0) % PLACEHOLDER_COLORS.length;
-  const [bg, fg] = PLACEHOLDER_COLORS[colorIdx];
-
-  // Initials from title words
-  const initials = (paper.title ?? "?")
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((w) => w[0].toUpperCase())
-    .join("");
-
-  // Determine the year
-  const year = paper.publicationDate
-    ? new Date(paper.publicationDate).getFullYear()
-    : "";
-
-  // Beautiful generated placeholder
-  return (
-    <div
-      className="w-full h-full flex flex-col items-center justify-center gap-1 select-none"
-      style={{ background: bg }}
-    >
-      {/* Decorative lines simulating a paper */}
-      <div className="w-full px-2 space-y-1 mb-1">
-        <div className="h-1 rounded-full opacity-30" style={{ background: fg, width: "85%" }} />
-        <div className="h-1 rounded-full opacity-20" style={{ background: fg, width: "70%" }} />
-        <div className="h-1 rounded-full opacity-20" style={{ background: fg, width: "60%" }} />
-      </div>
-      {/* Initials badge */}
-      <div
-        className="w-10 h-10 rounded-xl flex items-center justify-center text-sm font-black shadow-sm"
-        style={{ background: fg, color: "#fff" }}
-      >
-        {initials || "?"}
-      </div>
-      {year && (
-        <span className="text-[9px] font-bold mt-1" style={{ color: fg, opacity: 0.7 }}>
-          {year}
-        </span>
-      )}
-    </div>
-  );
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
-export default function MethodFilteredPapers({ papers, methodName }: Props) {
+export default function MethodFilteredPapers({ papers = [], methodName }: Props) {
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [sortBy, setSortBy] = useState<SortKey>("popular");
+
+  const safePapers = Array.isArray(papers) ? papers : [];
 
   // Count how many papers match each filter chip
   const chipCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const chip of FILTER_CHIPS) {
-      counts[chip.key] = papers.filter((p) =>
+      counts[chip.key] = safePapers.filter((p) =>
         matchesFilter(p, chip.key, chip.keywords)
       ).length;
     }
     return counts;
-  }, [papers]);
+  }, [safePapers]);
 
   // Apply active filter then sort
   const displayedPapers = useMemo(() => {
-    const activeChip = FILTER_CHIPS.find((c) => c.key === activeFilter)!;
-    const filtered = papers.filter((p) =>
+    const activeChip = FILTER_CHIPS.find((c) => c.key === activeFilter) || FILTER_CHIPS[0];
+    const filtered = safePapers.filter((p) =>
       matchesFilter(p, activeFilter, activeChip.keywords)
     );
     return sortPapers(filtered, sortBy);
-  }, [papers, activeFilter, sortBy]);
+  }, [safePapers, activeFilter, sortBy]);
 
   return (
     <>
       {/* ── Filter Bar ─────────────────────────────────────────────────── */}
       <section className="mb-6 lg:mb-8 bg-white border border-gray-100 lg:rounded-xl shadow-[0_2px_12px_rgba(0,0,0,0.04)] -mx-5 px-5 lg:mx-0 lg:px-5 py-4">
-
         {/* Row 1: Label + Chips (wrap on mobile) */}
         <div className="flex flex-wrap items-center gap-2 mb-3">
           <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest shrink-0 mr-1">
@@ -247,19 +154,17 @@ export default function MethodFilteredPapers({ papers, methodName }: Props) {
             const isActive = activeFilter === chip.key;
             const count = chipCounts[chip.key] ?? 0;
 
-            // Hide the chip if it has 0 results (unless it's the 'all' chip)
             if (count === 0 && chip.key !== "all") return null;
 
             return (
               <button
                 key={chip.key}
                 onClick={() => setActiveFilter(chip.key)}
-                className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-150
-                  ${
-                    isActive
-                      ? "bg-[#ff4d20] text-white border-[#ff4d20] shadow-sm"
-                      : "border-gray-200 text-gray-600 bg-white hover:border-orange-300 hover:text-orange-600"
-                  }`}
+                className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-150 ${
+                  isActive
+                    ? "bg-[#ff4d20] text-white border-[#ff4d20] shadow-sm"
+                    : "border-gray-200 text-gray-600 bg-white hover:border-orange-300 hover:text-orange-600"
+                }`}
               >
                 {chip.label}
                 {chip.key !== "all" && (
@@ -286,19 +191,17 @@ export default function MethodFilteredPapers({ papers, methodName }: Props) {
               <button
                 key={key}
                 onClick={() => setSortBy(key)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150
-                  ${
-                    sortBy === key
-                      ? "bg-white text-slate-900 shadow-sm"
-                      : "text-gray-500 hover:text-slate-700"
-                  }`}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all duration-150 ${
+                  sortBy === key
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-gray-500 hover:text-slate-700"
+                }`}
               >
                 <Icon className="w-3 h-3" />
                 {label}
               </button>
             ))}
           </div>
-
         </div>
       </section>
 
@@ -306,35 +209,43 @@ export default function MethodFilteredPapers({ papers, methodName }: Props) {
       <div className="space-y-4 pb-20">
         {displayedPapers.length > 0 ? (
           displayedPapers.map((paper) => {
+            const authorsList = Array.isArray(paper.authors) ? paper.authors : [];
+            const tasksList = Array.isArray(paper.tasks) ? paper.tasks : [];
+            const methodsList = Array.isArray(paper.methods) ? paper.methods : [];
+            const sotaList = Array.isArray(paper.sotaClaims) ? paper.sotaClaims : [];
+
             const apiPaper: ApiPaper = {
               id: paper.id,
               slug: paper.slug ?? paper.id,
-              title: paper.title,
+              title: paper.title || "Untitled Paper",
               thumbnail: paper.thumbnailUrl ?? (paper.arxivId ? `https://arxiv.org/html/${paper.arxivId}/thumbnail.png` : ""),
-              authors: (paper.authors || []).map(a => ({ name: a.name, slug: '' })),
-              date: paper.publicationDate ? new Date(paper.publicationDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : "Unknown Date",
+              authors: authorsList.map((a) => ({ name: a.name || "Unknown", slug: "" })),
+              date: formatPublicationDate(paper.publicationDate),
               description: paper.abstract || "No abstract available.",
-              sota: Array.isArray((paper as any).sotaClaims) ? (paper as any).sotaClaims.map((sc: any) => `SOTA on ${sc.benchmark?.name}`).join(" • ") : "",
-              tags: (paper.tasks || []).map((t: any) => t.task?.name ?? ''),
-              additionalTags: (paper as any).methods ? (paper as any).methods.map((m: any) => m.method?.name ?? '') : [methodName],
+              sota: sotaList.map((sc) => `SOTA on ${sc.benchmark?.name || "Benchmark"}`).join(" • "),
+              tags: tasksList.map((t) => t.task?.name ?? "").filter(Boolean),
+              additionalTags: methodsList.length > 0 ? methodsList.map((m) => m.method?.name ?? "").filter(Boolean) : [methodName],
               upvotes: String(paper.githubStars || 0),
               repo: String(paper.githubForks || 0),
               citations: paper.citationCount ?? paper.githubStars ?? 0,
               conference: paper.conference ?? "",
-              // Additional properties expected by PaperCard
               ...(paper.githubUrl ? { githubUrl: paper.githubUrl } : {}),
             } as ApiPaper;
 
-            // PaperCard reads these from (paper as any)
-            (apiPaper as any).arxivUrl = getArxivAbsUrl(paper.arxivId, (paper as any).paperUrl) || (paper.arxivId ? `https://arxiv.org/abs/${paper.arxivId}` : (paper as any).paperUrl);
-            (apiPaper as any).pdfUrl = getArxivPdfUrl((paper as any).pdfUrl, (paper as any).paperUrl, paper.arxivId) || (paper.arxivId ? `https://arxiv.org/pdf/${paper.arxivId}.pdf` : undefined);
-            
+            const arxivAbs = getArxivAbsUrl(paper.arxivId, paper.paperUrl) || (paper.arxivId ? `https://arxiv.org/abs/${paper.arxivId}` : paper.paperUrl);
+            const arxivPdf = getArxivPdfUrl(paper.pdfUrl, paper.paperUrl, paper.arxivId) || (paper.arxivId ? `https://arxiv.org/pdf/${paper.arxivId}.pdf` : undefined);
+
+            Object.assign(apiPaper, {
+              arxivUrl: arxivAbs,
+              pdfUrl: arxivPdf,
+            });
+
             apiPaper.repositories = [];
             if (paper.githubUrl) {
               apiPaper.repositories.push({ url: paper.githubUrl, name: "GitHub", owner: "" });
             }
-            if ((paper as any).paperUrl?.includes('huggingface.co') || (paper as any).pdfUrl?.includes('huggingface.co')) {
-              apiPaper.repositories.push({ url: (paper as any).paperUrl || (paper as any).pdfUrl, name: "HuggingFace", owner: "" });
+            if (paper.paperUrl?.includes("huggingface.co") || paper.pdfUrl?.includes("huggingface.co")) {
+              apiPaper.repositories.push({ url: paper.paperUrl || paper.pdfUrl || "", name: "HuggingFace", owner: "" });
             }
 
             return (
@@ -351,7 +262,7 @@ export default function MethodFilteredPapers({ papers, methodName }: Props) {
             <p className="text-sm text-gray-400 mb-6">
               No papers match the{" "}
               <span className="font-semibold text-orange-600">
-                {FILTER_CHIPS.find((c) => c.key === activeFilter)?.label}
+                {FILTER_CHIPS.find((c) => c.key === activeFilter)?.label || "selected"}
               </span>{" "}
               filter.
             </p>

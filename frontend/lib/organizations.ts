@@ -1,10 +1,28 @@
 import { getModelFacets, getModels, type ModelFacets, type ModelItem } from "@/lib/models";
-import { getPapers } from "@/lib/paperApi";
+import { fetchApi } from "@/lib/api"; // Adjust import path if needed based on your project structure
+
+export type OrganizationMetricsResponse = {
+  status: string;
+  count: number;
+  data: Array<{
+    organization: string;
+    paperCount: number;
+    citations: number;
+    stars: number;
+    trendingScore: number;
+    logo?: string;
+    logoUrl?: string;
+  }>;
+};
 
 export type OrganizationDirectoryData = {
   models: ModelItem[];
   facets: ModelFacets;
   paperCounts: Record<string, number>;
+  citations: Record<string, number>;
+  stars: Record<string, number>;
+  trendingScores: Record<string, number>;
+  logos: Record<string, string>;
 };
 
 export type OrganizationCatalogData = Pick<OrganizationDirectoryData, "models" | "facets">;
@@ -13,29 +31,25 @@ let catalogPromise: Promise<OrganizationCatalogData> | null = null;
 let directoryPromise: Promise<OrganizationDirectoryData> | null = null;
 let facetsPromise: Promise<ModelFacets> | null = null;
 
-async function mapWithConcurrency<T, R>(
-  values: T[],
-  concurrency: number,
-  worker: (value: T) => Promise<R>,
-): Promise<R[]> {
-  const results = new Array<R>(values.length);
-  let nextIndex = 0;
-
-  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, async () => {
-    while (nextIndex < values.length) {
-      const index = nextIndex++;
-      results[index] = await worker(values[index]);
-    }
-  }));
-
-  return results;
-}
+const DEFAULT_FACETS: ModelFacets = {
+  totalModels: 0,
+  vendors: [],
+  modalities: [],
+  accessTypes: [],
+  opennessTypes: [],
+  modelFamilies: [],
+  capabilities: [],
+  researchAreas: [],
+};
 
 /** The small, fast data set needed to render every organization card. */
 export function getOrganizationCatalog(): Promise<OrganizationCatalogData> {
   if (!catalogPromise) {
     catalogPromise = Promise.all([getModels(), getOrganizationFacets()])
-      .then(([models, facets]) => ({ models, facets }))
+      .then(([models, facets]) => ({
+        models: Array.isArray(models) ? models : [],
+        facets: facets || DEFAULT_FACETS,
+      }))
       .catch((error) => {
         catalogPromise = null;
         throw error;
@@ -45,47 +59,102 @@ export function getOrganizationCatalog(): Promise<OrganizationCatalogData> {
   return catalogPromise;
 }
 
-/** The compact endpoint that supplies all 60 organization names immediately. */
+/** The compact endpoint that supplies organization facets immediately. */
 export function getOrganizationFacets(): Promise<ModelFacets> {
   if (!facetsPromise) {
-    facetsPromise = getModelFacets().catch((error) => {
-      facetsPromise = null;
-      throw error;
-    });
+    facetsPromise = getModelFacets()
+      .then((facets) => facets || DEFAULT_FACETS)
+      .catch((error) => {
+        facetsPromise = null;
+        throw error;
+      });
   }
 
   return facetsPromise;
 }
 
+/** Fetches aggregated organization metrics from backend in a single batched query. */
+export async function getOrganizationMetrics(): Promise<OrganizationMetricsResponse | null> {
+  try {
+    return await fetchApi<OrganizationMetricsResponse>("/api/v1/research-papers/organization-metrics");
+  } catch {
+    // Non-critical: if endpoint is not available or fails, gracefully return null
+    return null;
+  }
+}
+
 /**
- * Warms counts and paper lists after the catalog is available. The paper
- * requests also warm paperApi's cache for organization profile pages.
+ * Warms counts and paper lists after the catalog is available.
  */
 export function getOrganizationDirectory(): Promise<OrganizationDirectoryData> {
   if (!directoryPromise) {
     directoryPromise = (async () => {
-      const [facets, models] = await Promise.all([
-        getOrganizationFacets().catch(() => ({ totalModels: 0, vendors: [], modalities: [], accessTypes: [], opennessTypes: [], modelFamilies: [], capabilities: [], researchAreas: [] })),
+      const [facets, models, metricsResponse] = await Promise.all([
+        getOrganizationFacets().catch(() => DEFAULT_FACETS),
         getModels().catch(() => []),
+        getOrganizationMetrics().catch(() => null),
       ]);
 
-      // Derive paper counts directly from models for instant, zero-latency rendering
+      const safeModels = Array.isArray(models) ? models : [];
+      const safeVendors = Array.isArray(facets?.vendors) ? facets.vendors : [];
+
       const initialCounts: Record<string, number> = {};
-      models.forEach((m) => {
-        if (m.vendor) {
-          initialCounts[m.vendor] = (initialCounts[m.vendor] || 0) + (m.paperCount || 1);
+      const initialCitations: Record<string, number> = {};
+      const initialStars: Record<string, number> = {};
+      const initialTrending: Record<string, number> = {};
+      const initialLogos: Record<string, string> = {};
+
+      // Populate metrics and logos from backend response if available
+      if (metricsResponse?.data && Array.isArray(metricsResponse.data)) {
+        metricsResponse.data.forEach((item: any) => {
+          if (item && item.organization) {
+            const key = item.organization.trim().toLowerCase();
+            initialCounts[key] = item.paperCount || 0;
+            initialCitations[key] = item.citations || 0;
+            initialStars[key] = item.stars || 0;
+            initialTrending[key] = item.trendingScore || 0;
+            if (item.logoUrl || item.logo) {
+              initialLogos[key] = item.logoUrl || item.logo;
+            }
+          }
+        });
+      }
+
+      // Derive paper counts and logos from models as fallback/supplement
+      safeModels.forEach((m: any) => {
+        if (m && typeof m.vendor === "string" && m.vendor.trim()) {
+          const key = m.vendor.trim().toLowerCase();
+          const count = typeof m.paperCount === "number" && m.paperCount > 0 ? m.paperCount : 1;
+          initialCounts[key] = (initialCounts[key] || 0) + count;
+          
+          const logo = m.vendorLogoUrl || m.vendor_logo_url || m.logoUrl;
+          if (logo && !initialLogos[key]) {
+            initialLogos[key] = logo;
+          }
         }
       });
-      facets.vendors.forEach((v) => {
-        if (!initialCounts[v.name]) {
-          initialCounts[v.name] = v.count;
+
+      safeVendors.forEach((v: any) => {
+        if (v && typeof v.name === "string" && v.name.trim()) {
+          const key = v.name.trim().toLowerCase();
+          if (!initialCounts[key]) {
+            initialCounts[key] = typeof v.count === "number" ? v.count : 0;
+          }
+          const logo = v.logoUrl || v.logo || v.vendorLogoUrl;
+          if (logo && !initialLogos[key]) {
+            initialLogos[key] = logo;
+          }
         }
       });
 
       return {
-        models,
-        facets,
+        models: safeModels,
+        facets: facets || DEFAULT_FACETS,
         paperCounts: initialCounts,
+        citations: initialCitations,
+        stars: initialStars,
+        trendingScores: initialTrending,
+        logos: initialLogos,
       };
     })().catch((error) => {
       directoryPromise = null;

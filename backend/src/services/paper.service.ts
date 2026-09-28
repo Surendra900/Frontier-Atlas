@@ -1,20 +1,16 @@
 import { PrismaClient, Prisma } from "../generated/prisma/client";
 import { QueryRouter } from "../routing/index.js";
-
-import { redisManager } from "../lib/redis.js";
-import { CursorManager } from "../pagination/CursorManager.js";
-import { SortingEngine } from "../pagination/SortingEngine.js";
 import { buildDeterministicSlug, normalizeArxivId, hashDisambiguator } from "../utils/slug.js";
 
 type GetPapersQuery = {
   sort?:
-  | "latest"
-  | "stars"
-  | "citations"
-  | "alphabetical"
-  | "ranking"
-  | "trending"
-  | string;
+    | "latest"
+    | "stars"
+    | "citations"
+    | "alphabetical"
+    | "ranking"
+    | "trending"
+    | string;
   task?: string;
   method?: string;
   model?: string;
@@ -43,7 +39,6 @@ const exposeThumbnailUrl = <T extends { thumbnailUrl?: string | null; arxivId?: 
   };
 };
 
-// Define the specific select object
 const paperSelect = {
   id: true,
   slug: true,
@@ -120,12 +115,12 @@ const paperSelect = {
     },
   },
 } satisfies Prisma.PaperSelect;
+
 const parseAuthors = (authors?: string | null) => {
   if (!authors) return [];
 
   return authors.split(",").map((name) => {
     const t = name.trim();
-
     return {
       id: t,
       name: t,
@@ -146,91 +141,15 @@ const paperSearchSelect = {
   projectUrl: true,
 } satisfies Prisma.PaperSelect;
 
-// Infer the type from the select object
-type PaperFindManyResult = Prisma.PaperGetPayload<{
-  select: typeof paperSelect;
-}>[];
-type PaperQueryResult = PaperFindManyResult;
-type PaperQueryItem = PaperFindManyResult[number];
-
-const getPaperIdentity = (paper: PaperQueryItem): string =>
-  paper.arxivId || paper.slug;
-
-const getConflictTimestamp = (paper: PaperQueryItem): number => {
-  const timestamp = paper.updatedAt ?? paper.publicationDate ?? paper.createdAt;
-  if (!timestamp) return 0;
-
-  const time =
-    timestamp instanceof Date
-      ? timestamp.getTime()
-      : new Date(timestamp).getTime();
-  return Number.isNaN(time) ? 0 : time;
-};
-
-const getCompletenessScore = (paper: PaperQueryItem): number => {
-  const fields: unknown[] = [
-    paper.abstract,
-    paper.thumbnailUrl,
-    paper.paperUrl,
-    paper.pdfUrl,
-    paper.githubUrl,
-    paper.language,
-    paper.authors?.length || 0,
-    paper.tasks.length,
-    paper.methods.length,
-    paper.sotaClaims.length,
-    paper.rankings.length,
-  ];
-
-  return fields.reduce<number>((score, value) => score + (value ? 1 : 0), 0);
-};
-
-const resolvePaperConflict = (
-  current: PaperQueryItem,
-  incoming: PaperQueryItem,
-): PaperQueryItem => {
-  const currentTimestamp = getConflictTimestamp(current);
-  const incomingTimestamp = getConflictTimestamp(incoming);
-
-  if (incomingTimestamp > currentTimestamp) return incoming;
-  if (incomingTimestamp < currentTimestamp) return current;
-
-  const currentScore = getCompletenessScore(current);
-  const incomingScore = getCompletenessScore(incoming);
-
-  if (incomingScore > currentScore) return incoming;
-  if (incomingScore < currentScore) return current;
-
-  return incoming.id.localeCompare(current.id) < 0 ? incoming : current;
-};
-
-const deduplicatePapers = (papers: PaperQueryItem[]): PaperFindManyResult => {
-  const deduplicated = new Map<string, PaperQueryItem>();
-
-  for (const paper of papers) {
-    const key = getPaperIdentity(paper);
-    const existing = deduplicated.get(key);
-    deduplicated.set(
-      key,
-      existing ? resolvePaperConflict(existing, paper) : paper,
-    );
-  }
-
-  return Array.from(deduplicated.values());
-};
-
-export const ingestPaper = async (queryRouter: QueryRouter, data: any) => {
+export const ingestPaper = async (queryRouter: QueryRouter, data: Record<string, any>) => {
   const arxivId = normalizeArxivId(data.arxiv_id || data.arxivId);
-  const baseSlug = buildDeterministicSlug(data.title);
+  const baseSlug = buildDeterministicSlug(data.title || "paper");
   const incomingUrl = data.paper_url || data.paperUrl;
 
   let initialSlug = baseSlug;
 
-  // If no arxivId, we must guarantee uniqueness against different papers with the same title.
-  // We avoid a findUnique read-before-write (which has race conditions) by ALWAYS
-  // appending a deterministic hash of the paperUrl to the slug.
   if (!arxivId) {
-    const disambiguator = hashDisambiguator(data.title, incomingUrl);
+    const disambiguator = hashDisambiguator(data.title || "", incomingUrl || "");
     initialSlug = `${baseSlug}-${disambiguator}`;
   }
 
@@ -248,8 +167,8 @@ export const ingestPaper = async (queryRouter: QueryRouter, data: any) => {
             paperUrl: incomingUrl,
             thumbnailUrl: data.thumbnail_url || data.thumbnailUrl,
             projectUrl: data.github_url || data.githubUrl,
-            githubStars: data.github_stars || data.githubStars || 0, // Added Github Stars
-            citationCount: data.citationCount || 0, // Fixed Citation Count
+            githubStars: data.github_stars || data.githubStars || 0,
+            citationCount: data.citationCount || 0,
           },
           update: {
             title: data.title,
@@ -257,8 +176,8 @@ export const ingestPaper = async (queryRouter: QueryRouter, data: any) => {
             paperUrl: incomingUrl,
             thumbnailUrl: data.thumbnail_url || data.thumbnailUrl,
             projectUrl: data.github_url || data.githubUrl,
-            githubStars: data.github_stars || data.githubStars || 0, // Added Github Stars
-            citationCount: data.citationCount || 0, // Fixed Citation Count
+            githubStars: data.github_stars || data.githubStars || 0,
+            citationCount: data.citationCount || 0,
           },
         });
       };
@@ -266,8 +185,6 @@ export const ingestPaper = async (queryRouter: QueryRouter, data: any) => {
       try {
         return await attemptUpsert(initialSlug);
       } catch (error: any) {
-        // P2002 is Prisma's Unique Constraint Violation
-        // This is a defensive fallback only (e.g. arxivId is present but baseSlug collides)
         const isSlugCollision =
           error.code === "P2002" &&
           error.meta?.target &&
@@ -278,18 +195,16 @@ export const ingestPaper = async (queryRouter: QueryRouter, data: any) => {
         if (isSlugCollision) {
           let disambiguator = "";
           if (arxivId) {
-            // Append last 6 chars of arxivId
             disambiguator = arxivId.slice(-6).replace(/[^a-z0-9]/gi, "");
           } else {
-            // Defensive fallback if the title+paperUrl hash STILL magically collides
-            disambiguator = hashDisambiguator(data.title, incomingUrl, "1");
+            disambiguator = hashDisambiguator(data.title || "", incomingUrl || "", "1");
           }
 
           const fallbackSlug = `${baseSlug}-${disambiguator}`;
-          return await attemptUpsert(fallbackSlug); // 2nd attempt, will throw if it fails
+          return await attemptUpsert(fallbackSlug);
         }
 
-        throw error; // Re-throw if it's not a slug collision
+        throw error;
       }
     },
   );
@@ -301,14 +216,14 @@ export const getPapers = async (
   queryRouter: QueryRouter,
   queryOrLimit: GetPapersQuery | number = {},
   legacySkip: number = 0,
-): Promise<any> => {
+): Promise<{ papers: any[]; total: number; page: number; hasMore: boolean; nextCursor: null }> => {
   const query: GetPapersQuery =
     typeof queryOrLimit === "number"
       ? {
-        limit: queryOrLimit,
-        skip: legacySkip,
-        page: Math.floor(legacySkip / queryOrLimit) + 1,
-      }
+          limit: queryOrLimit,
+          skip: legacySkip,
+          page: Math.floor(legacySkip / queryOrLimit) + 1,
+        }
       : queryOrLimit;
 
   const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
@@ -317,18 +232,43 @@ export const getPapers = async (
   const sort = query.sort || "trending";
   const period = query.period || "all";
 
-  const where: any = {};
+  const where: Prisma.PaperWhereInput = {};
 
   if (query.task) where.tasks = { some: { task: { slug: query.task } } };
-  if (query.method)
-    where.methods = { some: { method: { slug: query.method } } };
+  if (query.method) where.methods = { some: { method: { slug: query.method } } };
   if (query.model) where.models = { some: { model: { slug: query.model } } };
   if (query.organization) {
+    const orgName = query.organization.trim();
     where.OR = [
-      { organization: { equals: query.organization, mode: "insensitive" } },
-      { models: { some: { model: { vendor: { equals: query.organization, mode: "insensitive" } } } } },
+      { organization: { equals: orgName, mode: "insensitive" } },
+      { models: { some: { model: { vendor: { equals: orgName, mode: "insensitive" } } } } },
     ];
   }
+
+  // Enforce papers must have at least one task/method
+  // Only enforce sotaClaim/ranking on the general feed to avoid flooding
+  const mandatoryConditions: any[] = [
+    {
+      OR: [
+        { tasks: { some: {} } },
+        { methods: { some: {} } }
+      ]
+    }
+  ];
+
+  if (!query.task && !query.method && !query.model && !query.organization) {
+    mandatoryConditions.push({
+      OR: [
+        { sotaClaims: { some: {} } },
+        { rankings: { some: {} } }
+      ]
+    });
+  }
+
+  where.AND = [
+    ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
+    ...mandatoryConditions
+  ];
 
   let baseDate = new Date();
   if (period !== "all") {
@@ -345,7 +285,7 @@ export const getPapers = async (
       });
       const now = new Date();
       const rawDate = latestPaper?.publicationDate ? new Date(latestPaper.publicationDate) : now;
-      latestDbDate = (rawDate.getTime() > 0 && rawDate.getTime() <= now.getTime()) ? rawDate : now;
+      latestDbDate = rawDate.getTime() > 0 && rawDate.getTime() <= now.getTime() ? rawDate : now;
       cachedLatestPaperDate = { date: latestDbDate, timestamp: Date.now() };
     }
     baseDate = latestDbDate;
@@ -353,7 +293,6 @@ export const getPapers = async (
     const publicationCutoff = new Date(baseDate);
 
     if (period === "today") {
-      // 48-hour window from latest paper date to cover arXiv weekend release gaps and timezones
       publicationCutoff.setDate(publicationCutoff.getDate() - 2);
     } else if (period === "week") {
       publicationCutoff.setDate(publicationCutoff.getDate() - 7);
@@ -370,45 +309,23 @@ export const getPapers = async (
     where.publicationDate = { not: null };
   }
 
-  const orderBy =
+  const orderBy: Prisma.PaperOrderByWithRelationInput[] =
     sort === "latest" || sort === "recent"
-      ? [
-        { publicationDate: "desc" as const },
-        { githubStars: "desc" as const },
-        { slug: "asc" as const },
-      ]
+      ? [{ publicationDate: "desc" }, { githubStars: "desc" }, { slug: "asc" }]
       : sort === "citations"
-        ? [
-          { citationCount: "desc" as const },
-          { githubStars: "desc" as const },
-          { publicationDate: "desc" as const },
-          { slug: "asc" as const },
-        ]
-        : sort === "trending" || sort === "popular" || sort === "stars"
-          ? [
-            { githubStars: "desc" as const },
-            { citationCount: "desc" as const },
-            { publicationDate: "desc" as const },
-            { slug: "asc" as const },
-          ]
-          : sort === "alphabetical"
-            ? [
-              { title: "asc" as const },
-              { slug: "asc" as const }
-            ]
-            : [
-              // Failsafe Default (Popularity oriented)
-              { githubStars: "desc" as const },
-              { citationCount: "desc" as const },
-              { publicationDate: "desc" as const },
-              { slug: "asc" as const },
-            ];
-  let papers = await queryRouter.routeQuery<any>(
+      ? [{ citationCount: "desc" }, { githubStars: "desc" }, { publicationDate: "desc" }, { slug: "asc" }]
+      : sort === "trending" || sort === "popular" || sort === "stars"
+      ? [{ githubStars: "desc" }, { citationCount: "desc" }, { publicationDate: "desc" }, { slug: "asc" }]
+      : sort === "alphabetical"
+      ? [{ title: "asc" }, { slug: "asc" }]
+      : [{ githubStars: "desc" }, { citationCount: "desc" }, { publicationDate: "desc" }, { slug: "asc" }];
+
+  let papers = await queryRouter.routeQuery<any[]>(
     async (prisma: PrismaClient) => {
       return prisma.paper.findMany({
         where,
         orderBy,
-        take: limit + 1, // Fetch one extra to determine hasMore
+        take: limit + 1,
         skip,
         select: paperSelect,
       });
@@ -416,21 +333,18 @@ export const getPapers = async (
   );
 
   let activeWhere = where;
-  // ADDED: Cascading fallback to guarantee papers are always shown while keeping new papers (2026) first
-  if (papers.length === 0 && skip === 0) {
+  if ((!papers || papers.length === 0) && skip === 0) {
     if (period !== "all") {
-      // Fallback 1: Expand date window progressively while preserving date filter
       const fallbackCutoff = new Date(baseDate);
       const lookbackDays = period === "today" ? 7 : period === "week" ? 30 : 90;
       fallbackCutoff.setDate(fallbackCutoff.getDate() - lookbackDays);
 
       activeWhere = { ...where, publicationDate: { gte: fallbackCutoff } };
     } else {
-      // Fallback for period === "all"
       activeWhere = { ...where, publicationDate: { not: null } };
     }
 
-    papers = await queryRouter.routeQuery<any>(
+    papers = await queryRouter.routeQuery<any[]>(
       async (prisma: PrismaClient) => {
         return prisma.paper.findMany({
           where: activeWhere,
@@ -443,8 +357,9 @@ export const getPapers = async (
     );
   }
 
-  const hasMore = papers.length > limit;
-  const pagePapers = hasMore ? papers.slice(0, limit) : papers;
+  const safePapers = Array.isArray(papers) ? papers : [];
+  const hasMore = safePapers.length > limit;
+  const pagePapers = hasMore ? safePapers.slice(0, limit) : safePapers;
 
   const totalCount = await queryRouter.routeQuery<number>(
     async (prisma: PrismaClient) => {
@@ -453,29 +368,26 @@ export const getPapers = async (
   ).catch(() => (hasMore ? skip + limit + 1 : skip + pagePapers.length));
 
   return {
-    papers: pagePapers.map((paper: any) => ({
+    papers: pagePapers.map((paper) => ({
       ...exposeThumbnailUrl(paper),
-      repositories: paper.repositories.map(
-        ({ repository }: any) => repository
-      ),
-
+      repositories: Array.isArray(paper.repositories)
+        ? paper.repositories.map(({ repository }: any) => repository)
+        : [],
       authors: parseAuthors(paper.authors),
-      tasks: paper.tasks.map(({ task }: any) => task),
-      methods: paper.methods.map(({ method }: any) => method),
-
+      tasks: Array.isArray(paper.tasks) ? paper.tasks.map(({ task }: any) => task) : [],
+      methods: Array.isArray(paper.methods) ? paper.methods.map(({ method }: any) => method) : [],
     })),
     total: typeof totalCount === "number" && totalCount > 0 ? totalCount : (hasMore ? skip + limit + 1 : skip + pagePapers.length),
     page,
     hasMore,
-    nextCursor: null, // Legacy cursor unused now
+    nextCursor: null,
   };
 };
 
-export const getPaperBySlug = async (
-  queryRouter: QueryRouter,
-  slug: string,
-) => {
-  const paper = await queryRouter.routeQuery(
+export const getPaperBySlug = async (queryRouter: QueryRouter, slug: string) => {
+  if (!slug) return null;
+
+  return queryRouter.routeQuery(
     async (prisma: PrismaClient) => {
       const paperData = await prisma.paper.findUnique({
         where: { slug },
@@ -593,35 +505,38 @@ export const getPaperBySlug = async (
           : null;
       }
 
-      // Use data already fetched by findUnique — no extra DB queries needed
       return {
         ...paperData,
         thumbnailUrl: resolvedThumb,
         thumbnail_url: resolvedThumb,
         authors: parseAuthors(paperData.authors),
-        models: paperData.models.map((r: any) => ({
-          role: r.role,
-          model: r.model,
-        })),
-        datasets: paperData.datasets.map((r: any) => r.dataset),
-        tasks: paperData.tasks.map((r: any) => r.task),
-        methods: paperData.methods.map((r: any) => r.method),
-        conferences: paperData.conferences.map((r: any) => r.conference),
-        rankings: paperData.rankings,
-        sotaClaims: paperData.sotaClaims,
-        repositories: (paperData as any).repositories?.map((r: any) => r.repository) || [],
+        models: Array.isArray(paperData.models)
+          ? paperData.models.map((r: any) => ({ role: r.role, model: r.model }))
+          : [],
+        datasets: Array.isArray(paperData.datasets)
+          ? paperData.datasets.map((r: any) => r.dataset)
+          : [],
+        tasks: Array.isArray(paperData.tasks)
+          ? paperData.tasks.map((r: any) => r.task)
+          : [],
+        methods: Array.isArray(paperData.methods)
+          ? paperData.methods.map((r: any) => r.method)
+          : [],
+        conferences: Array.isArray(paperData.conferences)
+          ? paperData.conferences.map((r: any) => r.conference)
+          : [],
+        rankings: paperData.rankings || [],
+        sotaClaims: paperData.sotaClaims || [],
+        repositories: Array.isArray(paperData.repositories)
+          ? paperData.repositories.map((r: any) => r.repository)
+          : [],
       };
     },
   );
-
-  return paper;
 };
 
-
-export const getPaperById = async (
-  queryRouter: QueryRouter,
-  id: string,
-) => {
+export const getPaperById = async (queryRouter: QueryRouter, id: string) => {
+  if (!id) return null;
   const paper = await queryRouter.routeQuery(async (prisma: PrismaClient) => {
     return prisma.paper.findUnique({
       where: { id },
@@ -634,8 +549,9 @@ export const getPaperById = async (
 export const updatePaper = async (
   queryRouter: QueryRouter,
   slug: string,
-  data: any,
+  data: Record<string, any>,
 ) => {
+  if (!slug) return null;
   const paper = await queryRouter.routeQuery(
     async (prisma: PrismaClient) => {
       const { thumbnail_url, ...rest } = data;
@@ -643,9 +559,7 @@ export const updatePaper = async (
         where: { slug },
         data: {
           ...rest,
-          ...(thumbnail_url !== undefined
-            ? { thumbnailUrl: thumbnail_url }
-            : {}),
+          ...(thumbnail_url !== undefined ? { thumbnailUrl: thumbnail_url } : {}),
         },
       });
     },
@@ -655,6 +569,7 @@ export const updatePaper = async (
 };
 
 export const deletePaper = async (queryRouter: QueryRouter, slug: string) => {
+  if (!slug) return null;
   return queryRouter.routeQuery(
     async (prisma: PrismaClient) => {
       return prisma.paper.delete({
@@ -678,13 +593,12 @@ export const searchPapers = async (
   const skip = (page - 1) * limit;
   const sort = query.sort || "relevance";
 
-  const papers = await queryRouter.routeQuery(
+  const papers = await queryRouter.routeQuery<any[]>(
     async (prisma: PrismaClient) => {
       return prisma.paper.findMany({
         where: {
           OR: [
             { title: { contains: searchTerm, mode: "insensitive" } },
-
           ],
         },
         orderBy:
@@ -697,22 +611,82 @@ export const searchPapers = async (
       });
     },
   );
-  console.log(JSON.stringify(papers[0], null, 2));
 
-
-
-
-
+  const safePapers = Array.isArray(papers) ? papers : [];
 
   return {
-    papers: papers.map((paper: any) => ({
+    papers: safePapers.map((paper) => ({
       ...exposeThumbnailUrl(paper),
+      repositories: paper.repositories?.map(
+        ({ repository }: any) => repository
+      ) || [],
       authors: parseAuthors(paper.authors),
-
     })),
-    total: papers.length,
+    total: safePapers.length,
     page,
-    hasMore: papers.length >= limit,
+    hasMore: safePapers.length >= limit,
     query: searchTerm,
   };
 };
+/**
+ * Retrieves aggregated organization metrics (paper counts, citations, stars, trending scores).
+ */
+export async function getOrganizationMetrics(queryRouter: QueryRouter, organization?: string) {
+  return queryRouter.routeQuery(async (prisma: PrismaClient) => {
+    // Fetch all papers with their associated models and vendors to aggregate metrics
+    const papers = await prisma.paper.findMany({
+      select: {
+        citationCount: true,
+        githubStars: true,
+        github_hourly_increase: true,
+        models: {
+          select: {
+            model: {
+              select: {
+                vendor: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const metricsMap = new Map<string, { paperCount: number; citations: number; stars: number; trendingScore: number }>();
+
+    papers.forEach((paper) => {
+      const vendors = new Set<string>();
+      paper.models?.forEach((m) => {
+        if (m?.model?.vendor && typeof m.model.vendor === "string") {
+          const v = m.model.vendor.trim();
+          if (v) vendors.add(v);
+        }
+      });
+
+      vendors.forEach((vendor) => {
+        const key = vendor.toLowerCase();
+        const current = metricsMap.get(key) || { paperCount: 0, citations: 0, stars: 0, trendingScore: 0 };
+        
+        current.paperCount += 1;
+        current.citations += Number(paper.citationCount || 0);
+        current.stars += Number(paper.githubStars || 0);
+        current.trendingScore += Number(paper.github_hourly_increase || 0);
+        
+        metricsMap.set(key, current);
+      });
+    });
+
+    const data = Array.from(metricsMap.entries()).map(([orgKey, stats]) => ({
+      organization: orgKey,
+      paperCount: stats.paperCount,
+      citations: stats.citations,
+      stars: stats.stars,
+      trendingScore: stats.trendingScore,
+    }));
+
+    return {
+      status: "success",
+      count: data.length,
+      data,
+    };
+  });
+}

@@ -1,7 +1,8 @@
 import { fetchApi } from './api';
 import { getPapers } from './paperApi';
 
-export interface BackendModelItem {
+// Base interface to eliminate duplicate field definitions
+export interface BaseModel {
   id: string;
   name: string;
   slug: string;
@@ -21,8 +22,6 @@ export interface BackendModelItem {
   architecture: string | null;
   contextWindow: string | null;
   license: string | null;
-  modelVersions: string[] | null;
-  releaseNotes: string | null;
   paperUrl: string | null;
   repositoryUrl: string | null;
   apiUrl: string | null;
@@ -33,11 +32,24 @@ export interface BackendModelItem {
   trendingScore: number;
 }
 
+export interface BackendModelItem extends BaseModel {
+  modelVersions: string[] | null;
+  releaseNotes: string | null;
+}
+
 export interface ModelTask {
   id: string;
   name: string;
   slug: string;
   color: string | null;
+}
+
+export interface ModelPaper {
+  id: string;
+  title: string;
+  slug: string;
+  citationCount: number;
+  githubStars: number;
 }
 
 export interface BackendModelDetail extends BackendModelItem {
@@ -49,76 +61,14 @@ export interface BackendModelDetail extends BackendModelItem {
   relatedModels: { id: string; name: string; slug: string; paperCount: number }[];
 }
 
-export interface ModelPaper {
-  id: string;
-  title: string;
-  slug: string;
-  citationCount: number;
-  githubStars: number;
-}
-
-export interface ModelItem {
-  id: string;
-  name: string;
-  slug: string;
-  vendor: string;
-  vendorLogoUrl?: string;
-  releaseDate: string | null;
-  parameterCount: string | null;
-  modality: string | null;
-  accessType: string | null;
-  opennessType: string | null;
-  description: string | null;
-  benchmarkScore: Record<string, number> | null;
-  modelFamily: string | null;
-  category: string | null;
-  capabilities: string[] | null;
-  researchAreas: string[] | null;
-  architecture: string | null;
-  contextWindow: string | null;
-  license: string | null;
-  paperUrl: string | null;
-repositoryUrl: string | null;
-apiUrl: string | null;
-  createdAt: string;
-  paperCount: number;
-  citationCount: number;
-  githubStars: number;
-  trendingScore: number;
+export interface ModelItem extends BaseModel {
   latestPaperDate: string | null;
   latestPaperTitle: string | null;
   latestPaperSlug: string | null;
   tasks: ModelTask[];
 }
 
-export interface ModelDetail {
-  id: string;
-  name: string;
-  slug: string;
-  vendor: string;
-  vendorLogoUrl?: string;
-  releaseDate: string | null;
-  parameterCount: string | null;
-  modality: string | null;
-  accessType: string | null;
-  opennessType: string | null;
-  description: string | null;
-  benchmarkScore: Record<string, number> | null;
-  modelFamily: string | null;
-  category: string | null;
-  capabilities: string[] | null;
-  researchAreas: string[] | null;
-  architecture: string | null;
-  contextWindow: string | null;
-  license: string | null;
-  paperUrl: string | null;
-repositoryUrl: string | null;
-apiUrl: string | null;
-  createdAt: string;
-  paperCount: number;
-  citationCount: number;
-  githubStars: number;
-  trendingScore: number;
+export interface ModelDetail extends BaseModel {
   papers: ModelPaper[];
   tasks: ModelTask[];
 }
@@ -155,13 +105,21 @@ interface GetFacetsResponse {
   data: ModelFacets;
 }
 
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
+
+const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const modelsCache = new Map<string, CacheEntry<unknown>>();
+
 function mapModelItem(m: BackendModelItem): ModelItem {
   return {
     id: m.id,
     name: m.name,
     slug: m.slug,
     vendor: m.vendor,
-    vendorLogoUrl: m.vendorLogoUrl,
+    vendorLogoUrl: m.vendorLogoUrl || (m as unknown as { vendor_logo_url?: string }).vendor_logo_url,
     releaseDate: m.releaseDate,
     parameterCount: m.parameterCount,
     modality: m.modality,
@@ -177,8 +135,8 @@ function mapModelItem(m: BackendModelItem): ModelItem {
     contextWindow: m.contextWindow,
     license: m.license,
     paperUrl: m.paperUrl,
-repositoryUrl: m.repositoryUrl,
-apiUrl: m.apiUrl,
+    repositoryUrl: m.repositoryUrl,
+    apiUrl: m.apiUrl,
     createdAt: m.createdAt,
     paperCount: m.paperCount,
     citationCount: m.citationCount,
@@ -191,44 +149,59 @@ apiUrl: m.apiUrl,
   };
 }
 
-const modelsCache = new Map<string, any>();
-
 function getCached<T>(key: string): T | null {
-  if (modelsCache.has(key)) return modelsCache.get(key) as T;
+  const now = Date.now();
+
+  // 1. Check in-memory cache with TTL validation
+  if (modelsCache.has(key)) {
+    const entry = modelsCache.get(key) as CacheEntry<T>;
+    if (now - entry.timestamp < CACHE_TTL_MS) {
+      return entry.data;
+    }
+    modelsCache.delete(key);
+  }
+
+  // 2. Fall back to localStorage if in browser environment
   if (typeof window !== 'undefined') {
     try {
-      const cached = localStorage.getItem(`atlas_cache_${key}`);
+      const storageKey = `atlas_cache_${key}`;
+      const cached = localStorage.getItem(storageKey);
       if (cached) {
-        const { data, timestamp } = JSON.parse(cached);
-        if (Date.now() - timestamp < 15 * 60 * 1000) { // 15 min TTL
-          modelsCache.set(key, data);
-          return data as T;
+        const entry: CacheEntry<T> = JSON.parse(cached);
+        if (now - entry.timestamp < CACHE_TTL_MS) {
+          modelsCache.set(key, entry);
+          return entry.data;
         }
+        localStorage.removeItem(storageKey);
       }
-    } catch(e) {}
+    } catch {
+      // In case of invalid JSON or restricted storage access
+    }
   }
   return null;
 }
 
-function setCached(key: string, data: any) {
-  modelsCache.set(key, data);
+function setCached<T>(key: string, data: T): void {
+  const entry: CacheEntry<T> = { data, timestamp: Date.now() };
+  modelsCache.set(key, entry as CacheEntry<unknown>);
+
   if (typeof window !== 'undefined') {
     try {
-      localStorage.setItem(`atlas_cache_${key}`, JSON.stringify({
-        data,
-        timestamp: Date.now()
-      }));
-    } catch(e) {}
+      localStorage.setItem(`atlas_cache_${key}`, JSON.stringify(entry));
+    } catch {
+      // Handle potential quota errors gracefully
+    }
   }
 }
 
-export function saveCachedModelDetail(slug: string, detail: ModelDetail) {
+export function saveCachedModelDetail(slug: string, detail: ModelDetail): void {
   const cleanSlug = slug.toLowerCase().trim();
   setCached(`model_detail_${cleanSlug}`, detail);
 }
 
 export function getCachedModelBySlug(slug: string): ModelDetail | null {
   const cleanSlug = slug.toLowerCase().trim();
+
   // 1. Check direct detail cache
   const cachedDetail = getCached<ModelDetail>(`model_detail_${cleanSlug}`);
   if (cachedDetail) return cachedDetail;
@@ -275,7 +248,7 @@ export function getCachedModelBySlug(slug: string): ModelDetail | null {
   return null;
 }
 
-export async function getModels(params?: string | Record<string, any>): Promise<ModelItem[]> {
+export async function getModels(params?: string | Record<string, unknown>): Promise<ModelItem[]> {
   let queryString = '?limit=10000';
   if (typeof params === 'string') {
     queryString = params.startsWith('?') ? params : `?${params}`;
@@ -288,14 +261,14 @@ export async function getModels(params?: string | Record<string, any>): Promise<
   }
 
   const cacheKey = `models_${queryString}`;
-  
   const cached = getCached<ModelItem[]>(cacheKey);
   if (cached) return cached;
 
   const response = await fetchApi<GetModelsResponse>(`/api/v1/models${queryString}`);
+  // console.log(response)
   const items = Array.isArray(response?.data) ? response.data : [];
   const result = items.map(mapModelItem);
-  
+
   setCached(cacheKey, result);
   return result;
 }
@@ -306,7 +279,7 @@ export async function getTrendingModels(limit = 20): Promise<ModelItem[]> {
 
 export async function getModelFacets(): Promise<ModelFacets> {
   const cacheKey = 'models_facets';
-  
+
   const cached = getCached<ModelFacets>(cacheKey);
   if (cached) return cached;
 
@@ -331,11 +304,11 @@ export function getCachedModelFacets(): ModelFacets | null {
 export async function getModelBySlug(slug: string): Promise<ModelDetail> {
   const cleanSlug = slug.toLowerCase().trim();
   const cached = getCachedModelBySlug(cleanSlug);
-  
-  // Make API call to fetch full fresh data with benchmarks & papers
+
   try {
     const response = await fetchApi<GetModelBySlugResponse>(`/api/v1/models/${encodeURIComponent(cleanSlug)}`);
     const data = response.data;
+
     const detail: ModelDetail = {
       id: data.id,
       name: data.name,
@@ -364,9 +337,12 @@ export async function getModelBySlug(slug: string): Promise<ModelDetail> {
       citationCount: data.citationCount,
       githubStars: data.githubStars,
       trendingScore: data.trendingScore,
-      papers: (data.papers ?? []).map((item: any) => item?.paper || item).filter(Boolean),
+      papers: (data.papers ?? [])
+        .map((item) => item?.paper || item)
+        .filter((paper): paper is ModelPaper => Boolean(paper && paper.id && paper.title)),
       tasks: data.tasks ?? [],
     };
+
     saveCachedModelDetail(cleanSlug, detail);
     return detail;
   } catch (err) {
@@ -375,25 +351,25 @@ export async function getModelBySlug(slug: string): Promise<ModelDetail> {
   }
 }
 
-export function prefetchModelBySlug(slug: string) {
-  if (typeof window === "undefined" || !slug) return;
+export function prefetchModelBySlug(slug: string): void {
+  if (typeof window === 'undefined' || !slug) return;
 
   const cleanSlug = slug.toLowerCase().trim();
 
   if (!modelsCache.has(`model_detail_${cleanSlug}`)) {
-    getModelBySlug(cleanSlug).catch(() => {});
+    getModelBySlug(cleanSlug).catch(() => { });
   }
 
   getPapers({
     page: 1,
     model: cleanSlug,
-    sort: "popular",
-    period: "all",
-  }).catch(() => {});
+    sort: 'popular',
+    period: 'all',
+  }).catch(() => { });
 }
 
-if (typeof window !== "undefined") {
-  const prefetchModels = async () => {
+if (typeof window !== 'undefined') {
+  const prefetchModels = async (): Promise<void> => {
     try {
       await Promise.all([
         getModels(),
@@ -401,11 +377,13 @@ if (typeof window !== "undefined") {
         getTrendingModels(15),
       ]);
     } catch (e) {
-      console.warn("Pre-warming models cache failed:", e);
+      console.warn('Pre-warming models cache failed:', e);
     }
   };
-  if ("requestIdleCallback" in window) {
-    (window as any).requestIdleCallback(() => setTimeout(prefetchModels, 100));
+
+  const win = window as unknown as { requestIdleCallback?: (cb: () => void) => void };
+  if (typeof win.requestIdleCallback === 'function') {
+    win.requestIdleCallback(() => setTimeout(prefetchModels, 100));
   } else {
     setTimeout(prefetchModels, 500);
   }
