@@ -10,6 +10,8 @@ export type OrganizationMetricsResponse = {
     citations: number;
     stars: number;
     trendingScore: number;
+    logo?: string;
+    logoUrl?: string;
   }>;
 };
 
@@ -20,6 +22,7 @@ export type OrganizationDirectoryData = {
   citations: Record<string, number>;
   stars: Record<string, number>;
   trendingScores: Record<string, number>;
+  logos: Record<string, string>;
 };
 
 export type OrganizationCatalogData = Pick<OrganizationDirectoryData, "models" | "facets">;
@@ -99,34 +102,47 @@ export function getOrganizationDirectory(): Promise<OrganizationDirectoryData> {
       const initialCitations: Record<string, number> = {};
       const initialStars: Record<string, number> = {};
       const initialTrending: Record<string, number> = {};
+      const initialLogos: Record<string, string> = {};
 
-      // Populate metrics from backend response if available
+      // Populate metrics and logos from backend response if available
       if (metricsResponse?.data && Array.isArray(metricsResponse.data)) {
-        metricsResponse.data.forEach((item) => {
+        metricsResponse.data.forEach((item: any) => {
           if (item && item.organization) {
             const key = item.organization.trim().toLowerCase();
             initialCounts[key] = item.paperCount || 0;
             initialCitations[key] = item.citations || 0;
             initialStars[key] = item.stars || 0;
             initialTrending[key] = item.trendingScore || 0;
+            if (item.logoUrl || item.logo) {
+              initialLogos[key] = item.logoUrl || item.logo;
+            }
           }
         });
       }
 
-      // Derive paper counts from models as fallback/supplement
-      safeModels.forEach((m) => {
+      // Derive paper counts and logos from models as fallback/supplement
+      safeModels.forEach((m: any) => {
         if (m && typeof m.vendor === "string" && m.vendor.trim()) {
           const key = m.vendor.trim().toLowerCase();
           const count = typeof m.paperCount === "number" && m.paperCount > 0 ? m.paperCount : 1;
           initialCounts[key] = (initialCounts[key] || 0) + count;
+          
+          const logo = m.vendorLogoUrl || m.vendor_logo_url || m.logoUrl;
+          if (logo && !initialLogos[key]) {
+            initialLogos[key] = logo;
+          }
         }
       });
 
-      safeVendors.forEach((v) => {
+      safeVendors.forEach((v: any) => {
         if (v && typeof v.name === "string" && v.name.trim()) {
           const key = v.name.trim().toLowerCase();
           if (!initialCounts[key]) {
             initialCounts[key] = typeof v.count === "number" ? v.count : 0;
+          }
+          const logo = v.logoUrl || v.logo || v.vendorLogoUrl;
+          if (logo && !initialLogos[key]) {
+            initialLogos[key] = logo;
           }
         }
       });
@@ -138,6 +154,7 @@ export function getOrganizationDirectory(): Promise<OrganizationDirectoryData> {
         citations: initialCitations,
         stars: initialStars,
         trendingScores: initialTrending,
+        logos: initialLogos,
       };
     })().catch((error) => {
       directoryPromise = null;

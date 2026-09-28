@@ -54,10 +54,8 @@ function OrganizationCard({
   featuredModel?: ModelItem;
   paperCount: number;
 }) {
-  const [imageError, setImageError] = useState(false);
   const targetSlug = organizationSlug(name);
   const href = targetSlug ? `/organizations/${encodeURIComponent(targetSlug)}` : "/organizations";
-  const initial = name ? name.trim().charAt(0).toUpperCase() : "O";
 
   return (
     <Link
@@ -66,18 +64,7 @@ function OrganizationCard({
     >
       <div className="flex items-start gap-2.5 border-b border-[#EEECE6] bg-[#FBFAF7] p-3">
         <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-[#E2DED5] bg-gradient-to-br from-white to-[#FFF8F4] p-1.5 shadow-[0_2px_5px_rgba(24,24,20,0.07)] ring-1 ring-white transition-all duration-200 group-hover:scale-105 group-hover:border-[#FFB098] group-hover:shadow-[0_4px_10px_rgba(255,90,31,0.14)]">
-          {logo && !imageError ? (
-            <img
-              src={logo}
-              alt={`${name} logo`}
-              className="h-full w-full object-contain"
-              onError={() => setImageError(true)}
-            />
-          ) : (
-            <span className="text-lg font-bold uppercase text-[#FF5A1F] select-none">
-              {initial}
-            </span>
-          )}
+          <OrganizationLogo logo={logo} name={name} className="h-full w-full object-contain" iconSize={22} />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
@@ -113,6 +100,7 @@ export default function OrganizationsPage() {
   const [citations, setCitations] = useState<Record<string, number>>({});
   const [stars, setStars] = useState<Record<string, number>>({});
   const [trendingScores, setTrendingScores] = useState<Record<string, number>>({});
+  const [logos, setLogos] = useState<Record<string, string>>({});
   const [sort, setSort] = useState<SortMode>("trending");
   const [loading, setLoading] = useState(() => !(getCachedModels() && getCachedModelFacets()));
   const [isMounted, setIsMounted] = useState(false);
@@ -138,6 +126,7 @@ export default function OrganizationsPage() {
         setCitations(directory?.citations || {});
         setStars(directory?.stars || {});
         setTrendingScores(directory?.trendingScores || {});
+        setLogos(directory?.logos || {});
       })
       .catch((error) => console.error("Unable to load organizations", error))
       .finally(() => {
@@ -193,9 +182,12 @@ export default function OrganizationsPage() {
           return scoreB - scoreA;
         });
 
+        // Safely extract logo from models fallback
+        const modelFallbackLogo = organizationModels.find((m: any) => m && (m.vendorLogoUrl || m.vendor_logo_url || m.logoUrl)) as any;
+
         return {
           ...organization,
-          logo: undefined,
+          logo: logos[key] || logos[organization.name] || modelFallbackLogo?.vendorLogoUrl || modelFallbackLogo?.vendor_logo_url || modelFallbackLogo?.logoUrl,
           featuredModel: sortedByTrending[0],
           paperCount: paperCounts[key] ?? paperCounts[organization.name] ?? organization.count,
           citations: citations[key] ?? citations[organization.name] ?? 0,
@@ -233,7 +225,7 @@ export default function OrganizationsPage() {
           a.name.localeCompare(b.name)
         );
       });
-  }, [facets?.vendors, models, paperCounts, citations, stars, trendingScores, sort]);
+  }, [facets?.vendors, models, paperCounts, citations, stars, trendingScores, logos, sort]);
 
   const orgCount = isMounted ? (facets?.vendors?.length ?? organizations.length) : "...";
 
