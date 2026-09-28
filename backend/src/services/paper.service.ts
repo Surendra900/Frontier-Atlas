@@ -245,21 +245,29 @@ export const getPapers = async (
     ];
   }
 
-  // Enforce papers must have at least one task/method AND at least one sotaClaim/ranking
-  where.AND = [
-    ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
-    {
-      OR: [
-        { sotaClaims: { some: {} } },
-        { rankings: { some: {} } }
-      ]
-    },
+  // Enforce papers must have at least one task/method
+  // Only enforce sotaClaim/ranking on the general feed to avoid flooding
+  const mandatoryConditions: any[] = [
     {
       OR: [
         { tasks: { some: {} } },
         { methods: { some: {} } }
       ]
     }
+  ];
+
+  if (!query.task && !query.method && !query.model && !query.organization) {
+    mandatoryConditions.push({
+      OR: [
+        { sotaClaims: { some: {} } },
+        { rankings: { some: {} } }
+      ]
+    });
+  }
+
+  where.AND = [
+    ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
+    ...mandatoryConditions
   ];
 
   let baseDate = new Date();
