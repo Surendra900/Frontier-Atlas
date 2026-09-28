@@ -13,7 +13,7 @@ import { prefetchMethods } from "@/lib/methodCache";
 export default function HomeContent({
   initialPapers,
   initialError,
-  initialPeriod = "Today",
+  initialPeriod = "All time",
 }: {
   initialPapers: GetPapersResult | null;
   initialError?: string;
@@ -24,13 +24,10 @@ export default function HomeContent({
   );
 
   const [activeSort, setActiveSort] =
-    useState<string>("Trending Papers");
+    useState<string>("");
 
   const [selectedPeriod, setSelectedPeriod] =
     useState<string>(initialPeriod);
-
-  const [isFilterChanging, setIsFilterChanging] =
-    useState(false);
 
   // ---------------------------------------------------------------------------
   // Prefetch commonly used paper views
@@ -66,15 +63,9 @@ export default function HomeContent({
       label === "Latest Papers" ||
       label === "Most GitHub Stars"
     ) {
-      setIsFilterChanging(true);
       setActiveSort(label);
-      if (label === "Latest Papers") {
-        setSelectedPeriod("Today");
-      } else if (label === "Most GitHub Stars") {
-        setSelectedPeriod("All time");
-      } else if (label === "Trending Papers") {
-        setSelectedPeriod("All time");
-      }
+      // Discover options should always show All time
+      setSelectedPeriod("All time");
     }
   };
 
@@ -83,7 +74,6 @@ export default function HomeContent({
   // ---------------------------------------------------------------------------
 
   const handlePeriodSelect = (period: string) => {
-    setIsFilterChanging(true);
     setSelectedPeriod(period);
   };
 
@@ -97,7 +87,6 @@ export default function HomeContent({
       | undefined
       | ((prev: string | undefined) => string | undefined)
   ) => {
-    setIsFilterChanging(true);
     setSelectedTag(tag);
   };
 
@@ -106,7 +95,7 @@ export default function HomeContent({
   // ---------------------------------------------------------------------------
 
   const apiPeriod =
-    selectedPeriod === "Today"
+    selectedPeriod === "Latest"
       ? "today"
       : selectedPeriod === "This Week"
         ? "week"
@@ -149,15 +138,10 @@ export default function HomeContent({
   }
 
   // ---------------------------------------------------------------------------
-  // IMPORTANT:
+  // Homepage
   //
-  // Do NOT use:
-  //   h-screen
-  //   overflow-hidden
-  //   overflow-y-auto
-  //   flex-1 scrolling container
-  //
-  // The entire homepage must use the browser's normal document scroll.
+  // The homepage uses normal browser document scrolling.
+  // Do NOT add h-screen, overflow-hidden, or an internal scroll container.
   // ---------------------------------------------------------------------------
 
   return (
@@ -176,6 +160,7 @@ export default function HomeContent({
           <HeroSection
             selectedTag={selectedTag}
             setSelectedTag={handleTagSelect as any}
+            onPeriodSelect={handlePeriodSelect}
           />
         </section>
 
@@ -207,8 +192,6 @@ export default function HomeContent({
               filterParams={dynamicFilterParams}
               initialPapers={initialPapers}
               initialError={initialError}
-              isFilterChanging={isFilterChanging}
-              onFilterDone={() => setIsFilterChanging(false)}
             />
 
           </main>

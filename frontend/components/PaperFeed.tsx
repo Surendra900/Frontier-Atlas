@@ -35,7 +35,7 @@ import {
 import { prefetchPaperBySlug } from "@/lib/papers";
 import { prefetchBenchmarkDetail } from "@/lib/benchmarks";
 import { getTaxonomyHref } from "@/lib/taxonomy";
- 
+
 // --- Performance Logger ---
 const logRender = (
   id: string,
@@ -53,7 +53,7 @@ const logRender = (
   console.log(`- Commit time: ${commitTime.toFixed(2)}ms`);
   console.groupEnd();
 };
- 
+
 /* ─── Tag color map ──────────────────────────────────────────────────────── */
 const TAG_COLORS: Record<
   string,
@@ -90,7 +90,7 @@ const TAG_COLORS: Record<
     border: "border border-[#E5E5E0]",
   },
 };
- 
+
 const getTagColor = (label: string): string => {
   const map: Record<string, string> = {
     "Reinforcement Learning": "blue",
@@ -101,7 +101,7 @@ const getTagColor = (label: string): string => {
     "World Models": "purple",
   };
   if (map[label]) return map[label];
- 
+
   const colors = ["purple", "blue", "green", "cyan"];
   let hash = 0;
   for (let i = 0; i < label.length; i++) {
@@ -109,7 +109,7 @@ const getTagColor = (label: string): string => {
   }
   return colors[Math.abs(hash) % colors.length];
 };
- 
+
 /* ─── Pill tag ───────────────────────────────────────────────────────────── */
 const Pill = memo(
   ({
@@ -119,19 +119,25 @@ const Pill = memo(
   }: {
     label: string;
     colorKey: string;
-    defaultType?: "task" | "method" | "model" | "dataset" | "benchmark" | "author";
+    defaultType?:
+      | "task"
+      | "method"
+      | "model"
+      | "dataset"
+      | "benchmark"
+      | "author";
   }) => {
     const router = useRouter();
     const c = TAG_COLORS[colorKey] || TAG_COLORS.gray;
     const isGray = colorKey === "gray";
     const href = getTaxonomyHref(label, defaultType);
- 
+
     const handleClick = (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
       router.push(href);
     };
- 
+
     const handleKeyDown = (e: React.KeyboardEvent) => {
       if (e.key === "Enter" || e.key === " ") {
         e.preventDefault();
@@ -139,7 +145,7 @@ const Pill = memo(
         router.push(href);
       }
     };
- 
+
     return (
       <span
         role="link"
@@ -159,22 +165,22 @@ const Pill = memo(
   },
 );
 Pill.displayName = "Pill";
- 
+
 /* ─── SOTA Display ───────────────────────────────────────────────────────── */
 const SotaDisplay = memo(({ sota }: { sota: string }) => {
   const router = useRouter();
   if (!sota) return null;
   const segments = sota.split(" • ");
- 
+
   return (
     <div className="mb-[10px] text-[11px] tracking-tight flex flex-wrap items-center gap-x-2 gap-y-1 w-full">
       {segments.map((segment, idx) => {
         const isSota = segment.startsWith("SOTA on ");
         const isOn = segment.includes(" on ");
- 
+
         let prefix = "";
         let benchmarks = segment;
- 
+
         if (isSota) {
           benchmarks = segment.replace("SOTA on ", "");
         } else if (isOn) {
@@ -182,15 +188,18 @@ const SotaDisplay = memo(({ sota }: { sota: string }) => {
           prefix = parts[0];
           benchmarks = parts[1];
         }
- 
-        const benchmarkList = benchmarks.split(",").map((b) => b.trim()).filter(Boolean);
- 
+
+        const benchmarkList = benchmarks
+          .split(",")
+          .map((b) => b.trim())
+          .filter(Boolean);
+
         return (
           <span key={idx} className="inline-flex items-center">
             {idx > 0 && (
               <span className="text-[#9CA3AF] mx-1.5 font-normal">•</span>
             )}
- 
+
             {isSota ? (
               <>
                 <span className="text-[#B48C52] font-semibold mr-1 tracking-wide">
@@ -209,7 +218,9 @@ const SotaDisplay = memo(({ sota }: { sota: string }) => {
                   };
                   return (
                     <span key={bIdx}>
-                      {bIdx > 0 && <span className="text-[#8B8B8B] mr-1">, </span>}
+                      {bIdx > 0 && (
+                        <span className="text-[#8B8B8B] mr-1">, </span>
+                      )}
                       <span
                         role="link"
                         tabIndex={0}
@@ -248,7 +259,9 @@ const SotaDisplay = memo(({ sota }: { sota: string }) => {
                   const href = getTaxonomyHref(bName, "benchmark");
                   return (
                     <span key={bIdx}>
-                      {bIdx > 0 && <span className="text-[#8B8B8B] mr-1">, </span>}
+                      {bIdx > 0 && (
+                        <span className="text-[#8B8B8B] mr-1">, </span>
+                      )}
                       <span
                         role="link"
                         tabIndex={0}
@@ -284,7 +297,7 @@ const SotaDisplay = memo(({ sota }: { sota: string }) => {
   );
 });
 SotaDisplay.displayName = "SotaDisplay";
- 
+
 /* ─── Thumbnail ──────────────────────────────────────────────────────────── */
 // Deterministic color palette from title string
 function getTitleColors(title: string): {
@@ -307,7 +320,7 @@ function getTitleColors(title: string): {
     hash = title.charCodeAt(i) + ((hash << 5) - hash);
   return palettes[Math.abs(hash) % palettes.length];
 }
- 
+
 function GeneratedCover({ title }: { title: string }) {
   const { bg1, bg2, accent } = getTitleColors(title);
   const words = (title || "Untitled").split(" ");
@@ -322,7 +335,7 @@ function GeneratedCover({ title }: { title: string }) {
   }
   if (cur && lines.length < 3) lines.push(cur.trim());
   const displayLines = lines.slice(0, 3);
- 
+
   const svgContent = `
     <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 200 250" preserveAspectRatio="none">
       <defs>
@@ -341,9 +354,9 @@ function GeneratedCover({ title }: { title: string }) {
       <rect x="12" y="247" width="30" height="3" rx="1.5" fill="${accent}"/>
     </svg>
   `;
- 
+
   const dataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgContent)}`;
- 
+
   return (
     <div className="absolute inset-0 bg-[#3A3F45]">
       <img
@@ -354,12 +367,12 @@ function GeneratedCover({ title }: { title: string }) {
     </div>
   );
 }
- 
+
 const isValidImageSrc = (src: string) => {
   if (!src || src === "null" || src === "None") return false;
   if (src.includes("cloudinary.com/xipefqle")) return false; // Disabled Cloudinary account
-  if (src.startsWith('/')) return true;
-  if (src.startsWith('data:image/')) return true;
+  if (src.startsWith("/")) return true;
+  if (src.startsWith("data:image/")) return true;
   try {
     new URL(src);
     return true;
@@ -367,16 +380,30 @@ const isValidImageSrc = (src: string) => {
     return false;
   }
 };
- 
+
 const PaperThumbnail = memo(
-  ({ title, thumbnail, slug, arxivId }: { title: string; thumbnail?: string; slug?: string; arxivId?: string }) => {
+  ({
+    title,
+    thumbnail,
+    slug,
+    arxivId,
+  }: {
+    title: string;
+    thumbnail?: string;
+    slug?: string;
+    arxivId?: string;
+  }) => {
     const [srcIndex, setSrcIndex] = useState(0);
     const imgRef = useRef<HTMLImageElement>(null);
 
     const rawArxiv = useMemo(() => {
       if (!arxivId) return null;
-      const match = arxivId.match(/(?:arxiv\.org\/(?:abs|pdf)\/|arxiv:\s*|^)([a-z\-]+(?:\.[a-z\-]+)?\/\d+|\d{4}\.\d{4,5}(?:v\d+)?)/i);
-      return match && match[1] ? match[1].replace(/\.pdf$/i, "") : arxivId.replace(/^arxiv:/i, "");
+      const match = arxivId.match(
+        /(?:arxiv\.org\/(?:abs|pdf)\/|arxiv:\s*|^)([a-z\-]+(?:\.[a-z\-]+)?\/\d+|\d{4}\.\d{4,5}(?:v\d+)?)/i,
+      );
+      return match && match[1]
+        ? match[1].replace(/\.pdf$/i, "")
+        : arxivId.replace(/^arxiv:/i, "");
     }, [arxivId]);
 
     const cleanArxiv = useMemo(() => {
@@ -387,15 +414,24 @@ const PaperThumbnail = memo(
       const list: string[] = [];
       if (isValidImageSrc(thumbnail || "")) list.push(thumbnail!);
       if (cleanArxiv) {
-        list.push(`https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${cleanArxiv}.webp`);
-        list.push(`https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${cleanArxiv}v1.webp`);
+        list.push(
+          `https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${cleanArxiv}.webp`,
+        );
+        list.push(
+          `https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${cleanArxiv}v1.webp`,
+        );
       }
       if (rawArxiv && rawArxiv !== cleanArxiv) {
-        list.push(`https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${rawArxiv}.webp`);
+        list.push(
+          `https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${rawArxiv}.webp`,
+        );
       }
       if (slug) list.push(`/thumbnails/${slug}.jpg`);
       if (cleanArxiv) list.push(`/thumbnails/${cleanArxiv}.jpg`);
-      if (cleanArxiv) list.push(`https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${cleanArxiv}.png`);
+      if (cleanArxiv)
+        list.push(
+          `https://cdn-thumbnails.huggingface.co/social-thumbnails/papers/${cleanArxiv}.png`,
+        );
       return Array.from(new Set(list));
     }, [thumbnail, slug, cleanArxiv, rawArxiv]);
 
@@ -403,15 +439,24 @@ const PaperThumbnail = memo(
     const isExternal = currentSrc && currentSrc.startsWith("http");
     const isR2 = currentSrc && currentSrc.includes("r2.dev");
     // Direct load for R2 storage (already CDN hosted); only proxy external endpoints that may need CORS
-    const imageSource = isExternal && !isR2 ? `/api/proxy-image?url=${encodeURIComponent(currentSrc)}` : currentSrc;
+    const imageSource =
+      isExternal && !isR2
+        ? `/api/proxy-image?url=${encodeURIComponent(currentSrc)}`
+        : currentSrc;
 
     const handleImgError = useCallback(() => {
-      setSrcIndex(prev => (prev + 1 < candidates.length ? prev + 1 : candidates.length));
+      setSrcIndex((prev) =>
+        prev + 1 < candidates.length ? prev + 1 : candidates.length,
+      );
     }, [candidates.length]);
 
     // Check if the image already failed before React hydration completed
     useEffect(() => {
-      if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth === 0) {
+      if (
+        imgRef.current &&
+        imgRef.current.complete &&
+        imgRef.current.naturalWidth === 0
+      ) {
         handleImgError();
       }
     }, [imageSource, handleImgError]);
@@ -440,7 +485,7 @@ const PaperThumbnail = memo(
   },
 );
 PaperThumbnail.displayName = "PaperThumbnail";
- 
+
 /* ─── Metric block ───────────────────────────────────────────────────────── */
 const Metric = memo(
   ({
@@ -468,7 +513,9 @@ const Metric = memo(
           }
         }}
       >
-        <div className={`flex items-center justify-center w-7 h-7 rounded-full bg-white/60 border border-[#E5E5E0]/60 ${isInteractive ? "group-hover/metric:border-[#F55036]/20 group-hover/metric:bg-[#F55036]/5 transition-colors" : ""}`}>
+        <div
+          className={`flex items-center justify-center w-7 h-7 rounded-full bg-white/60 border border-[#E5E5E0]/60 ${isInteractive ? "group-hover/metric:border-[#F55036]/20 group-hover/metric:bg-[#F55036]/5 transition-colors" : ""}`}
+        >
           {children}
         </div>
         <div className="flex flex-col items-start justify-center">
@@ -488,18 +535,17 @@ const Metric = memo(
   },
 );
 Metric.displayName = "Metric";
- 
+
 export const PaperCard = memo(({ paper }: { paper: Paper }) => {
   const upvotesNum = parseFloat(paper.upvotes) || 0;
   const router = useRouter();
- 
+
   const safeAuthors = paper.authors || [];
   const visibleAuthors = safeAuthors.slice(0, 3);
   const remaining = safeAuthors.length - 3;
-  const githubRepo = paper.repositories?.find(
-    (repo: any) => repo.url?.includes("github.com")
+  const githubRepo = paper.repositories?.find((repo: any) =>
+    repo.url?.includes("github.com"),
   );
-
   const [preferredPlatform, setPreferredPlatform] = useState<ModelPlatformInfo | null>(null);
 
   useEffect(() => {
@@ -513,6 +559,10 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
       active = false;
     };
   }, [paper]);
+  const resolvedGithubUrl = paper.githubUrl || githubRepo?.url || null;
+  const huggingFaceRepo = paper.repositories?.find((repo: any) =>
+    repo.url?.includes("huggingface.co"),
+  );
 
   const handlePrefetch = useCallback(() => {
     router.prefetch(`/papers/${paper.slug}`);
@@ -522,7 +572,6 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
   if (!paperHasTags(paper)) {
     return null;
   }
-  
   return (
     <div
       className="block"
@@ -532,25 +581,38 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
       <div className="group flex flex-col xl:flex-row gap-3 sm:gap-4 xl:gap-5 p-3 sm:p-4 xl:pt-3 xl:pb-3 bg-white xl:bg-transparent border xl:border-none border-[#E5E5E0] rounded-none hover:shadow-lg xl:hover:bg-white xl:hover:shadow-[0_8px_30px_rgba(0,0,0,0.06)] transition-all duration-300 ease-out">
         {/* PDF thumbnail */}
         <div className="order-first xl:order-last shrink-0 w-full xl:w-auto mx-auto xl:mx-0 xl:self-stretch border-b xl:border-b-0 border-[#E5E5E0] pb-3 xl:pb-0 mb-1 xl:mb-0">
-          <Link href={`/papers/${paper.slug}`} className="block h-full group/thumb cursor-pointer">
-            <PaperThumbnail 
-              title={paper.title} 
-              thumbnail={paper.thumbnail || (paper as any).thumbnailUrl || (paper as any).imageUrl || (paper as any).image_url || (paper as any).image || ""} 
+          <Link
+            href={`/papers/${paper.slug}`}
+            className="block h-full group/thumb cursor-pointer"
+          >
+            <PaperThumbnail
+              title={paper.title}
+              thumbnail={
+                paper.thumbnail ||
+                (paper as any).thumbnailUrl ||
+                (paper as any).imageUrl ||
+                (paper as any).image_url ||
+                (paper as any).image ||
+                ""
+              }
               slug={paper.slug}
               arxivId={paper.arxivId}
             />
           </Link>
         </div>
- 
+
         {/* Content */}
         <div className="flex-1 min-w-0 flex flex-col">
           {/* Title */}
           <h3 className="text-[15px] sm:text-[17px] xl:text-[20px] font-serif font-medium text-[#111111] leading-snug xl:leading-[1.3] mb-1 xl:mb-1.5 transition-colors line-clamp-2">
-            <Link href={`/papers/${paper.slug}`} className="hover:text-[#F55036]">
+            <Link
+              href={`/papers/${paper.slug}`}
+              className="hover:text-[#F55036]"
+            >
               {paper.title}
             </Link>
           </h3>
- 
+
           {/* Authors + Date + Citations */}
           <div className="flex flex-wrap items-center gap-x-2 text-[13px] text-[#666666] mb-3">
             <div className="flex flex-wrap items-center">
@@ -566,25 +628,26 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
               ) : (
                 <span>Unknown Author</span>
               )}
-              {remaining > 0 && <span>, +{remaining} {remaining === 1 ? 'author' : 'authors'}</span>}
+              {remaining > 0 && (
+                <span>
+                  , +{remaining} {remaining === 1 ? "author" : "authors"}
+                </span>
+              )}
             </div>
             <span className="text-[#CCCCCC]">•</span>
- 
+
             <span>{paper.date}</span>
- 
+
             <span className="text-[#CCCCCC]">•</span>
- 
+
             <span>{paper.citations || 0} citations</span>
- 
           </div>
- 
- 
- 
+
           {/* Description */}
           <p className="text-[13px] sm:text-[13.5px] xl:text-[14px] text-[#444444] leading-[1.6] mb-3 line-clamp-3">
             {paper.description}
           </p>
- 
+
           {/* Benchmark / SOTA (Row 1) */}
           <div className="w-full">
             <SotaDisplay sota={paper.sota} />
@@ -611,7 +674,10 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const url = paper.arxivUrl || getArxivAbsUrl(paper.arxivId, paper.paperUrl) || "https://arxiv.org";
+                const url =
+                  paper.arxivUrl ||
+                  getArxivAbsUrl(paper.arxivId, paper.paperUrl) ||
+                  "https://arxiv.org";
                 window.open(url, "_blank");
               }}
               className="flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-2 min-[375px]:px-2.5 sm:px-3 md:px-2 lg:px-4 xl:px-2 h-[26px] min-[375px]:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#b31b1b] border-[1.5px] border-[#b31b1b]/40 hover:border-[#b31b1b] hover:bg-[#b31b1b]/5 rounded-[6px] transition-all duration-300"
@@ -626,14 +692,25 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                   <span className="hidden lg:block text-[12px] text-[#666] xl:hidden">Original preprint</span>
                 </div>
               </div>
-              <ArrowUpRight size={14} strokeWidth={1.5} className="hidden lg:block xl:hidden" />
+              <ArrowUpRight
+                size={14}
+                strokeWidth={1.5}
+                className="hidden lg:block xl:hidden"
+              />
             </button>
 
             <button
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                const url = paper.pdfUrl || getArxivPdfUrl((paper as any).pdfUrl, paper.paperUrl, paper.arxivId) || "https://arxiv.org";
+                const url =
+                  paper.pdfUrl ||
+                  getArxivPdfUrl(
+                    (paper as any).pdfUrl,
+                    paper.paperUrl,
+                    paper.arxivId,
+                  ) ||
+                  "https://arxiv.org";
                 window.open(url, "_blank");
               }}
               className="flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-2 min-[375px]:px-2.5 sm:px-3 md:px-2 lg:px-4 xl:px-2 h-[26px] min-[375px]:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#E54D59] border-[1.5px] border-[#E54D59]/40 hover:border-[#E54D59] hover:bg-[#E54D59]/5 rounded-[6px] transition-all duration-300"
@@ -647,7 +724,11 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                   <span className="hidden lg:block text-[12px] text-[#666] xl:hidden">Full paper</span>
                 </div>
               </div>
-              <ArrowUpRight size={14} strokeWidth={1.5} className="hidden lg:block xl:hidden" />
+              <ArrowUpRight
+                size={14}
+                strokeWidth={1.5}
+                className="hidden lg:block xl:hidden"
+              />
             </button>
 
             <button
@@ -657,11 +738,12 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                 const ghUrl =
                   paper.githubUrl ||
                   githubRepo?.url ||
-                  (paper.repositories?.find((repo: any) => repo.url?.includes("github.com"))?.url);
+                  paper.repositories?.find((repo: any) =>
+                    repo.url?.includes("github.com"),
+                  )?.url;
+
                 if (ghUrl) {
                   window.open(ghUrl, "_blank");
-                } else {
-                  window.open("https://github.com", "_blank");
                 }
               }}
               className="flex-none md:flex-1 flex items-center justify-center lg:justify-between xl:justify-center px-2 min-[375px]:px-2.5 sm:px-3 md:px-2 lg:px-4 xl:px-2 h-[26px] min-[375px]:h-[28px] lg:h-[58px] xl:h-[28px] bg-white text-[#24292f] border-[1.5px] border-[#24292f]/30 hover:border-[#24292f] hover:bg-[#24292f]/5 rounded-[6px] transition-all duration-300"
@@ -674,12 +756,22 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                 <div className="flex flex-col items-start">
                   <span className="font-medium lg:font-semibold xl:font-medium text-[8.5px] min-[375px]:text-[9.5px] sm:text-[10.5px] md:text-[11.5px] lg:text-[15px] xl:text-[11.5px] whitespace-nowrap tracking-tight">Code</span>
                   <span className="hidden lg:block text-[12px] text-[#666] xl:hidden">
-                    {upvotesNum > 0 ? `${upvotesNum >= 1000 ? (upvotesNum / 1000).toFixed(1) + "k" : upvotesNum} stars` : "0 stars"}
+                    {upvotesNum > 0
+                      ? `${upvotesNum >= 1000 ? (upvotesNum / 1000).toFixed(1) + "k" : upvotesNum} stars`
+                      : "0 stars"}
                   </span>
                 </div>
-                {upvotesNum > 0 && <span className="hidden lg:inline xl:hidden text-[#9CA3AF] text-[12.5px] font-normal">{upvotesNum}k</span>}
+                {upvotesNum > 0 && (
+                  <span className="hidden lg:inline xl:hidden text-[#9CA3AF] text-[12.5px] font-normal">
+                    {upvotesNum}k
+                  </span>
+                )}
               </div>
-              <ArrowUpRight size={14} strokeWidth={1.5} className="text-[#9CA3AF] hidden lg:block xl:hidden" />
+              <ArrowUpRight
+                size={14}
+                strokeWidth={1.5}
+                className="text-[#9CA3AF] hidden lg:block xl:hidden"
+              />
             </button>
 
             {preferredPlatform && (
@@ -714,7 +806,9 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                 const ghUrl =
                   paper.githubUrl ||
                   githubRepo?.url ||
-                  (paper.repositories?.find((repo: any) => repo.url?.includes("github.com"))?.url);
+                  paper.repositories?.find((repo: any) =>
+                    repo.url?.includes("github.com"),
+                  )?.url;
                 if (ghUrl) {
                   window.open(ghUrl, "_blank");
                 }
@@ -736,6 +830,13 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
               </div>
               <ArrowUpRight size={14} strokeWidth={1.5} className="text-[#9CA3AF] hidden lg:block xl:hidden" />
             </button>
+              </div>
+              <ArrowUpRight
+                size={14}
+                strokeWidth={1.5}
+                className="text-[#9CA3AF] hidden lg:block xl:hidden"
+              />
+            </button>
           </div>
         </div>
       </div>
@@ -743,7 +844,7 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
   );
 });
 PaperCard.displayName = "PaperCard";
- 
+
 /* ─── Paper Card Skeleton ────────────────────────────────────────────────── */
 const PaperCardSkeleton = memo(() => {
   return (
@@ -751,7 +852,7 @@ const PaperCardSkeleton = memo(() => {
       <div className="flex flex-col justify-center shrink-0 w-full xl:w-auto">
         <div className="w-full xl:w-[170px] h-[180px] sm:h-[220px] xl:h-[240px] shrink-0 border border-[#E5E5E0] rounded-md xl:rounded-none bg-[#EFEDE6]" />
       </div>
- 
+
       <div className="flex-1 min-w-0 flex flex-col xl:pr-8">
         <div className="h-6 bg-[#EFEDE6] rounded mb-2 w-11/12" />
         <div className="h-6 bg-[#EFEDE6] rounded mb-3 w-7/12" />
@@ -769,7 +870,7 @@ const PaperCardSkeleton = memo(() => {
           <div className="h-[28px] xl:h-[24px] w-20 bg-[#EFEDE6] rounded-[4px]" />
         </div>
       </div>
- 
+
       <div className="shrink-0 flex items-stretch xl:pl-[24px] xl:pr-[32px] border-t xl:border-t-0 xl:border-l border-[#E5E5E0] mt-auto xl:mt-0 pt-4 xl:pt-0 w-full xl:w-auto">
         <div className="flex flex-row xl:flex-col justify-around xl:justify-around items-center w-full xl:w-[64px] xl:py-2 gap-2 xl:gap-0">
           <div className="h-8 w-12 bg-[#EFEDE6] rounded" />
@@ -784,8 +885,7 @@ function getPaginationRange(
   currentPage: number,
   totalPages: number,
 ): (number | string)[] {
-  // If there are 6 or fewer pages, show all pages.
-  if (totalPages <= 6) {
+  if (totalPages <= 7) {
     return Array.from({ length: totalPages }, (_, i) => i + 1);
   }
 
@@ -794,8 +894,7 @@ function getPaginationRange(
     return [1, 2, 3, 4, 5, "...", totalPages];
   }
 
-  // End: 1 ... last-4 last-3 last-2 last-1 last
-  if (currentPage >= totalPages - 2) {
+  if (currentPage >= totalPages - 3) {
     return [
       1,
       "...",
@@ -807,15 +906,12 @@ function getPaginationRange(
     ];
   }
 
-  // Middle: 1 ... current-2 current-1 current current+1 current+2 ... last
   return [
     1,
     "...",
-    currentPage - 2,
     currentPage - 1,
     currentPage,
     currentPage + 1,
-    currentPage + 2,
     "...",
     totalPages,
   ];
@@ -857,8 +953,12 @@ export default function PaperList({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(initialError ?? null);
   const [itemsPerPage, setItemsPerPage] = useState(25);
-  const [totalPapers, setTotalPapers] = useState(() => initialPapers?.total ?? 0);
-  const [displayCount, setDisplayCount] = useState(() => initialPapers?.papers?.length ?? 25);
+  const [totalPapers, setTotalPapers] = useState(
+    () => initialPapers?.total ?? 0,
+  );
+  const [displayCount, setDisplayCount] = useState(
+    () => initialPapers?.papers?.length ?? 25,
+  );
   const cacheRef = useRef<Map<string, GetPapersResult>>(new Map());
   const inFlightRef = useRef<Map<string, Promise<GetPapersResult>>>(new Map());
   const loadingRef = useRef(false);
@@ -875,37 +975,37 @@ export default function PaperList({
     if (!selectedFilter || selectedFilter === "All") {
       return papers;
     }
- 
+
     return papers.filter((paper) => {
       const text = [
         paper.title,
         paper.description,
         ...(paper.tags ?? []),
-        ...(paper.additionalTags ?? [])
+        ...(paper.additionalTags ?? []),
       ]
         .join(" ")
         .toLowerCase();
- 
+
       return text.includes(selectedFilter.toLowerCase());
     });
   }, [papers, selectedFilter]);
   const totalPages = Math.max(1, Math.ceil(totalPapers / itemsPerPage));
- 
+
   // Render all fetched cards immediately without artificial delay
   useEffect(() => {
     setDisplayCount(papers.length);
   }, [papers.length]);
- 
+
   // Paper detail prefetching — staggered to avoid connection saturation
   const prefetchedRef = useRef(new Set<string>());
   const prefetchQueueRef = useRef<string[]>([]);
   const prefetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const prefetchCountRef = useRef(0);
- 
+
   const schedulePrefetch = useCallback((slug: string) => {
     if (prefetchedRef.current.has(slug)) return;
     prefetchedRef.current.add(slug);
- 
+
     if (prefetchCountRef.current < 3) {
       prefetchCountRef.current++;
       prefetchPaperBySlug(slug);
@@ -925,34 +1025,36 @@ export default function PaperList({
       }
     }
   }, []);
- 
+
   const observerRef = useRef<IntersectionObserver | null>(null);
- 
+
   useEffect(() => {
     const scrollRoot = document.getElementById("scroll-container") || null;
     observerRef.current = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            const slug = (entry.target as HTMLElement).getAttribute("data-paper-slug");
+            const slug = (entry.target as HTMLElement).getAttribute(
+              "data-paper-slug",
+            );
             if (slug) schedulePrefetch(slug);
           }
         }
       },
-      { root: scrollRoot, rootMargin: "400px" }
+      { root: scrollRoot, rootMargin: "400px" },
     );
     return () => {
       observerRef.current?.disconnect();
       if (prefetchTimerRef.current) clearTimeout(prefetchTimerRef.current);
     };
   }, [schedulePrefetch]);
- 
+
   const observeCard = useCallback((el: HTMLDivElement | null) => {
     if (el) {
       observerRef.current?.observe(el);
     }
   }, []);
- 
+
   const matchesSearch = useCallback(
     (paper: Paper) => {
       if (!normalizedSearchQuery) return true;
@@ -969,13 +1071,13 @@ export default function PaperList({
     },
     [normalizedSearchQuery],
   );
- 
+
   const method = useMemo(() => {
     if (filterParams?.method) return filterParams.method;
     if (selectedTag === "MCP") return "mcp";
     return undefined;
   }, [filterParams?.method, selectedTag]);
- 
+
   const task = useMemo(() => {
     if (filterParams?.task) return filterParams.task;
     if (selectedTag === "MCP") return undefined;
@@ -1130,7 +1232,10 @@ export default function PaperList({
         initialPapers.papers.length > 0 &&
         !normalizedSearchQuery
       ) {
-        cacheRef.current.set(getCacheKey(initialPapers.page, itemsPerPage), initialPapers);
+        cacheRef.current.set(
+          getCacheKey(initialPapers.page, itemsPerPage),
+          initialPapers,
+        );
         setTotalPapers(initialPapers.total);
         if (initialPapers.hasMore) {
           prefetchPage(initialPapers.page + 1);
@@ -1169,7 +1274,7 @@ export default function PaperList({
       void loadPage(1, itemsPerPage);
     }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     filterParams?.method,
     filterParams?.model,
@@ -1210,7 +1315,7 @@ export default function PaperList({
     period,
     selectedTag,
   ]);
- 
+
   if (error && papers.length === 0) {
     return (
       <div className="pb-12 pt-8 flex justify-center items-center text-[#F55036]">
@@ -1218,43 +1323,75 @@ export default function PaperList({
       </div>
     );
   }
- 
+
   return (
     <Profiler id="PaperList" onRender={logRender}>
       <div
         className="bg-transparent grid grid-cols-1 md:grid-cols-2 xl:flex xl:flex-col gap-8 md:gap-10 xl:gap-5"
         data-page={page}
       >
-        {isTransitioning || isFilterChanging || (loading && papers.length === 0) ? (
+        {isTransitioning ||
+        isFilterChanging ||
+        (loading && papers.length === 0) ? (
           <>
             <PaperCardSkeleton />
             <PaperCardSkeleton />
             <PaperCardSkeleton />
           </>
         ) : (
-          filteredPapers
-            .slice(0, displayCount)
-            .map((paper, idx) => (
-              <Fragment key={paper.slug}>
-                {idx > 0 && <div className="hidden xl:block h-px w-full bg-[#E5E5E0]" />}
-                <div ref={observeCard} data-paper-slug={paper.slug} className="animate-fade-in">
-                  <PaperCard paper={paper} />
-                </div>
-              </Fragment>
-            ))
+          filteredPapers.slice(0, displayCount).map((paper, idx) => (
+            <Fragment key={paper.slug}>
+              {idx > 0 && (
+                <div className="hidden xl:block h-px w-full bg-[#E5E5E0]" />
+              )}
+              <div
+                ref={observeCard}
+                data-paper-slug={paper.slug}
+                className="animate-fade-in"
+              >
+                <PaperCard paper={paper} />
+              </div>
+            </Fragment>
+          ))
         )}
-  
+
         {(totalPapers > 0 || papers.length > 0) && (
-          <div className="flex justify-center w-full col-span-full mt-10 mb-6 pt-5 border-t border-[#E5E5E0]">
-            <div className="flex items-center justify-center bg-white border border-[#E5E5E0] shadow-sm rounded-full p-1.5 min-h-[48px] max-w-full overflow-x-auto hide-scroll">
-              <div className="flex items-center px-1 gap-1 shrink-0">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 w-full col-span-full mt-10 mb-6 pt-5 border-t border-[#E5E5E0]">
+            <div className="text-[13px] text-[#666] font-mono">
+              {totalPapers > 0 ? (
+                <span>
+                  Showing{" "}
+                  <strong className="text-[#111]">
+                    {(page - 1) * itemsPerPage + 1}
+                  </strong>
+                  –
+                  <strong className="text-[#111]">
+                    {Math.min(
+                      page * itemsPerPage,
+                      totalPapers,
+                    ).toLocaleString()}
+                  </strong>{" "}
+                  of{" "}
+                  <strong className="text-[#111]">
+                    {totalPapers.toLocaleString()}
+                  </strong>{" "}
+                  papers
+                </span>
+              ) : (
+                <span>Page {page}</span>
+              )}
+            </div>
+
+            <div className="flex items-center bg-white border border-[#E5E5E0] shadow-sm rounded-full p-1.5 h-[48px] max-w-full overflow-x-auto hide-scroll">
+              <div className="flex items-center px-1 gap-1">
                 {/* Previous Page Button */}
                 <button
                   onClick={() => {
                     if (page > 1) {
                       const newPage = page - 1;
                       void loadPage(newPage, itemsPerPage);
-                      const container = document.getElementById("scroll-container");
+                      const container =
+                        document.getElementById("scroll-container");
                       if (container) {
                         container.scrollTo({ top: 0, behavior: "smooth" });
                       } else {
@@ -1268,12 +1405,15 @@ export default function PaperList({
                 >
                   <ChevronLeft size={18} />
                 </button>
-                
+
                 {/* Numbered Page Buttons */}
                 {getPaginationRange(page, totalPages).map((item, index) => {
                   if (item === "...") {
                     return (
-                      <span key={`dots-${index}`} className="w-7 h-9 flex items-center justify-center text-[#777] text-[13px] font-medium select-none shrink-0">
+                      <span
+                        key={`dots-${index}`}
+                        className="w-6 h-8 flex items-center justify-center text-[#999] text-[13px] font-medium select-none shrink-0"
+                      >
                         …
                       </span>
                     );
@@ -1288,7 +1428,8 @@ export default function PaperList({
                       onClick={() => {
                         if (p !== page) {
                           void loadPage(p, itemsPerPage);
-                          const container = document.getElementById("scroll-container");
+                          const container =
+                            document.getElementById("scroll-container");
                           if (container) {
                             container.scrollTo({ top: 0, behavior: "smooth" });
                           } else {
@@ -1315,7 +1456,8 @@ export default function PaperList({
                     if (page < totalPages || hasMore) {
                       const newPage = page + 1;
                       void loadPage(newPage, itemsPerPage);
-                      const container = document.getElementById("scroll-container");
+                      const container =
+                        document.getElementById("scroll-container");
                       if (container) {
                         container.scrollTo({ top: 0, behavior: "smooth" });
                       } else {
@@ -1342,7 +1484,8 @@ export default function PaperList({
                     setItemsPerPage(newLimit);
                     setPage(1);
                     void loadPage(1, newLimit);
-                    const container = document.getElementById("scroll-container");
+                    const container =
+                      document.getElementById("scroll-container");
                     if (container) {
                       container.scrollTo({ top: 0, behavior: "smooth" });
                     }
@@ -1366,7 +1509,7 @@ export default function PaperList({
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#E5E5E0]" />
           </div>
         )}
- 
+
         {!loading && papers.length === 0 && (
           <div className="flex flex-col items-center justify-center py-24 px-4 text-center animate-fade-in w-full col-span-full">
             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-6 border border-[#E5E5E0] shadow-sm">
@@ -1389,8 +1532,9 @@ export default function PaperList({
               No Papers Found
             </h3>
             <p className="text-[14px] text-[#666666] max-w-[320px] leading-relaxed">
-              We couldn&apos;t find any papers matching your selected time period or
-              category. Try clearing your filters or selecting &quot;All time&quot;.
+              We couldn&apos;t find any papers matching your selected time
+              period or category. Try clearing your filters or selecting
+              &quot;All time&quot;.
             </p>
           </div>
         )}

@@ -3,12 +3,12 @@
 import { useState } from "react";
 import { getPapers } from "@/lib/paperApi";
 
-const TABS = ["Today", "This Week", "This Month", "All time"];
+const TABS = ["All time", "This Month", "This Week", "Latest"];
 const TAB_TO_PERIOD: Record<string, string> = {
-  Today: "today",
-  "This Week": "week",
-  "This Month": "month",
   "All time": "all",
+  "This Month": "month",
+  "This Week": "week",
+  Latest: "today",
 };
 
 interface PaperTabsProps {
@@ -20,7 +20,7 @@ export default function PaperTabs({
   selectedPeriod,
   onPeriodSelect,
 }: PaperTabsProps = {}) {
-  const [internalActiveTab, setInternalActiveTab] = useState("Today");
+  const [internalActiveTab, setInternalActiveTab] = useState("All time");
   const activeTab = selectedPeriod ?? internalActiveTab;
 
   const handleTabClick = (tab: string) => {

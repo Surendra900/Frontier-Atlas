@@ -438,7 +438,6 @@ export default function Sidebar({
       "/methods/lora",
       "/methods/rlhf",
       "/methods",
-      "/submit",
     ];
 
     routes.forEach((route) => {
@@ -465,17 +464,6 @@ export default function Sidebar({
 
       <div className="px-2 pt-1 space-y-1">
 
-        {/* SUBMIT */}
-        <SidebarItem
-          item={{ label: "Submit", slug: "submit", icon: PaperPlaneTilt, color: "#F55036" }}
-          isActive={pathname === "/submit"}
-          onClick={() => {
-            setActiveItem("Submit");
-            onItemClick?.();
-          }}
-          href="/submit"
-        />
-
 
         {/* ======================================================
             DISCOVER
@@ -484,24 +472,16 @@ export default function Sidebar({
 
 
         <SidebarSection title="Discover">
-          {discover.map((item) => (
-            <SidebarItem
-              key={item.label}
-              item={item}
-              isActive={activeItem === item.label}
-              onClick={() =>
-                handleItemClick(item.label)
-              }
-              href={
-                pathname === "/"
-                  ? "#"
-                  : item.slug === "trending"
-                    ? "/"
-                    : `/category/${item.slug}`
-              }
-            />
-          ))}
-        </SidebarSection>
+  {discover.map((item) => (
+    <SidebarItem
+      key={item.label}
+      item={item}
+      isActive={activeItem === item.label}
+      onClick={() => handleItemClick(item.label)}
+      href="/#all-time"
+    />
+  ))}
+</SidebarSection>
 
         {/* ======================================================
             TASKS

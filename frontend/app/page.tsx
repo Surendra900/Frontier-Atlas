@@ -2,20 +2,31 @@ import HomeContent from "@/components/HomeContent";
 import { getPapers } from "@/lib/paperApi";
 
 export const runtime = "edge";
-export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
+export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
 export const revalidate = 0;
 
 export default async function Home() {
   try {
-    const initialPapers = await getPapers({ page: 1, sort: "trending", period: "today" });
-    return <HomeContent initialPapers={initialPapers} initialPeriod="Today" />;
+    const initialPapers = await getPapers({
+      page: 1,
+      sort: "trending",
+      period: "all",
+    });
+
+    return (
+      <HomeContent
+        initialPapers={initialPapers}
+        initialPeriod="All time"
+      />
+    );
   } catch (error) {
     console.error("Failed to load initial papers:", error);
+
     return (
       <HomeContent
         initialPapers={null}
-        initialPeriod="Today"
+        initialPeriod="All time"
         initialError="Failed to load papers. Please try again later."
       />
     );
