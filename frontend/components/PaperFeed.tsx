@@ -830,13 +830,6 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
               </div>
               <ArrowUpRight size={14} strokeWidth={1.5} className="text-[#9CA3AF] hidden lg:block xl:hidden" />
             </button>
-              </div>
-              <ArrowUpRight
-                size={14}
-                strokeWidth={1.5}
-                className="text-[#9CA3AF] hidden lg:block xl:hidden"
-              />
-            </button>
           </div>
         </div>
       </div>
