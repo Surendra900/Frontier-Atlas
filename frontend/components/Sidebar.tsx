@@ -26,6 +26,7 @@ import {
   PlugsConnected,
   Cube,
   Target,
+  PaperPlaneTilt,
   type Icon,
 } from "@phosphor-icons/react";
 
@@ -80,10 +81,9 @@ function SidebarItem({
         transition-all
         duration-150
         ease-out
-        ${
-          isActive
-            ? "bg-[#ECECE7] text-[#111111]"
-            : "text-[#666666] hover:bg-[#EFEEE9] hover:text-[#111111]"
+        ${isActive
+          ? "bg-[#ECECE7] text-[#111111]"
+          : "text-[#666666] hover:bg-[#EFEEE9] hover:text-[#111111]"
         }
       `}
     >
@@ -104,10 +104,9 @@ function SidebarItem({
           className={`
             transition-all
             duration-150
-            ${
-              isActive
-                ? "opacity-100"
-                : "opacity-80 group-hover:opacity-100"
+            ${isActive
+              ? "opacity-100"
+              : "opacity-80 group-hover:opacity-100"
             }
           `}
           style={{
@@ -121,10 +120,9 @@ function SidebarItem({
           truncate
           text-[12.5px]
           leading-none
-          ${
-            isActive
-              ? "font-semibold text-[#111111]"
-              : "font-medium text-[#666666] group-hover:text-[#222222]"
+          ${isActive
+            ? "font-semibold text-[#111111]"
+            : "font-medium text-[#666666] group-hover:text-[#222222]"
           }
         `}
       >
@@ -440,6 +438,7 @@ export default function Sidebar({
       "/methods/lora",
       "/methods/rlhf",
       "/methods",
+      "/submit",
     ];
 
     routes.forEach((route) => {
@@ -466,9 +465,23 @@ export default function Sidebar({
 
       <div className="px-2 pt-1 space-y-1">
 
+        {/* SUBMIT */}
+        <SidebarItem
+          item={{ label: "Submit", slug: "submit", icon: PaperPlaneTilt, color: "#F55036" }}
+          isActive={pathname === "/submit"}
+          onClick={() => {
+            setActiveItem("Submit");
+            onItemClick?.();
+          }}
+          href="/submit"
+        />
+
+
         {/* ======================================================
             DISCOVER
             ====================================================== */}
+
+
 
         <SidebarSection title="Discover">
           {discover.map((item) => (
