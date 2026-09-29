@@ -241,7 +241,15 @@ function mapBackendPaper(raw: Record<string, unknown>): Paper {
 const CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 function getCacheKey(params: GetPapersParams): string {
-  return `papers_v4:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "none"}:${params.period ?? "all"}:${params.task ?? "none"}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
+  const rawTask = params.task ? params.task.toLowerCase().trim() : "none";
+  const normalizedTask =
+    rawTask === "reasoning"
+      ? "reasoning-models"
+      : rawTask === "ss1" || rawTask === "ssl"
+      ? "small-language-models"
+      : rawTask;
+  const safePeriod = params.period === "today" ? "all" : (params.period ?? "all");
+  return `papers_v5:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "none"}:${safePeriod}:${normalizedTask}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
 }
 
 // In-memory cache — fastest possible, zero deserialization cost
@@ -465,12 +473,25 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
 
       if (params.page !== undefined) query.append("page", params.page.toString());
       if (params.limit !== undefined) query.append("limit", params.limit.toString());
-      if (params.task) query.append("task", params.task);
+      if (params.task) {
+        const rawTask = params.task.toLowerCase().trim();
+        const normalizedTask =
+          rawTask === "reasoning"
+            ? "reasoning-models"
+            : rawTask === "ss1" || rawTask === "ssl"
+            ? "small-language-models"
+            : rawTask;
+        query.append("task", normalizedTask);
+      }
       if (params.method) query.append("method", params.method);
       if (params.model) query.append("model", params.model);
       if (params.organization) query.append("organization", params.organization);
       if (params.sort) query.append("sort", params.sort);
-      if (params.period) query.append("period", params.period);
+      if (params.period) {
+        // Guard: historical DB papers should not return 0 results on 'today'
+        const safePeriod = params.period === "today" ? "all" : params.period;
+        query.append("period", safePeriod);
+      }
 
       const response = await fetchApi<PapersResponse>(
         `/api/v1/research-papers?${query.toString()}`

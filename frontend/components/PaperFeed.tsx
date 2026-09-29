@@ -1125,18 +1125,21 @@ export default function PaperList({
   }, [filterParams?.method, selectedTag]);
 
   const task = useMemo(() => {
-    if (filterParams?.task) return filterParams.task;
-    if (selectedTag === "MCP") return undefined;
-    return selectedTag && selectedTag !== "All Topics"
-      ? selectedTag.toLowerCase().replace(/\s+/g, "-")
-      : undefined;
+    const raw = filterParams?.task || (selectedTag && selectedTag !== "All Topics" && selectedTag !== "MCP" ? selectedTag : undefined);
+    if (!raw) return undefined;
+    const clean = raw.toLowerCase().replace(/\s+/g, "-");
+    return clean === "reasoning" ? "reasoning-models" : (clean === "ss1" || clean === "ssl" ? "small-language-models" : clean);
   }, [filterParams?.task, selectedTag]);
+
+  const safePeriod = useMemo(() => {
+    return period === "today" ? "all" : period;
+  }, [period]);
 
   const getCacheKey = useCallback(
     (pageNumber: number, limit: number) => {
-      return `${task ?? "all"}:${filterParams?.model ?? "none"}:${method ?? "none"}:${filterParams?.sort ?? "none"}:${period ?? "all"}:${limit}:${pageNumber}`;
+      return `${task ?? "all"}:${filterParams?.model ?? "none"}:${method ?? "none"}:${filterParams?.sort ?? "none"}:${safePeriod ?? "all"}:${limit}:${pageNumber}`;
     },
-    [method, filterParams?.model, filterParams?.sort, period, task],
+    [method, filterParams?.model, filterParams?.sort, safePeriod, task],
   );
 
   const fetchPage = useCallback(
@@ -1157,7 +1160,7 @@ export default function PaperList({
         model: filterParams?.model,
         method,
         sort: filterParams?.sort,
-        period,
+        period: safePeriod,
       })
         .then((result) => {
           if (result.papers && result.papers.length > 0) {
@@ -1177,7 +1180,7 @@ export default function PaperList({
       filterParams?.model,
       filterParams?.sort,
       getCacheKey,
-      period,
+      safePeriod,
       task,
     ],
   );

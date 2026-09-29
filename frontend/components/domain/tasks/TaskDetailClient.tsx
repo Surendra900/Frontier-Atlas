@@ -12,7 +12,8 @@ interface Props {
 }
 
 const PERIOD_MAP: Record<string, string> = {
-  Today: "today",
+  Latest: "all",
+  Today: "all",
   "This Week": "week",
   "This Month": "month",
   "All time": "all",
@@ -22,13 +23,22 @@ export default function TaskDetailClient({ slug, initialPapers }: Props) {
   const [sort, setSort] = useState<"popular" | "latest" | "citations">("popular");
   const [period, setPeriod] = useState<string>("All time");
 
-  const safeSlug = (slug || "").trim();
-  const mappedPeriod = PERIOD_MAP[period] || "all";
+  const rawSlug = (slug || "").trim().toLowerCase();
+  const safeSlug =
+    rawSlug === "reasoning"
+      ? "reasoning-models"
+      : rawSlug === "ss1" || rawSlug === "ssl"
+      ? "small-language-models"
+      : rawSlug;
+
+  const isLatest = period === "Latest";
+  const mappedPeriod = isLatest ? "all" : (PERIOD_MAP[period] || "all");
+  const effectiveSort = isLatest ? "latest" : sort;
 
   return (
     <>
       <TaskFilterBar
-        selectedSort={sort}
+        selectedSort={effectiveSort}
         onSortChange={setSort}
       />
       <PaperTabs selectedPeriod={period} onPeriodSelect={setPeriod} />
@@ -36,7 +46,7 @@ export default function TaskDetailClient({ slug, initialPapers }: Props) {
       <PaperList
         filterParams={{
           task: safeSlug,
-          sort,
+          sort: effectiveSort,
         }}
         period={mappedPeriod}
         initialPapers={sort === "popular" && period === "All time" ? initialPapers ?? null : null}

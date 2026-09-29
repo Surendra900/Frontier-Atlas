@@ -331,7 +331,14 @@ function formatSlug(slug: string): string {
 }
 
 function getTaskBySlug(slug: string) {
-  return tasks.find((task) => task.slug === slug);
+  const raw = (slug || "").trim().toLowerCase();
+  const normalized =
+    raw === "reasoning"
+      ? "reasoning-models"
+      : raw === "ss1" || raw === "ssl"
+      ? "small-language-models"
+      : raw;
+  return tasks.find((task) => task.slug === normalized || task.slug === raw);
 }
 
 function getTaskMetadata(slug: string) {

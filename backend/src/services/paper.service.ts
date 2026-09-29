@@ -234,7 +234,14 @@ export const getPapers = async (
 
   const where: Prisma.PaperWhereInput = {};
 
-  if (query.task) where.tasks = { some: { task: { slug: query.task } } };
+  if (query.task) {
+    const rawTask = query.task.toLowerCase().trim();
+    const taskSlugs = [rawTask];
+    if (rawTask === "reasoning") taskSlugs.push("reasoning-models");
+    if (rawTask === "reasoning-models") taskSlugs.push("reasoning");
+    if (rawTask === "ss1" || rawTask === "ssl") taskSlugs.push("small-language-models");
+    where.tasks = { some: { task: { slug: { in: taskSlugs } } } };
+  }
   if (query.method) where.methods = { some: { method: { slug: query.method } } };
   if (query.model) where.models = { some: { model: { slug: query.model } } };
   if (query.organization) {
@@ -245,8 +252,7 @@ export const getPapers = async (
     ];
   }
 
-  // Enforce papers must have at least one task/method
-  // Only enforce sotaClaim/ranking on the general feed to avoid flooding
+  // Enforce papers must have at least one task or method tag
   const mandatoryConditions: any[] = [
     {
       OR: [
@@ -255,15 +261,6 @@ export const getPapers = async (
       ]
     }
   ];
-
-  if (!query.task && !query.method && !query.model && !query.organization) {
-    mandatoryConditions.push({
-      OR: [
-        { sotaClaims: { some: {} } },
-        { rankings: { some: {} } }
-      ]
-    });
-  }
 
   where.AND = [
     ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
@@ -355,6 +352,22 @@ export const getPapers = async (
         });
       },
     );
+
+    // If still 0 papers and period was restricted, gracefully fallback to all dates
+    if ((!papers || papers.length === 0) && period !== "all") {
+      activeWhere = { ...where, publicationDate: { not: null } };
+      papers = await queryRouter.routeQuery<any[]>(
+        async (prisma: PrismaClient) => {
+          return prisma.paper.findMany({
+            where: activeWhere,
+            orderBy,
+            take: limit + 1,
+            skip,
+            select: paperSelect,
+          });
+        },
+      );
+    }
   }
 
   const safePapers = Array.isArray(papers) ? papers : [];

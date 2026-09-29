@@ -48,7 +48,13 @@ function getFilterParams(slug: string) {
       params.task = "agents";
       break;
     case "reasoning":
-      params.task = "reasoning";
+    case "reasoning-models":
+      params.task = "reasoning-models";
+      break;
+    case "ss1":
+    case "ssl":
+    case "small-language-models":
+      params.task = "small-language-models";
       break;
     case "language-modeling":
       params.task = "language-modeling";
@@ -111,8 +117,9 @@ function getFilterParams(slug: string) {
 
 function getPeriodParam(selectedPeriod: string) {
   switch (selectedPeriod) {
+    case "Latest":
     case "Today":
-      return "today";
+      return "all";
     case "This Week":
       return "week";
     case "This Month":
@@ -120,7 +127,7 @@ function getPeriodParam(selectedPeriod: string) {
     case "All time":
       return "all";
     default:
-      return "today";
+      return "all";
   }
 }
 

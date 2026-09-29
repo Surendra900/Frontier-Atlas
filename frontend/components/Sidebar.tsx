@@ -34,7 +34,11 @@ import { getPapers } from "@/lib/paperApi";
 
 type SidebarProps = {
   onItemClick?: () => void;
-  onItemSelect?: (label: string) => void;
+  onItemSelect?: (
+    label: string,
+    slug?: string,
+    categoryType?: "discover" | "task" | "method"
+  ) => void;
   initialActive?: string;
 };
 
@@ -58,7 +62,7 @@ function SidebarItem({
 }: {
   item: SidebarItem;
   isActive: boolean;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent) => void;
   href: string;
   onMouseEnter?: () => void;
 }) {
@@ -265,6 +269,12 @@ export default function Sidebar({
       color: "#596A82",
     },
     {
+      label: "Small Language Models",
+      icon: Cube,
+      slug: "small-language-models",
+      color: "#4B6B8A",
+    },
+    {
       label: "All Tasks",
       icon: Files,
       slug: "",
@@ -449,9 +459,18 @@ export default function Sidebar({
   // ITEM CLICK
   // ============================================================
 
-  const handleItemClick = (label: string) => {
-    setActiveItem(label);
-    onItemSelect?.(label);
+  const handleItemClick = (
+    e: React.MouseEvent,
+    item: SidebarItem,
+    categoryType: "discover" | "task" | "method"
+  ) => {
+    setActiveItem(item.label);
+    if (onItemSelect && item.slug !== "") {
+      e.preventDefault();
+      onItemSelect(item.label, item.slug, categoryType);
+      onItemClick?.();
+      return;
+    }
     onItemClick?.();
   };
 
@@ -464,24 +483,21 @@ export default function Sidebar({
 
       <div className="px-2 pt-1 space-y-1">
 
-
         {/* ======================================================
             DISCOVER
             ====================================================== */}
 
-
-
         <SidebarSection title="Discover">
-  {discover.map((item) => (
-    <SidebarItem
-      key={item.label}
-      item={item}
-      isActive={activeItem === item.label}
-      onClick={() => handleItemClick(item.label)}
-      href="/#all-time"
-    />
-  ))}
-</SidebarSection>
+          {discover.map((item) => (
+            <SidebarItem
+              key={item.label}
+              item={item}
+              isActive={activeItem === item.label}
+              onClick={(e) => handleItemClick(e, item, "discover")}
+              href={item.slug === "trending" ? "/#trending" : item.slug === "latest" ? "/#latest" : "/#stars"}
+            />
+          ))}
+        </SidebarSection>
 
         {/* ======================================================
             TASKS
@@ -493,9 +509,7 @@ export default function Sidebar({
               key={item.label}
               item={item}
               isActive={activeItem === item.label}
-              onClick={() =>
-                handleItemClick(item.label)
-              }
+              onClick={(e) => handleItemClick(e, item, "task")}
               onMouseEnter={() => {
                 if (item.slug) {
                   void getPapers({
@@ -507,7 +521,7 @@ export default function Sidebar({
               }}
               href={
                 item.slug
-                  ? `/tasks/${item.slug}`
+                  ? `/?task=${item.slug}`
                   : "/tasks"
               }
             />
@@ -524,12 +538,10 @@ export default function Sidebar({
               key={item.label}
               item={item}
               isActive={activeItem === item.label}
-              onClick={() =>
-                handleItemClick(item.label)
-              }
+              onClick={(e) => handleItemClick(e, item, "method")}
               href={
                 item.slug
-                  ? `/methods/${item.slug}`
+                  ? `/?method=${item.slug}`
                   : "/methods"
               }
             />

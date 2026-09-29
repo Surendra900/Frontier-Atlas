@@ -8,7 +8,7 @@ const TAB_TO_PERIOD: Record<string, string> = {
   "All time": "all",
   "This Month": "month",
   "This Week": "week",
-  Latest: "today",
+  Latest: "all",
 };
 
 interface PaperTabsProps {
@@ -32,7 +32,8 @@ export default function PaperTabs({
 
   const handleTabHover = (tab: string) => {
     const period = TAB_TO_PERIOD[tab] || "all";
-    getPapers({ page: 1, sort: "trending", period }).catch(() => {});
+    const sort = tab === "Latest" ? "latest" : "trending";
+    getPapers({ page: 1, sort, period }).catch(() => {});
   };
 
   return (
