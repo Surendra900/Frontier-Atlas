@@ -248,8 +248,17 @@ function getCacheKey(params: GetPapersParams): string {
       : rawTask === "ss1" || rawTask === "ssl"
       ? "small-language-models"
       : rawTask;
+  const rawMethod = params.method ? params.method.toLowerCase().trim() : "none";
+  const normalizedMethod =
+    rawMethod === "policy-learning" || rawMethod === "reinforcement-learning"
+      ? "reinforcement-learning"
+      : rawMethod === "diffusion-models" || rawMethod === "diffusion"
+      ? "diffusion"
+      : rawMethod === "rag" || rawMethod === "retrieval-augmented-generation"
+      ? "retrieval-augmented-generation"
+      : rawMethod;
   const safePeriod = params.period === "today" ? "all" : (params.period ?? "all");
-  return `papers_v5:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "none"}:${safePeriod}:${normalizedTask}:${params.method ?? "none"}:${params.model ?? "none"}:${params.organization ?? "none"}`;
+  return `papers_v5:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "none"}:${safePeriod}:${normalizedTask}:${normalizedMethod}:${params.model ?? "none"}:${params.organization ?? "none"}`;
 }
 
 // In-memory cache — fastest possible, zero deserialization cost
@@ -483,7 +492,18 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
             : rawTask;
         query.append("task", normalizedTask);
       }
-      if (params.method) query.append("method", params.method);
+      if (params.method) {
+        const rawMethod = params.method.toLowerCase().trim();
+        const normalizedMethod =
+          rawMethod === "policy-learning" || rawMethod === "reinforcement-learning"
+            ? "reinforcement-learning"
+            : rawMethod === "diffusion-models" || rawMethod === "diffusion"
+            ? "diffusion"
+            : rawMethod === "rag" || rawMethod === "retrieval-augmented-generation"
+            ? "retrieval-augmented-generation"
+            : rawMethod;
+        query.append("method", normalizedMethod);
+      }
       if (params.model) query.append("model", params.model);
       if (params.organization) query.append("organization", params.organization);
       if (params.sort) query.append("sort", params.sort);

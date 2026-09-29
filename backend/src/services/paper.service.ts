@@ -242,7 +242,23 @@ export const getPapers = async (
     if (rawTask === "ss1" || rawTask === "ssl") taskSlugs.push("small-language-models");
     where.tasks = { some: { task: { slug: { in: taskSlugs } } } };
   }
-  if (query.method) where.methods = { some: { method: { slug: query.method } } };
+  if (query.method) {
+    const rawMethod = query.method.toLowerCase().trim();
+    const methodSlugs = [rawMethod];
+    if (rawMethod === "policy-learning" || rawMethod === "reinforcement-learning") {
+      methodSlugs.push("reinforcement-learning", "policy-learning");
+    }
+    if (rawMethod === "diffusion-models" || rawMethod === "diffusion") {
+      methodSlugs.push("diffusion", "diffusion-models");
+    }
+    if (rawMethod === "transformer" || rawMethod === "transformers") {
+      methodSlugs.push("transformer", "transformers");
+    }
+    if (rawMethod === "rag" || rawMethod === "retrieval-augmented-generation") {
+      methodSlugs.push("retrieval-augmented-generation", "rag");
+    }
+    where.methods = { some: { method: { slug: { in: methodSlugs } } } };
+  }
   if (query.model) where.models = { some: { model: { slug: query.model } } };
   if (query.organization) {
     const orgName = query.organization.trim();

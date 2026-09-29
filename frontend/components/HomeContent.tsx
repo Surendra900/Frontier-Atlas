@@ -256,7 +256,15 @@ export default function HomeContent({
   };
 
   if (selectedMethod) {
-    dynamicFilterParams.method = selectedMethod.toLowerCase();
+    const cleanMethod = selectedMethod.toLowerCase().trim();
+    dynamicFilterParams.method =
+      cleanMethod === "policy-learning" || cleanMethod === "reinforcement-learning"
+        ? "reinforcement-learning"
+        : cleanMethod === "diffusion-models" || cleanMethod === "diffusion"
+        ? "diffusion"
+        : cleanMethod === "rag" || cleanMethod === "retrieval-augmented-generation"
+        ? "retrieval-augmented-generation"
+        : cleanMethod;
   } else if (selectedTag) {
     const cleanTag = selectedTag.toLowerCase().trim();
     if (cleanTag === "model-context-protocol-mcp" || cleanTag === "mcp") {
