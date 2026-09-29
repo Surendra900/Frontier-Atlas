@@ -20,7 +20,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { PaperDetail as PaperDetailType, PaperRanking, PaperSotaClaim } from "@/lib/papers";
-import { getPapers, getArxivAbsUrl, getArxivPdfUrl, paperHasTags, getPreferredModelPlatform, type ModelPlatformInfo, type Paper } from "@/lib/paperApi";
+import { getPapers, getArxivAbsUrl, getArxivPdfUrl, getPreferredModelPlatform, type ModelPlatformInfo, type Paper } from "@/lib/paperApi";
 import { atlasUiFont } from "@/lib/fonts";
 
 
@@ -1033,10 +1033,6 @@ const { addRecentPaper } = useRecentPapers();
     const id = requestAnimationFrame(() => setDeferred(true));
     return () => cancelAnimationFrame(id);
   }, []);
-
-  if (paper && !paperHasTags(paper as any)) {
-    return null;
-  }
 
   return (
     <div className={`${atlasUiFont.className} min-h-screen bg-[#F8F7F2] text-[#171717] tracking-tight selection:bg-[rgba(255,90,31,0.16)]`}>

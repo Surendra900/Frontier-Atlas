@@ -546,6 +546,7 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
   const githubRepo = paper.repositories?.find((repo: any) =>
     repo.url?.includes("github.com"),
   );
+
   const [preferredPlatform, setPreferredPlatform] = useState<ModelPlatformInfo | null>(null);
 
   useEffect(() => {
@@ -559,19 +560,11 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
       active = false;
     };
   }, [paper]);
-  const resolvedGithubUrl = paper.githubUrl || githubRepo?.url || null;
-  const huggingFaceRepo = paper.repositories?.find((repo: any) =>
-    repo.url?.includes("huggingface.co"),
-  );
 
   const handlePrefetch = useCallback(() => {
     router.prefetch(`/papers/${paper.slug}`);
     prefetchPaperBySlug(paper.slug);
   }, [router, paper.slug]);
-
-  if (!paperHasTags(paper)) {
-    return null;
-  }
   return (
     <div
       className="block"
@@ -828,7 +821,11 @@ export const PaperCard = memo(({ paper }: { paper: Paper }) => {
                   <span className="hidden lg:block text-[12px] text-[#666] xl:hidden">Trending</span>
                 </div>
               </div>
-              <ArrowUpRight size={14} strokeWidth={1.5} className="text-[#9CA3AF] hidden lg:block xl:hidden" />
+              <ArrowUpRight
+                size={14}
+                strokeWidth={1.5}
+                className="text-[#9CA3AF] hidden lg:block xl:hidden"
+              />
             </button>
           </div>
         </div>
@@ -1256,7 +1253,9 @@ export default function PaperList({
       setPage(1);
       setTotalPapers(cached.total);
       setHasMore(cached.hasMore);
-      const visible = (normalizedSearchQuery ? cached.papers.filter(matchesSearch) : cached.papers).filter(paperHasTags);
+      const visible = normalizedSearchQuery
+        ? cached.papers.filter(matchesSearch)
+        : cached.papers;
       setPapers(visible);
       setLoading(false);
       void loadPage(1, itemsPerPage, true);
