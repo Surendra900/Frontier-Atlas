@@ -41,13 +41,19 @@ app.use(
   "*",
   cors({
     origin: (origin) => {
-  // Allow local development, production, and Cloudflare Pages previews
+  // Allow local development, production, Cloudflare Pages, Vercel, and preview domains
   if (
     !origin ||
     origin.includes("localhost") ||
     origin.includes("127.0.0.1") ||
     origin === "https://frontieratlas.co" ||
-    /^https:\/\/[a-z0-9-]+\.frontieratlas\.pages\.dev$/.test(origin)
+    origin.endsWith(".frontieratlas.pages.dev") ||
+    origin.endsWith(".pages.dev") ||
+    origin.endsWith(".vercel.app") ||
+    origin.includes("ngrok") ||
+    origin.includes("localtunnel") ||
+    origin.includes("serveousercontent.com") ||
+    origin.includes("pinggy")
   ) {
     return origin;
   }
