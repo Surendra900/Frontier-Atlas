@@ -16,7 +16,6 @@ import {
   GitBranch,
 } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useState, useCallback, useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { PaperDetail as PaperDetailType, PaperRanking, PaperSotaClaim } from "@/lib/papers";
@@ -502,10 +501,15 @@ function BenchmarksSection({
   models: PaperDetailType["models"];
   sotaClaims: PaperSotaClaim[];
 }) {
-  const sotaBenchmarkIds = new Set(sotaClaims.map((claim) => claim.benchmark_id));
-  const sortedRankings = [...rankings].sort((a, b) => a.rank - b.rank);
-  const modelName = models[0]?.name ?? null;
-  const showRankDelta = sortedRankings.some((ranking) => ranking.previous_rank != null);
+  const safeRankings = Array.isArray(rankings) ? rankings : [];
+  const safeSotaClaims = Array.isArray(sotaClaims) ? sotaClaims : [];
+  const safeModels = Array.isArray(models) ? models : [];
+
+  const sotaBenchmarkIds = new Set(safeSotaClaims.map((claim) => claim?.benchmark_id).filter(Boolean));
+  const sortedRankings = [...safeRankings].sort((a, b) => (a?.rank ?? 0) - (b?.rank ?? 0));
+  const firstModel = safeModels[0];
+  const modelName = (firstModel as any)?.name || (firstModel as any)?.model?.name || null;
+  const showRankDelta = sortedRankings.some((ranking) => ranking?.previous_rank != null);
   const desktopGridClass = showRankDelta
     ? "grid grid-cols-[80px_minmax(0,1.3fr)_minmax(160px,1fr)_84px_104px] items-center"
     : "grid grid-cols-[80px_minmax(0,1.3fr)_minmax(160px,1fr)_104px] items-center";
@@ -515,7 +519,7 @@ function BenchmarksSection({
     <div className="flex flex-col gap-6">
       <h2 className="section-label">BENCHMARKS</h2>
 
-      {sortedRankings.length > 0 || sotaClaims.length > 0 ? (
+      {sortedRankings.length > 0 ? (
         <>
           {/* Desktop table */}
           <div className="hidden md:block">
@@ -532,6 +536,7 @@ function BenchmarksSection({
 
               {sortedRankings.map((ranking) => {
                 const isSota = sotaBenchmarkIds.has(ranking.benchmark_id);
+                const benchmarkName = ranking.benchmark?.name || (ranking as any).benchmark_name || "Benchmark";
                 return (
                   <div
                     key={ranking.id}
@@ -542,7 +547,7 @@ function BenchmarksSection({
                     </div>
                     <div className={`${desktopCellClass} min-w-0`}>
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-[14px] font-semibold text-[#171717]">{ranking.benchmark.name}</span>
+                        <span className="text-[14px] font-semibold text-[#171717]">{benchmarkName}</span>
                         {isSota && (
                           <span className="inline-flex items-center gap-1 rounded-full border border-[#F0DECF] bg-[#FFF9F4] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.06em] text-[#B48C52]">
                             SOTA
@@ -579,6 +584,7 @@ function BenchmarksSection({
               const isSota = sotaBenchmarkIds.has(ranking.benchmark_id);
               const improved = ranking.previous_rank != null && ranking.rank < ranking.previous_rank;
               const worsened = ranking.previous_rank != null && ranking.rank > ranking.previous_rank;
+              const benchmarkName = ranking.benchmark?.name || (ranking as any).benchmark_name || "Benchmark";
               return (
                 <div key={ranking.id} className="py-3 border-b border-[#EDE8DF]">
                   <div className="flex items-center justify-between gap-2 mb-1">
@@ -591,7 +597,7 @@ function BenchmarksSection({
                       </span>
                     )}
                   </div>
-                  <p className="text-[14px] font-semibold text-[#171717] m-0 mb-1">{ranking.benchmark.name}</p>
+                  <p className="text-[14px] font-semibold text-[#171717] m-0 mb-1">{benchmarkName}</p>
                   <div className="flex items-center gap-2">
                     <span className="text-[13px] text-[#8B8B8B]">{modelName ?? "—"}</span>
                     {improved && (
@@ -610,16 +616,19 @@ function BenchmarksSection({
             })}
           </div>
         </>
-      ) : sotaClaims.length > 0 ? (
+      ) : safeSotaClaims.length > 0 ? (
         <div className="space-y-3">
-          {sotaClaims.map((claim) => (
-            <div key={claim.id} className="flex items-center gap-3 rounded-xl border border-[#F0DECF] bg-[#FFF9F4] px-4 py-3.5">
-              <span className="text-[8px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 uppercase">SOTA</span>
-              <div className="min-w-0">
-                <p className="text-[14px] font-semibold text-[#171717]">{claim.benchmark.name}</p>
+          {safeSotaClaims.map((claim) => {
+            const benchmarkName = claim.benchmark?.name || (claim as any).benchmark_name || "Benchmark";
+            return (
+              <div key={claim.id} className="flex items-center gap-3 rounded-xl border border-[#F0DECF] bg-[#FFF9F4] px-4 py-3.5">
+                <span className="text-[8px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100 uppercase">SOTA</span>
+                <div className="min-w-0">
+                  <p className="text-[14px] font-semibold text-[#171717] m-0">{benchmarkName}</p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <span className="text-[13px] text-[#999] italic">Not available</span>
@@ -793,7 +802,7 @@ function RelatedPaperThumbnail({ paper }: { paper: Paper }) {
 export function RelatedPaperCard({ paper }: { paper: Paper }) {
   const displayAuthors = (() => {
     if (!Array.isArray(paper.authors) || paper.authors.length === 0) return "";
-    const names = paper.authors.map((a) => a.name);
+    const names = paper.authors.map((a: any) => typeof a === "string" ? a : (a?.name || "")).filter(Boolean);
     if (names.length > 2) return `${names.slice(0, 2).join(", ")} et al.`;
     return names.join(", ");
   })();
@@ -958,9 +967,9 @@ const { addRecentPaper } = useRecentPapers();
 
   useEffect(() => {
     async function loadRelated() {
-      const taskSlugs = [...new Set((paper.tasks || []).map((t) => t.slug))];
-      const methodSlugs = [...new Set((paper.methods || []).map((m) => m.slug))];
-      const modelSlugs = [...new Set((paper.models || []).map((m) => m.slug))];
+      const taskSlugs = [...new Set((paper.tasks || []).map((t) => t?.slug).filter((s): s is string => typeof s === "string" && s.trim().length > 0))];
+      const methodSlugs = [...new Set((paper.methods || []).map((m) => m?.slug).filter((s): s is string => typeof s === "string" && s.trim().length > 0))];
+      const modelSlugs = [...new Set((paper.models || []).map((m: any) => m?.slug || m?.model?.slug).filter((s): s is string => typeof s === "string" && s.trim().length > 0))];
 
       if (taskSlugs.length === 0 && methodSlugs.length === 0 && modelSlugs.length === 0) {
         setRelatedLoading(false);
@@ -996,7 +1005,8 @@ const { addRecentPaper } = useRecentPapers();
         const currentId = String(paper.id);
 
         for (const result of results) {
-          for (const p of result.papers) {
+          const papersList = Array.isArray(result?.papers) ? result.papers : [];
+          for (const p of papersList) {
             const id = String(p.id);
             if (id === currentId) continue;
             const existing = score.get(id);
@@ -1110,20 +1120,24 @@ const { addRecentPaper } = useRecentPapers();
                   <div className="flex flex-wrap items-center">
                     {(paper.authors || [])
                       .slice(0, showAllAuthors ? paper.authors.length : 3)
-                      .map((pa, i, arr) => (
-                        <span key={pa.id || i} className="inline-flex items-center">
-                          <Link
-                            href={`/authors/${pa.slug || pa.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`}
-                            className="text-[14px] font-semibold text-[#444444] hover:text-[#F55036] hover:underline cursor-pointer no-underline"
-                          >
-                            {pa.name}
-                          </Link>
+                      .map((pa, i, arr) => {
+                        const authorName = pa.name || "Unknown Author";
+                        const authorSlug = pa.slug || authorName.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+                        return (
+                          <span key={pa.id || i} className="inline-flex items-center">
+                            <Link
+                              href={`/authors/${authorSlug}`}
+                              className="text-[14px] font-semibold text-[#444444] hover:text-[#F55036] hover:underline cursor-pointer no-underline"
+                            >
+                              {authorName}
+                            </Link>
 
-                          {i < arr.length - 1 && (
-                            <span className="ml-0.5 mr-1 text-[#171717] font-bold">,</span>
-                          )}
-                        </span>
-                      ))}
+                            {i < arr.length - 1 && (
+                              <span className="ml-0.5 mr-1 text-[#171717] font-bold">,</span>
+                            )}
+                          </span>
+                        );
+                      })}
                     {(paper.authors || []).length > 3 && (
                       <span className="inline-flex items-center">
                         <button
@@ -1136,18 +1150,26 @@ const { addRecentPaper } = useRecentPapers();
                       </span>
                     )}
                   </div>
-                  {paper.publicationDate && (
-                    <div className="flex items-center gap-1.5 text-[14px] text-[#666]">
-                      <span className="text-[#B0B0B0]">•</span>
-                      <span>
-                        {new Date(paper.publicationDate).toLocaleDateString("en-US", {
-                          year: "numeric",
-                          month: "long",
-                          day: "numeric",
-                        })}
-                      </span>
-                    </div>
-                  )}
+                  {paper.publicationDate && (() => {
+                    try {
+                      const d = new Date(paper.publicationDate);
+                      if (isNaN(d.getTime())) return null;
+                      return (
+                        <div className="flex items-center gap-1.5 text-[14px] text-[#666]">
+                          <span className="text-[#B0B0B0]">•</span>
+                          <span>
+                            {d.toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })}
+                          </span>
+                        </div>
+                      );
+                    } catch {
+                      return null;
+                    }
+                  })()}
                 </div>
 
                 {/* Action buttons */}
@@ -1240,15 +1262,28 @@ const { addRecentPaper } = useRecentPapers();
                 </div>
 
                 {/* Benchmark Highlights */}
-                {paper.rankings && paper.rankings.length > 0 && (
+                {((paper.rankings && paper.rankings.length > 0) || (paper.sotaClaims && paper.sotaClaims.length > 0)) && (
                   <div className="flex flex-col gap-2 pt-3 border-l-[3px] border-[rgba(255,90,31,0.15)] pl-4">
-                    {paper.rankings.slice(0, 3).map((ranking) => (
-                      <div key={ranking.id} className="flex items-center gap-2 text-[13.5px] font-semibold text-[#171717]">
-                        <span className="text-[#FF5A1F]">#{ranking.rank}</span>
-                        <span className="text-[#8B8B8B] font-medium">on</span>
-                        <span className="hover:text-[#FF5A1F] transition-colors cursor-pointer border-b border-transparent hover:border-[rgba(255,90,31,0.3)]">{ranking.benchmark.name}</span>
-                      </div>
-                    ))}
+                    {(paper.rankings || []).slice(0, 3).map((ranking) => {
+                      const bmName = ranking.benchmark?.name || (ranking as any).benchmark_name || "Benchmark";
+                      return (
+                        <div key={ranking.id} className="flex items-center gap-2 text-[13.5px] font-semibold text-[#171717]">
+                          <span className="text-[#FF5A1F]">#{ranking.rank}</span>
+                          <span className="text-[#8B8B8B] font-medium">on</span>
+                          <span className="hover:text-[#FF5A1F] transition-colors cursor-pointer border-b border-transparent hover:border-[rgba(255,90,31,0.3)]">{bmName}</span>
+                        </div>
+                      );
+                    })}
+                    {(!paper.rankings || paper.rankings.length === 0) && (paper.sotaClaims || []).slice(0, 3).map((claim) => {
+                      const bmName = claim.benchmark?.name || (claim as any).benchmark_name || "Benchmark";
+                      return (
+                        <div key={claim.id} className="flex items-center gap-2 text-[13.5px] font-semibold text-[#171717]">
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-black bg-blue-50 text-blue-600 border border-blue-100 uppercase">SOTA</span>
+                          <span className="text-[#8B8B8B] font-medium">on</span>
+                          <span className="text-[#171717] font-semibold">{bmName}</span>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1352,16 +1387,22 @@ const { addRecentPaper } = useRecentPapers();
                 <h3 className="text-[11px] font-black uppercase tracking-[0.1em] text-[#8B8B8B] m-0">MODELS</h3>
                 {(paper.models || []).length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
-                    {(paper.models || []).map((m, i) => (
-  <Link
-    key={m.id || m.slug || i}
-                        href={`/models/${m.slug}`}
-                        className="inline-flex items-center gap-1 rounded-[4px] border border-[#FDE4C8] bg-[#FFF8F0] px-2 py-0.5 text-[12.5px] font-medium text-[#A45C00] no-underline hover:opacity-80 transition-opacity"
-                      >
-                        <span className="w-1 h-1 rounded-full bg-[#A45C00] opacity-50" />
-                        {m.name}
-                      </Link>
-                    ))}
+                    {(paper.models || []).map((m: any, i: number) => {
+                      const modelSlug = m?.slug || m?.model?.slug;
+                      const modelName = m?.name || m?.model?.name;
+                      const modelId = m?.id || m?.model?.id || i;
+                      if (!modelSlug && !modelName) return null;
+                      return (
+                        <Link
+                          key={modelId}
+                          href={modelSlug ? `/models/${modelSlug}` : "#"}
+                          className="inline-flex items-center gap-1 rounded-[4px] border border-[#FDE4C8] bg-[#FFF8F0] px-2 py-0.5 text-[12.5px] font-medium text-[#A45C00] no-underline hover:opacity-80 transition-opacity"
+                        >
+                          <span className="w-1 h-1 rounded-full bg-[#A45C00] opacity-50" />
+                          {modelName || modelSlug}
+                        </Link>
+                      );
+                    })}
                   </div>
                 ) : (
                   <span className="text-[13px] text-[#999] italic">Not available</span>
@@ -1371,18 +1412,24 @@ const { addRecentPaper } = useRecentPapers();
               {/* DATASETS */}
               <section className="flex flex-col gap-3">
                 <h3 className="text-[11px] font-black uppercase tracking-[0.1em] text-[#8B8B8B] m-0">DATASETS</h3>
-                {paper.datasets.length > 0 ? (
+                {(paper.datasets || []).length > 0 ? (
                   <div className="flex flex-wrap gap-1.5">
-                    {paper.datasets.map((d) => (
-                      <Link
-                        key={d.id}
-                        href={`/datasets/${d.slug}`}
-                        className="inline-flex items-center gap-1 rounded-[4px] border border-[#D0E6F2] bg-[#EDF5FA] px-2 py-0.5 text-[12.5px] font-medium text-[#2C617D] no-underline hover:opacity-80 transition-opacity"
-                      >
-                        <span className="w-1 h-1 rounded-full bg-[#2C617D] opacity-50" />
-                        {d.name}
-                      </Link>
-                    ))}
+                    {(paper.datasets || []).map((d: any, i: number) => {
+                      const datasetSlug = d?.slug || d?.dataset?.slug;
+                      const datasetName = d?.name || d?.dataset?.name;
+                      const datasetId = d?.id || d?.dataset?.id || i;
+                      if (!datasetSlug && !datasetName) return null;
+                      return (
+                        <Link
+                          key={datasetId}
+                          href={datasetSlug ? `/datasets/${datasetSlug}` : "#"}
+                          className="inline-flex items-center gap-1 rounded-[4px] border border-[#D0E6F2] bg-[#EDF5FA] px-2 py-0.5 text-[12.5px] font-medium text-[#2C617D] no-underline hover:opacity-80 transition-opacity"
+                        >
+                          <span className="w-1 h-1 rounded-full bg-[#2C617D] opacity-50" />
+                          {datasetName || datasetSlug}
+                        </Link>
+                      );
+                    })}
                   </div>
                 ) : (
                   <span className="text-[13px] text-[#999] italic">Not available</span>

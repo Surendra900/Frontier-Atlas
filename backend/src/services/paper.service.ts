@@ -386,115 +386,137 @@ export const getPapers = async (
 
 export const getPaperBySlug = async (queryRouter: QueryRouter, slug: string) => {
   if (!slug) return null;
+  const decodedSlug = decodeURIComponent(slug);
+
+  const paperSelect = {
+    id: true,
+    slug: true,
+    title: true,
+    abstract: true,
+    tlDr: true,
+    publicationDate: true,
+    submissionDate: true,
+    arxivId: true,
+    doi: true,
+    paperUrl: true,
+    pdfUrl: true,
+    thumbnailUrl: true,
+    sourceUrl: true,
+    projectUrl: true,
+    citationCount: true,
+    referenceCount: true,
+    pageCount: true,
+    paperType: true,
+    status: true,
+    language: true,
+    license: true,
+    updatedAt: true,
+    githubForks: true,
+    githubStars: true,
+    github_hourly_increase: true,
+    githubUrl: true,
+    hfUrl: true,
+    isOfficialCode: true,
+    discoverySource: true,
+    authors: true,
+    models: {
+      include: {
+        model: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            parameterCount: true,
+            architecture: true,
+            vendor: true,
+            vendor_logo_url: true,
+            modelFamily: true,
+            description: true,
+            repositoryUrl: true,
+          },
+        },
+      },
+    },
+    datasets: {
+      select: {
+        dataset: { select: { id: true, name: true, slug: true } },
+      },
+    },
+    tasks: {
+      orderBy: { task: { name: "asc" } },
+      select: {
+        task: { select: { id: true, name: true, slug: true, color: true } },
+      },
+    },
+    methods: {
+      orderBy: { method: { name: "asc" } },
+      select: {
+        method: { select: { id: true, name: true, slug: true } },
+      },
+    },
+    conferences: {
+      select: {
+        conference: { select: { id: true, name: true, slug: true } },
+      },
+    },
+    rankings: {
+      select: {
+        id: true,
+        paper_id: true,
+        benchmark_id: true,
+        rank: true,
+        previous_rank: true,
+        benchmark: { select: { id: true, name: true, slug: true } },
+      },
+    },
+    sotaClaims: {
+      select: {
+        id: true,
+        paper_id: true,
+        benchmark_id: true,
+        benchmark: { select: { id: true, name: true, slug: true } },
+      },
+    },
+    repositories: {
+      select: {
+        repository: {
+          select: {
+            url: true,
+            owner: true,
+            name: true,
+          },
+        },
+      },
+    },
+    huggingface_url: true,
+    hfUpvotes: true,
+  } as const;
 
   return queryRouter.routeQuery(
     async (prisma: PrismaClient) => {
-      const paperData = await prisma.paper.findUnique({
-        where: { slug },
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-          abstract: true,
-          tlDr: true,
-          publicationDate: true,
-          submissionDate: true,
-          arxivId: true,
-          doi: true,
-          paperUrl: true,
-          pdfUrl: true,
-          thumbnailUrl: true,
-          sourceUrl: true,
-          projectUrl: true,
-          citationCount: true,
-          referenceCount: true,
-          pageCount: true,
-          paperType: true,
-          status: true,
-          language: true,
-          license: true,
-          updatedAt: true,
-          githubForks: true,
-          githubStars: true,
-          github_hourly_increase: true,
-          githubUrl: true,
-          hfUrl: true,
-          isOfficialCode: true,
-          discoverySource: true,
-          authors: true,
-          models: {
-            include: {
-              model: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                  parameterCount: true,
-                  architecture: true,
-                  vendor: true,
-                  vendor_logo_url: true,
-                  modelFamily: true,
-                  description: true,
-                  repositoryUrl: true,
-                },
-              },
-            },
-          },
-          datasets: {
-            select: {
-              dataset: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          tasks: {
-            orderBy: { task: { name: "asc" } },
-            select: {
-              task: { select: { id: true, name: true, slug: true, color: true } },
-            },
-          },
-          methods: {
-            orderBy: { method: { name: "asc" } },
-            select: {
-              method: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          conferences: {
-            select: {
-              conference: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          rankings: {
-            select: {
-              id: true,
-              paper_id: true,
-              benchmark_id: true,
-              rank: true,
-              previous_rank: true,
-              benchmark: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          sotaClaims: {
-            select: {
-              id: true,
-              paper_id: true,
-              benchmark_id: true,
-              benchmark: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          repositories: {
-            select: {
-              repository: {
-                select: {
-                  url: true,
-                  owner: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          huggingface_url: true,
-          hfUpvotes: true,
-        },
+      let paperData = await prisma.paper.findUnique({
+        where: { slug: decodedSlug },
+        select: paperSelect,
       });
+
+      if (!paperData && decodedSlug !== slug) {
+        paperData = await prisma.paper.findUnique({
+          where: { slug },
+          select: paperSelect,
+        });
+      }
+
+      if (!paperData) {
+        paperData = await prisma.paper.findFirst({
+          where: {
+            OR: [
+              { id: decodedSlug },
+              { arxivId: decodedSlug },
+            ],
+          },
+          select: paperSelect,
+        });
+      }
 
       if (!paperData) return null;
 
@@ -511,24 +533,32 @@ export const getPaperBySlug = async (queryRouter: QueryRouter, slug: string) => 
         thumbnail_url: resolvedThumb,
         authors: parseAuthors(paperData.authors),
         models: Array.isArray(paperData.models)
-          ? paperData.models.map((r: any) => ({ role: r.role, model: r.model }))
+          ? paperData.models
+              .filter(Boolean)
+              .map((r: any) => ({
+                id: r.model?.id || r.model_id,
+                name: r.model?.name || "",
+                slug: r.model?.slug || "",
+                role: r.role || "referenced",
+                model: r.model,
+              }))
           : [],
         datasets: Array.isArray(paperData.datasets)
-          ? paperData.datasets.map((r: any) => r.dataset)
+          ? paperData.datasets.map((r: any) => r?.dataset).filter(Boolean)
           : [],
         tasks: Array.isArray(paperData.tasks)
-          ? paperData.tasks.map((r: any) => r.task)
+          ? paperData.tasks.map((r: any) => r?.task).filter(Boolean)
           : [],
         methods: Array.isArray(paperData.methods)
-          ? paperData.methods.map((r: any) => r.method)
+          ? paperData.methods.map((r: any) => r?.method).filter(Boolean)
           : [],
         conferences: Array.isArray(paperData.conferences)
-          ? paperData.conferences.map((r: any) => r.conference)
+          ? paperData.conferences.map((r: any) => r?.conference).filter(Boolean)
           : [],
-        rankings: paperData.rankings || [],
-        sotaClaims: paperData.sotaClaims || [],
+        rankings: Array.isArray(paperData.rankings) ? paperData.rankings.filter(Boolean) : [],
+        sotaClaims: Array.isArray(paperData.sotaClaims) ? paperData.sotaClaims.filter(Boolean) : [],
         repositories: Array.isArray(paperData.repositories)
-          ? paperData.repositories.map((r: any) => r.repository)
+          ? paperData.repositories.map((r: any) => r?.repository).filter(Boolean)
           : [],
       };
     },

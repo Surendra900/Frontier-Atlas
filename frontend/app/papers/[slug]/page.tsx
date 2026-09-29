@@ -5,7 +5,7 @@ export const runtime = "edge";
 import { AlertCircle, BookOpen, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useState, useEffect, useLayoutEffect } from "react";
+import React, { useState, useEffect, useLayoutEffect, Component, type ErrorInfo, type ReactNode } from "react";
 import { getPaperBySlug, getPaperBySlugSync } from "@/lib/papers";
 import type { PaperDetail as PaperDetailType } from "@/lib/papers";
 import PaperDetail from "@/components/PaperDetail";
@@ -16,17 +16,100 @@ import Navbar from "@/components/Navbar";
 const useIsomorphicLayoutEffect =
   typeof window !== "undefined" ? useLayoutEffect : useEffect;
 
+class PaperDetailErrorBoundary extends Component<
+  { children: ReactNode; paper: PaperDetailType },
+  { hasError: boolean }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("PaperDetail render error boundary caught:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      const { paper } = this.props;
+      return (
+        <div className="w-full max-w-[1440px] mx-auto px-4 py-8 sm:px-6 md:px-12 lg:px-16">
+          <div className="bg-white rounded-2xl border border-[#EDE8DF] p-6 sm:p-10 shadow-sm space-y-6">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-orange-600 block mb-2">Research Paper</span>
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-[#171717] leading-tight">
+                {paper.title}
+              </h1>
+              {paper.authors && paper.authors.length > 0 && (
+                <p className="text-sm font-semibold text-[#666666] mt-2">
+                  {paper.authors.map((a) => a.name).join(", ")}
+                </p>
+              )}
+            </div>
+            {paper.abstract && (
+              <div className="border-t border-[#E5E5E0] pt-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[#8B8B8B] mb-2">Abstract</h3>
+                <p className="text-sm sm:text-base text-[#444444] leading-relaxed">
+                  {paper.abstract}
+                </p>
+              </div>
+            )}
+            <div className="flex flex-wrap gap-3 pt-2">
+              {paper.pdfUrl && (
+                <a
+                  href={paper.pdfUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-2.5 bg-[#FF5A1F] hover:bg-[#E0462D] text-white rounded-full text-sm font-semibold transition-colors no-underline"
+                >
+                  Read Paper PDF
+                </a>
+              )}
+              {paper.arxivId && (
+                <a
+                  href={`https://arxiv.org/abs/${paper.arxivId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-2.5 border border-[#E0DDD6] hover:bg-gray-50 text-[#171717] rounded-full text-sm font-semibold transition-colors no-underline"
+                >
+                  arXiv: {paper.arxivId}
+                </a>
+              )}
+              {paper.githubUrl && (
+                <a
+                  href={paper.githubUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-2.5 border border-[#E0DDD6] hover:bg-gray-50 text-[#171717] rounded-full text-sm font-semibold transition-colors no-underline"
+                >
+                  GitHub Repository
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function PaperPage() {
   const params = useParams();
-  const slug = params?.slug as string;
+  const rawSlug = Array.isArray(params?.slug) ? params.slug[0] : (params?.slug as string | undefined);
+  const slug = typeof rawSlug === "string" ? decodeURIComponent(rawSlug) : "";
 
   // ── Cache-first: read synchronously before first paint ──
   const [paper, setPaper] = useState<PaperDetailType | null>(() => {
-    if (typeof window === "undefined") return null;
+    if (typeof window === "undefined" || !slug) return null;
     return getPaperBySlugSync(slug);
   });
   const [loading, setLoading] = useState(() => {
-    if (typeof window === "undefined") return true;
+    if (typeof window === "undefined" || !slug) return true;
     return getPaperBySlugSync(slug) === null;
   });
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +125,7 @@ export default function PaperPage() {
       setPaper(cached);
       setLoading(false);
       // Silently refresh in background — no spinner shown
-      getPaperBySlug(slug).then(setPaper).catch(() => {});
+      getPaperBySlug(slug, true).then(setPaper).catch(() => {});
       return;
     }
 
@@ -127,7 +210,11 @@ export default function PaperPage() {
       </div>
     );
   } else if (paper) {
-    content = <PaperDetail paper={paper} />;
+    content = (
+      <PaperDetailErrorBoundary paper={paper}>
+        <PaperDetail paper={paper} />
+      </PaperDetailErrorBoundary>
+    );
   }
 
   return (
