@@ -3,17 +3,25 @@ const defaultApiUrl = process.env.NODE_ENV === "development"
   : "https://frontieratlas-backend.morningsignal-india.workers.dev";
 
 function getApiBase(): string {
-  // In development, directly connect to 127.0.0.1:8787 (avoids 5000ms Windows IPv6 localhost lag)
-  if (process.env.NODE_ENV === "development") {
-    return process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8787";
+  // If explicitly set via environment variable, use it
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
   }
-  return (process.env.NEXT_PUBLIC_API_URL || defaultApiUrl).replace(/\/$/, "");
+  // In browser, use same-origin relative path so Next.js rewrites proxy requests with 0 CORS issues
+  if (typeof window !== "undefined") {
+    return "";
+  }
+  // In development SSR, directly connect to 127.0.0.1:8787
+  if (process.env.NODE_ENV === "development") {
+    return "http://127.0.0.1:8787";
+  }
+  return defaultApiUrl;
 }
 
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const base = getApiBase();
-  let url = `${base}${path}`;
+  const url = `${base}${path}`;
   
   let response: Response;
   try {
@@ -27,19 +35,20 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
       },
     } as any);
   } catch (fetchErr) {
-    // Only fallback if NOT in development and on localhost
-    if (process.env.NODE_ENV === "production" && (base.includes("localhost") || base.includes("127.0.0.1"))) {
-      url = `https://frontieratlas-backend.morningsignal-india.workers.dev${path}`;
-
-      response = await fetch(url, {
-        ...options,
-        credentials: "include",
-        next: { revalidate: 120 },
-        headers: {
-          'Content-Type': 'application/json',
-          ...options.headers,
-        },
-      } as any);
+    // If direct external call failed (e.g. CORS preflight on preview domains), fallback to same-origin /api rewrite
+    if (typeof window !== "undefined" && url.startsWith("http") && !url.startsWith(window.location.origin)) {
+      try {
+        response = await fetch(path, {
+          ...options,
+          credentials: "include",
+          headers: {
+            'Content-Type': 'application/json',
+            ...options.headers,
+          },
+        } as any);
+      } catch {
+        throw fetchErr;
+      }
     } else {
       throw fetchErr;
     }
