@@ -251,14 +251,16 @@ function getCacheKey(params: GetPapersParams): string {
   const rawMethod = params.method ? params.method.toLowerCase().trim() : "none";
   const normalizedMethod =
     rawMethod === "policy-learning" || rawMethod === "reinforcement-learning"
-      ? "reinforcement-learning"
+      ? "policy-learning"
       : rawMethod === "diffusion-models" || rawMethod === "diffusion"
-      ? "diffusion"
+      ? "diffusion-models"
+      : rawMethod === "transformer" || rawMethod === "transformers"
+      ? "transformer"
       : rawMethod === "rag" || rawMethod === "retrieval-augmented-generation"
       ? "retrieval-augmented-generation"
       : rawMethod;
   const safePeriod = params.period === "today" ? "all" : (params.period ?? "all");
-  return `papers_v5:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "none"}:${safePeriod}:${normalizedTask}:${normalizedMethod}:${params.model ?? "none"}:${params.organization ?? "none"}`;
+  return `papers_v6:${params.page ?? 1}:${params.limit ?? 25}:${params.sort ?? "none"}:${safePeriod}:${normalizedTask}:${normalizedMethod}:${params.model ?? "none"}:${params.organization ?? "none"}`;
 }
 
 // In-memory cache — fastest possible, zero deserialization cost
@@ -496,9 +498,11 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
         const rawMethod = params.method.toLowerCase().trim();
         const normalizedMethod =
           rawMethod === "policy-learning" || rawMethod === "reinforcement-learning"
-            ? "reinforcement-learning"
+            ? "policy-learning"
             : rawMethod === "diffusion-models" || rawMethod === "diffusion"
-            ? "diffusion"
+            ? "diffusion-models"
+            : rawMethod === "transformer" || rawMethod === "transformers"
+            ? "transformer"
             : rawMethod === "rag" || rawMethod === "retrieval-augmented-generation"
             ? "retrieval-augmented-generation"
             : rawMethod;

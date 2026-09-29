@@ -259,9 +259,11 @@ export default function HomeContent({
     const cleanMethod = selectedMethod.toLowerCase().trim();
     dynamicFilterParams.method =
       cleanMethod === "policy-learning" || cleanMethod === "reinforcement-learning"
-        ? "reinforcement-learning"
+        ? "policy-learning"
         : cleanMethod === "diffusion-models" || cleanMethod === "diffusion"
-        ? "diffusion"
+        ? "diffusion-models"
+        : cleanMethod === "transformer" || cleanMethod === "transformers"
+        ? "transformer"
         : cleanMethod === "rag" || cleanMethod === "retrieval-augmented-generation"
         ? "retrieval-augmented-generation"
         : cleanMethod;

@@ -68,6 +68,11 @@ model Paper {
   summaries              Summary[]
   savedPapers            SavedPaper[]
 
+  // Performance indexes to prevent full table scans on sorts and feeds
+  @@index([publicationDate])
+  @@index([citationCount])
+  @@index([githubStars])
+  @@index([trendingScore])
   @@map("papers")
 }
 
