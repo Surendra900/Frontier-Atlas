@@ -483,7 +483,13 @@ export const getPapers = async (
         FROM paper_repositories pr
         JOIN repositories repo ON pr.repository_id = repo.id
         WHERE pr.paper_id = p.id
-      ), '[]'::json) as repositories
+      ), '[]'::json) as repositories,
+      COALESCE((
+        SELECT json_agg(json_build_object('model', json_build_object('id', mo.id, 'name', mo.name, 'slug', mo.slug, 'repositoryUrl', mo.repository_url, 'apiUrl', mo.api_url)))
+        FROM paper_models pmo
+        JOIN models mo ON pmo.model_id = mo.id
+        WHERE pmo.paper_id = p.id
+      ), '[]'::json) as models
     FROM selected_papers p
     ${orderSql};
   `;
