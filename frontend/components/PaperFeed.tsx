@@ -1002,6 +1002,9 @@ export default function PaperList({
   const [totalPapers, setTotalPapers] = useState(
     () => initialPapers?.total ?? 0,
   );
+  const [fallbackNotice, setFallbackNotice] = useState<string | null>(
+    () => initialPapers?.isFallback ? (initialPapers?.fallbackMessage || "Showing recent research across all periods.") : null
+  );
   const [displayCount, setDisplayCount] = useState(
     () => initialPapers?.papers?.length ?? 25,
   );
@@ -1132,7 +1135,7 @@ export default function PaperList({
   }, [filterParams?.task, selectedTag]);
 
   const safePeriod = useMemo(() => {
-    return period === "today" ? "all" : period;
+    return period || "all";
   }, [period]);
 
   const getCacheKey = useCallback(
@@ -1238,6 +1241,7 @@ export default function PaperList({
         setTotalPapers(result.total);
         setHasMore(result.hasMore);
         setPapers(visiblePapers);
+        setFallbackNotice(result.isFallback ? (result.fallbackMessage || "Showing recent research across all periods.") : null);
 
         // Pre-fetch next page if possible
         if (result.hasMore) {
@@ -1312,6 +1316,7 @@ export default function PaperList({
       setPage(1);
       setTotalPapers(cached.total);
       setHasMore(cached.hasMore);
+      setFallbackNotice(cached.isFallback ? (cached.fallbackMessage || "Showing recent research across all periods.") : null);
       const visible = normalizedSearchQuery
         ? cached.papers.filter(matchesSearch)
         : cached.papers;
@@ -1381,6 +1386,12 @@ export default function PaperList({
         className="bg-transparent grid grid-cols-1 md:grid-cols-2 xl:flex xl:flex-col gap-8 md:gap-10 xl:gap-5"
         data-page={page}
       >
+        {fallbackNotice && (
+          <div className="col-span-full mb-2 px-4 py-2.5 bg-[#FFFBEB] border border-[#FDE68A] rounded-xl text-[#92400E] text-xs flex items-center gap-2 shadow-xs">
+            <span className="font-semibold text-[#B45309]">Filter Note:</span>
+            <span>{fallbackNotice}</span>
+          </div>
+        )}
         {isTransitioning ||
         isFilterChanging ||
         (loading && papers.length === 0) ? (
@@ -1389,6 +1400,18 @@ export default function PaperList({
             <PaperCardSkeleton />
             <PaperCardSkeleton />
           </>
+        ) : filteredPapers.length === 0 ? (
+          <div className="col-span-full py-16 text-center flex flex-col items-center justify-center">
+            <div className="w-12 h-12 rounded-full bg-stone-100 flex items-center justify-center mb-3">
+              <FileText className="text-stone-400" size={24} />
+            </div>
+            <h3 className="text-stone-800 font-semibold text-base mb-1">No papers found</h3>
+            <p className="text-stone-500 text-sm max-w-sm">
+              {period && period !== "all"
+                ? `No papers found for "${period === "week" ? "This Week" : period === "month" ? "This Month" : period}". Try selecting "All Time" to view all research.`
+                : "No papers match your search criteria. Try adjusting your filters."}
+            </p>
+          </div>
         ) : (
           filteredPapers.slice(0, displayCount).map((paper, idx) => (
             <Fragment key={paper.slug}>

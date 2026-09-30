@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
   const rawSort = searchParams.get("sort") || "trending";
-  const rawPeriod = searchParams.get("period") || "all";
+  const period = searchParams.get("period") || "all";
   const rawTask = searchParams.get("task");
   const rawMethod = searchParams.get("method");
   const model = searchParams.get("model");
@@ -34,7 +34,6 @@ export async function GET(request: NextRequest) {
 
   const task = normalizeTaskSlug(rawTask);
   const method = normalizeMethodSlug(rawMethod);
-  const period = rawPeriod === "today" ? "all" : rawPeriod;
   const sort = rawSort;
 
   // ── Specific taxonomy filtering (task, method, model, organization) ─────────
@@ -58,15 +57,20 @@ export async function GET(request: NextRequest) {
       let data = await res.json();
       const papers = data?.data?.papers || [];
 
-      // If strict period filter resulted in < 3 papers, fallback to period=all for this taxonomy
-      if (papers.length < 3 && (period === "week" || period === "month")) {
+      // If strict period filter resulted in 0 or < 3 papers, fallback with transparent metadata
+      if (papers.length < 3 && (period === "week" || period === "month" || period === "today")) {
         upstreamParams.delete("period");
         upstreamUrl = `${PROD_BACKEND}/api/v1/research-papers?${upstreamParams.toString()}`;
         res = await fetch(upstreamUrl, {
           headers: { "Content-Type": "application/json" },
           next: { revalidate: 60 },
         });
-        data = await res.json();
+        const fallbackData = await res.json();
+        if (fallbackData?.data) {
+          fallbackData.data.isFallback = true;
+          fallbackData.data.fallbackMessage = `Fewer than 3 papers found in ${period === "today" ? "the last 24h" : period === "week" ? "this week" : "this month"} for this category. Showing all-time papers.`;
+        }
+        data = fallbackData;
       }
 
       return NextResponse.json(data, {
@@ -104,18 +108,38 @@ export async function GET(request: NextRequest) {
     const maxDate = dates.length > 0 ? Math.max(...dates) : Date.now();
 
     let pool = [...allPapers];
+    let isFallback = false;
+    let fallbackMessage = "";
 
-    if (period === "week") {
-      const weekCutoff = maxDate - 14 * 24 * 60 * 60 * 1000;
-      pool = allPapers.filter((p) => new Date(p.publicationDate).getTime() >= weekCutoff);
-      if (pool.length < 20) {
+    if (period === "today") {
+      const todayCutoff = maxDate - 48 * 60 * 60 * 1000;
+      const filtered = allPapers.filter((p) => new Date(p.publicationDate).getTime() >= todayCutoff);
+      if (filtered.length > 0) {
+        pool = filtered;
+      } else {
+        isFallback = true;
+        fallbackMessage = "No new papers published today. Showing recent research across all periods.";
+        pool = allPapers.slice(0, 20);
+      }
+    } else if (period === "week") {
+      const weekCutoff = maxDate - 7 * 24 * 60 * 60 * 1000;
+      const filtered = allPapers.filter((p) => new Date(p.publicationDate).getTime() >= weekCutoff);
+      if (filtered.length > 0) {
+        pool = filtered;
+      } else {
+        isFallback = true;
+        fallbackMessage = "No papers published this week. Showing recent research across all periods.";
         pool = allPapers.slice(0, 20);
       }
     } else if (period === "month") {
-      const monthCutoff = maxDate - 180 * 24 * 60 * 60 * 1000;
-      pool = allPapers.filter((p) => new Date(p.publicationDate).getTime() >= monthCutoff);
-      if (pool.length < 25) {
-        pool = allPapers.slice(0, 35);
+      const monthCutoff = maxDate - 30 * 24 * 60 * 60 * 1000;
+      const filtered = allPapers.filter((p) => new Date(p.publicationDate).getTime() >= monthCutoff);
+      if (filtered.length > 0) {
+        pool = filtered;
+      } else {
+        isFallback = true;
+        fallbackMessage = "No papers published this month. Showing recent research across all periods.";
+        pool = allPapers.slice(0, 30);
       }
     }
 
@@ -151,6 +175,8 @@ export async function GET(request: NextRequest) {
           total: pool.length,
           page,
           hasMore,
+          isFallback,
+          fallbackMessage,
         },
       },
       {

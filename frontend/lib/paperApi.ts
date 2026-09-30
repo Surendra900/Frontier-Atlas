@@ -65,6 +65,8 @@ export interface GetPapersResult {
   total: number;
   page: number;
   hasMore: boolean;
+  isFallback?: boolean;
+  fallbackMessage?: string;
 }
 
 function extractString(val: unknown): string {
@@ -529,6 +531,8 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
       if (process.env.NODE_ENV === "development") console.log(`[paperApi] getPapers complete in ${totalDuration.toFixed(2)}ms (mapping took ${mapDuration.toFixed(2)}ms)`);
 
       let validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+      let isLocalFallback = (response.data as any)?.isFallback || false;
+      let localFallbackMessage = (response.data as any)?.fallbackMessage || "";
 
       // Dual-layer safety: If a time-filter query returned only 1 paper (e.g. strict DB cutoff on legacy worker),
       // fetch period="all" and apply intelligent windowing so the user NEVER sees a broken single-paper feed
@@ -543,13 +547,25 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
             const maxDate = dates.length > 0 ? Math.max(...dates) : Date.now();
             let pool = fallbackPapers;
             if (params.period === "week") {
-              const weekCutoff = maxDate - 14 * 24 * 60 * 60 * 1000;
-              pool = fallbackPapers.filter(p => new Date(p.date).getTime() >= weekCutoff);
-              if (pool.length < 20) pool = fallbackPapers.slice(0, 20);
+              const weekCutoff = maxDate - 7 * 24 * 60 * 60 * 1000;
+              const filtered = fallbackPapers.filter(p => new Date(p.date).getTime() >= weekCutoff);
+              if (filtered.length > 0) {
+                pool = filtered;
+              } else {
+                isLocalFallback = true;
+                localFallbackMessage = "No papers published this week. Showing recent research across all periods.";
+                pool = fallbackPapers.slice(0, 20);
+              }
             } else if (params.period === "month") {
-              const monthCutoff = maxDate - 180 * 24 * 60 * 60 * 1000;
-              pool = fallbackPapers.filter(p => new Date(p.date).getTime() >= monthCutoff);
-              if (pool.length < 25) pool = fallbackPapers.slice(0, 35);
+              const monthCutoff = maxDate - 30 * 24 * 60 * 60 * 1000;
+              const filtered = fallbackPapers.filter(p => new Date(p.date).getTime() >= monthCutoff);
+              if (filtered.length > 0) {
+                pool = filtered;
+              } else {
+                isLocalFallback = true;
+                localFallbackMessage = "No papers published this month. Showing recent research across all periods.";
+                pool = fallbackPapers.slice(0, 35);
+              }
             }
             if (params.sort === "stars") {
               pool.sort((a, b) => {
@@ -570,6 +586,8 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
         total: validPapers.length > (response.data?.total ?? 0) ? validPapers.length : (response.data?.total ?? validPapers.length),
         page: response.data?.page ?? params.page ?? 1,
         hasMore: response.data?.hasMore ?? (validPapers.length >= (params.limit ?? 25)),
+        isFallback: isLocalFallback,
+        fallbackMessage: localFallbackMessage,
       };
 
       if (validPapers.length > 0) {

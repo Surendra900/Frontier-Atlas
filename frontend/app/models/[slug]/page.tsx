@@ -282,6 +282,42 @@ export default function ModelsListingPage({
     selectedContext !== "0" ||
     selectedPrice !== "0";
 
+  // 404 State if slug is invalid and no models match without active filters
+  if (!loading && models.length === 0 && !hasActiveFilters && rawSlug !== "all" && rawSlug !== "models") {
+    return (
+      <div className="min-h-screen bg-[#F8F7F2] text-[#111827]">
+        <Navbar />
+        <main className="w-full max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-20">
+          <div className="max-w-md mx-auto text-center space-y-6">
+            <div className="w-20 h-20 rounded-full bg-[#E5E5E0]/50 flex items-center justify-center mx-auto text-[#6B7280]">
+              <Cpu size={36} />
+            </div>
+            <div className="space-y-2">
+              <h1 className="text-2xl font-bold text-[#111827]">Model Catalog Not Found</h1>
+              <p className="text-sm text-[#4B5563]">
+                No models or vendor category match &ldquo;{rawSlug}&rdquo;. Check the URL or explore our complete catalog.
+              </p>
+            </div>
+            <div className="flex items-center justify-center gap-3 pt-2">
+              <Link
+                href="/models"
+                className="px-5 py-2.5 bg-[#FF5A1F] hover:bg-[#E04D16] text-white rounded-xl text-sm font-semibold transition-colors shadow-sm"
+              >
+                Browse All Models
+              </Link>
+              <Link
+                href="/"
+                className="px-5 py-2.5 bg-white border border-[#E5E5E0] hover:bg-stone-50 text-[#111827] rounded-xl text-sm font-semibold transition-colors"
+              >
+                Back to Home
+              </Link>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8F7F2] text-[#111827]">
       <Navbar />

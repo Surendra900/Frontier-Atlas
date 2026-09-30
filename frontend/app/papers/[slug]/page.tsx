@@ -2,6 +2,7 @@ import { BookOpen, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { normalizePaperDetail, type PaperDetail as PaperDetailType } from "@/lib/papers";
+import { resolvePaperBySlug } from "@/lib/paper-resolver";
 import PaperDetail from "@/components/PaperDetail";
 import Navbar from "@/components/Navbar";
 
@@ -13,65 +14,7 @@ interface Props {
 
 async function getPaper(slug: string): Promise<PaperDetailType | null> {
   if (!slug) return null;
-  const PROD_BACKEND = "https://frontieratlas-backend.morningsignal-india.workers.dev";
-
-  try {
-    const upstreamUrl = `${PROD_BACKEND}/api/v1/research-papers/${encodeURIComponent(slug)}`;
-    const res = await fetch(upstreamUrl, {
-      headers: { "Content-Type": "application/json" },
-      next: { revalidate: 60 },
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      if (json?.status === "success" && json?.data) {
-        return normalizePaperDetail(json.data);
-      }
-    }
-  } catch (err) {
-    console.warn(`Upstream fetch for slug "${slug}" failed:`, err);
-  }
-
-  // Fallback: search in active paper list
-  try {
-    const listUrl = `${PROD_BACKEND}/api/v1/research-papers?limit=100&period=all`;
-    const listRes = await fetch(listUrl, {
-      headers: { "Content-Type": "application/json" },
-      next: { revalidate: 60 },
-    });
-    if (listRes.ok) {
-      const listJson = await listRes.json();
-      const papers: any[] = listJson?.data?.papers || [];
-      const lowerSlug = slug.toLowerCase();
-      const match = papers.find(
-        (p) =>
-          p.slug === slug ||
-          p.slug?.toLowerCase() === lowerSlug ||
-          (p.arxivId && lowerSlug.includes(p.arxivId.toLowerCase())) ||
-          (p.id && String(p.id) === slug)
-      );
-
-      if (match) {
-        return normalizePaperDetail({
-          ...match,
-          abstract: match.abstract || "Abstract available in the full publication.",
-          authors: match.authors || [],
-          tasks: match.tasks || [],
-          methods: match.methods || [],
-          models: match.models || [],
-          datasets: match.datasets || [],
-          conferences: match.conferences || [],
-          rankings: match.rankings || [],
-          sotaClaims: match.sotaClaims || [],
-          repositories: match.repositories || [],
-        });
-      }
-    }
-  } catch (err) {
-    console.warn(`Fallback search for slug "${slug}" failed:`, err);
-  }
-
-  return null;
+  return resolvePaperBySlug(slug);
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
