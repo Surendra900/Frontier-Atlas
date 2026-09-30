@@ -829,23 +829,127 @@ export const searchPapers = async (
   const skip = (page - 1) * limit;
   const sort = query.sort || "relevance";
 
-  const orderClause =
-    sort === "latest"
-      ? `publication_date DESC NULLS LAST, github_stars DESC NULLS LAST`
-      : `github_stars DESC NULLS LAST, publication_date DESC NULLS LAST`;
+  const cleanQuery = searchTerm.replace(/[^\w\s-]/g, " ").trim();
+  const words = cleanQuery.split(/[\s-]+/).filter((w) => w.length > 0);
+  const phrasePattern = `%${words.length > 0 ? words.join("%") : cleanQuery}%`;
+  const prefixPattern = `${words.length > 0 ? words[0] : cleanQuery}%`;
+
+  const sqlParams: any[] = [phrasePattern, prefixPattern, cleanQuery];
+  let pIdx = 4;
+
+  const wordConditions: string[] = [];
+  if (words.length > 1) {
+    for (const word of words) {
+      wordConditions.push(`(
+        p.title ILIKE $${pIdx} 
+        OR p.authors ILIKE $${pIdx} 
+        OR p.abstract ILIKE $${pIdx}
+        OR EXISTS (
+          SELECT 1 FROM paper_tasks pt 
+          JOIN tasks t ON pt.task_id = t.id 
+          WHERE pt.paper_id = p.id AND (t.name ILIKE $${pIdx} OR t.slug ILIKE $${pIdx})
+        )
+        OR EXISTS (
+          SELECT 1 FROM paper_methods pm 
+          JOIN methods m ON pm.method_id = m.id 
+          WHERE pm.paper_id = p.id AND (m.name ILIKE $${pIdx} OR m.slug ILIKE $${pIdx})
+        )
+      )`);
+      sqlParams.push(`%${word}%`);
+      pIdx++;
+    }
+  }
+
+  const whereCondition = `(
+    p.title ILIKE $1 
+    OR p.authors ILIKE $1 
+    OR p.abstract ILIKE $1
+    ${wordConditions.length > 0 ? `OR (${wordConditions.join(" AND ")})` : ""}
+    OR EXISTS (
+      SELECT 1 FROM paper_tasks pt 
+      JOIN tasks t ON pt.task_id = t.id 
+      WHERE pt.paper_id = p.id AND (t.name ILIKE $1 OR t.slug ILIKE $1)
+    )
+    OR EXISTS (
+      SELECT 1 FROM paper_methods pm 
+      JOIN methods m ON pm.method_id = m.id 
+      WHERE pm.paper_id = p.id AND (m.name ILIKE $1 OR m.slug ILIKE $1)
+    )
+  )`;
+
+  let orderClause = `
+    ORDER BY 
+      CASE
+        WHEN LOWER(p.title) = LOWER($3) THEN 1
+        WHEN LOWER(p.title) LIKE LOWER($2) THEN 2
+        WHEN p.title ILIKE $1 THEN 3
+        ELSE 4
+      END ASC,
+      p.github_stars DESC NULLS LAST,
+      p.citation_count DESC NULLS LAST,
+      p.publication_date DESC NULLS LAST
+  `;
+
+  if (sort === "latest") {
+    orderClause = `ORDER BY p.publication_date DESC NULLS LAST, p.github_stars DESC NULLS LAST`;
+  } else if (sort === "stars") {
+    orderClause = `ORDER BY p.github_stars DESC NULLS LAST, p.citation_count DESC NULLS LAST`;
+  }
+
+  const limitParamIdx = pIdx;
+  const skipParamIdx = pIdx + 1;
+  sqlParams.push(limit, skip);
 
   const papers = await queryRouter.routeQuery<any[]>(
     async (prisma: PrismaClient) => {
       return prisma.$queryRawUnsafe<any[]>(
-        `SELECT id, slug, title, github_stars as "githubStars", github_hourly_increase as "github_hourly_increase",
-                citation_count as "citationCount", thumbnail_url as "thumbnailUrl", authors, project_url as "projectUrl"
-         FROM papers
-         WHERE title ILIKE $1 OR authors ILIKE $1
-         ORDER BY ${orderClause}
-         LIMIT $2 OFFSET $3`,
-        `%${searchTerm}%`,
-        limit,
-        skip
+        `SELECT 
+           p.id, 
+           p.slug, 
+           p.title, 
+           p.abstract,
+           p.publication_date as "publicationDate",
+           p.github_stars as "githubStars", 
+           p.github_hourly_increase as "github_hourly_increase",
+           p.github_forks as "githubForks",
+           p.citation_count as "citationCount", 
+           p.thumbnail_url as "thumbnailUrl", 
+           p.authors, 
+           p.project_url as "projectUrl",
+           p.paper_url as "paperUrl",
+           p.pdf_url as "pdfUrl",
+           p.arxiv_id as "arxivId",
+           p.hf_url as "hfUrl",
+           p.huggingface_url,
+           COALESCE((
+             SELECT json_agg(json_build_object('task', json_build_object('name', t.name, 'slug', t.slug)))
+             FROM paper_tasks pt
+             JOIN tasks t ON pt.task_id = t.id
+             WHERE pt.paper_id = p.id
+           ), '[]'::json) as tasks,
+           COALESCE((
+             SELECT json_agg(json_build_object('method', json_build_object('name', m.name, 'slug', m.slug)))
+             FROM paper_methods pm
+             JOIN methods m ON pm.method_id = m.id
+             WHERE pm.paper_id = p.id
+           ), '[]'::json) as methods,
+           COALESCE((
+             SELECT json_agg(json_build_object('benchmark', json_build_object('name', b.name, 'slug', b.slug)))
+             FROM sota_claims sc
+             JOIN benchmarks b ON sc.benchmark_id = b.id
+             WHERE sc.paper_id = p.id
+           ), '[]'::json) as "sotaClaims",
+           COALESCE((
+             SELECT json_agg(json_build_object('rank', r.rank, 'benchmark', json_build_object('name', b.name, 'slug', b.slug)))
+             FROM rankings r
+             JOIN benchmarks b ON r.benchmark_id = b.id
+             WHERE r.paper_id = p.id
+           ), '[]'::json) as rankings
+         FROM papers p
+         WHERE ${whereCondition}
+         ${orderClause}
+         LIMIT $${limitParamIdx} OFFSET $${skipParamIdx}`,
+        ...sqlParams
       );
     },
   );
@@ -857,6 +961,10 @@ export const searchPapers = async (
       ...exposeThumbnailUrl(paper),
       repositories: [],
       authors: parseAuthors(paper.authors),
+      tasks: Array.isArray(paper.tasks) ? paper.tasks : [],
+      methods: Array.isArray(paper.methods) ? paper.methods : [],
+      sotaClaims: Array.isArray(paper.sotaClaims) ? paper.sotaClaims : [],
+      rankings: Array.isArray(paper.rankings) ? paper.rankings : [],
     })),
     total: safePapers.length,
     page,

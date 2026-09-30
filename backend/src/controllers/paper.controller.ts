@@ -539,7 +539,7 @@ export const deletePaper = async (c: Context) => {
 };
 
 export const searchPapers = async (c: Context) => {
-  const queryRouter = c.var.queryRouter as QueryRouter;
+  const queryRouter = (c.var?.queryRouter || c.get("queryRouter")) as QueryRouter;
 
   const q = c.req.query("q")?.trim() || "";
   const sort = c.req.query("sort") || "relevance";

@@ -32,6 +32,7 @@ export default function HeroSection({
   const [results, setResults] = useState<Paper[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(-1);
   const searchRef = useRef<HTMLDivElement>(null);
   const isScrolled = useScrollThreshold(50);
 
@@ -60,29 +61,43 @@ export default function HeroSection({
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(query);
-    }, 300);
+    }, 250);
     return () => clearTimeout(timer);
   }, [query]);
 
   useEffect(() => {
+    let isCurrent = true;
     async function performSearch() {
-      if (!debouncedQuery.trim()) {
+      const trimmed = debouncedQuery.trim();
+      if (!trimmed) {
         setResults([]);
         setIsSearching(false);
+        setSelectedIndex(-1);
         return;
       }
       setIsSearching(true);
       try {
-        const data = await searchPapers(debouncedQuery);
-        setResults(data);
+        const data = await searchPapers(trimmed);
+        if (isCurrent) {
+          setResults(data);
+          setSelectedIndex(-1);
+        }
       } catch (error) {
-        console.error("Search failed", error);
-        setResults([]);
+        if (isCurrent) {
+          console.error("Search failed", error);
+          setResults([]);
+          setSelectedIndex(-1);
+        }
       } finally {
-        setIsSearching(false);
+        if (isCurrent) {
+          setIsSearching(false);
+        }
       }
     }
     performSearch();
+    return () => {
+      isCurrent = false;
+    };
   }, [debouncedQuery]);
 
   useEffect(() => {
@@ -137,10 +152,25 @@ export default function HeroSection({
             }}
             onFocus={() => setShowDropdown(true)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && query.trim()) {
+              if (e.key === "ArrowDown") {
                 e.preventDefault();
+                setSelectedIndex((prev) => (prev < results.length - 1 ? prev + 1 : prev));
+              } else if (e.key === "ArrowUp") {
+                e.preventDefault();
+                setSelectedIndex((prev) => (prev > 0 ? prev - 1 : -1));
+              } else if (e.key === "Enter") {
+                if (selectedIndex >= 0 && selectedIndex < results.length) {
+                  e.preventDefault();
+                  setShowDropdown(false);
+                  const selectedPaper = results[selectedIndex];
+                  router.push(`/papers/${encodeURIComponent(selectedPaper.slug || String(selectedPaper.id))}`);
+                } else if (query.trim()) {
+                  e.preventDefault();
+                  setShowDropdown(false);
+                  router.push(`/search?q=${encodeURIComponent(query.trim())}`);
+                }
+              } else if (e.key === "Escape") {
                 setShowDropdown(false);
-                router.push(`/search?q=${encodeURIComponent(query.trim())}`);
               }
             }}
             placeholder="Search papers, authors, topics, methods"
@@ -164,22 +194,40 @@ export default function HeroSection({
                 </div>
               ) : results.length > 0 ? (
                 <div className="flex flex-col">
-                  {results.map((paper) => (
+                  {results.map((paper, index) => (
                     <Link
                       key={paper.id}
                       href={`/papers/${encodeURIComponent(paper.slug || String(paper.id))}`}
                       onClick={() => setShowDropdown(false)}
-                      className="px-4 md:px-5 py-3 hover:bg-[#F8F7F2] cursor-pointer transition-colors border-b border-[#E5E5E0] last:border-0 flex flex-col gap-1 text-left"
+                      className={`px-4 md:px-5 py-3 cursor-pointer transition-colors border-b border-[#E5E5E0] last:border-0 flex flex-col gap-1 text-left ${
+                        index === selectedIndex ? "bg-[#FFF5F2]" : "hover:bg-[#F8F7F2]"
+                      }`}
                     >
                       <h4 className="text-[14px] font-semibold text-[#111111] leading-snug line-clamp-2">
                         {paper.title}
                       </h4>
-                      <div className="flex items-center gap-2 text-[12px] text-[#737373]">
-                        <span className="truncate max-w-[200px]">{formatAuthors(paper.authors)}</span>
+                      <div className="flex items-center gap-2 text-[12px] text-[#737373] flex-wrap">
+                        {paper.authors && paper.authors.length > 0 && (
+                          <span className="truncate max-w-[200px]">{formatAuthors(paper.authors)}</span>
+                        )}
                         {Number(paper.upvotes) > 0 && (
                           <>
                             <span>•</span>
                             <span>{paper.upvotes} stars</span>
+                          </>
+                        )}
+                        {paper.citations > 0 && (
+                          <>
+                            <span>•</span>
+                            <span>{paper.citations} citations</span>
+                          </>
+                        )}
+                        {paper.tags && paper.tags.length > 0 && (
+                          <>
+                            <span>•</span>
+                            <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#F1F0EA] text-[#555555]">
+                              {paper.tags[0]}
+                            </span>
                           </>
                         )}
                       </div>
