@@ -1,0 +1,718 @@
+{
+  "deployedHub": {
+    "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/models",
+    "domLoadedTime": 4132,
+    "totalSettledTime": 12677,
+    "pageDetails": {
+      "title": "Frontier Atlas - Discover AI Research",
+      "textSnippet": "Tasks Methods Benchmarks Models Organizations Submit Home / Models All Models Discover the full landscape of AI foundation models through â€” model families spanning reasoning, vision, code, audio, robotics, healthcare, and more. â€” Capabilities â€” Model Families â€” Verified Models MODELS Browse by Capability Browse by Model Family Browse by Organization Browse by Research Area Trending Models Recently Released Model Directory Table Browse by Capability TASKS & MODALITIES Trending Models MO",
+      "hasGarbled": true,
+      "capabilityCards": 0,
+      "familyCards": 0,
+      "orgCards": 0,
+      "researchCards": 0,
+      "trendingCards": 0,
+      "headings": [
+        "All Models",
+        "MODELS",
+        "Browse by Capability",
+        "Trending Models",
+        "OpenAI: GPT-6.1 Sol Pro",
+        "OpenAI: GPT-6.1 Sol",
+        "Anthropic: Claude Sonnet 5.5",
+        "TypeSafe: Jev Router",
+        "Perceptron: Perceptron Mk1.5",
+        "Fireworks: Ember-1",
+        "Z.ai: GLM 5.3 Prime",
+        "Qwen: Qwen3.8 Max Prime",
+        "Space Bunny Alpha",
+        "AionLabs: Aion 3.5 Mini",
+        "AionLabs: Aion 3.5"
+      ]
+    },
+    "failedRequests": [
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?sort=trending&limit=15",
+        "status": 500
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?limit=10000",
+        "status": 500
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?sort=trending&limit=15",
+        "status": 500
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?limit=10000",
+        "status": 500
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?limit=10000",
+        "status": 500
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?limit=10000",
+        "status": 500
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://moonshotai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://prism-ml.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://mistral-ai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://ibm-granite.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://sakana.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://bytedance-seed.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://arcee-ai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/research-papers/check-saved?paper_id=000aa1d5-6797-4ab4-a308-6146c6395668",
+        "status": 401
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/thumbnails/gpt-4-technical-report---2303.08774.jpg",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/thumbnails/2303.08774.jpg",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      }
+    ],
+    "consoleErrors": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 400 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Error: API error: 404  - Model not found\n    at n (https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/_next/static/chunks/7824-c115b06dc55b7db2.js:1:852)\n    at async h (https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/_next/static/chunks/7824-c115b06dc55b7db2.js:1:6840)"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      }
+    ]
+  },
+  "originalHub": {
+    "url": "https://frontieratlas.co/models",
+    "domLoadedTime": 1730,
+    "totalSettledTime": 9379,
+    "pageDetails": {
+      "title": "Frontier Atlas - Discover AI Research",
+      "textSnippet": "Tasks Methods Benchmarks Models Organizations Submit Home / Models All Models Discover the full landscape of AI foundation models through 261 model families spanning reasoning, vision, code, audio, robotics, healthcare, and more. 19 Capabilities 261 Model Families 1635 Verified Models MODELS Browse by Capability Browse by Model Family Browse by Organization Browse by Research Area Trending Models Recently Released Model Directory Table Browse by Capability 19 TASKS & MODALITIES General Purpose",
+      "hasGarbled": false,
+      "capabilityCards": 0,
+      "familyCards": 0,
+      "orgCards": 0,
+      "researchCards": 0,
+      "trendingCards": 0,
+      "headings": [
+        "All Models",
+        "MODELS",
+        "Browse by Capability",
+        "General Purpose",
+        "Chat",
+        "Instruction Following",
+        "Reasoning",
+        "Coding",
+        "Multimodal",
+        "Computer Vision",
+        "Translation",
+        "Audio",
+        "Document AI",
+        "OCR",
+        "Speech"
+      ]
+    },
+    "failedRequests": [
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?sort=trending&limit=15",
+        "status": 500
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?limit=10000",
+        "status": 500
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?sort=trending&limit=15",
+        "status": 500
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?limit=10000",
+        "status": 500
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?limit=10000",
+        "status": 500
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/models?limit=10000",
+        "status": 500
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://moonshotai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://prism-ml.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://mistral-ai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://ibm-granite.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://sakana.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://bytedance-seed.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://arcee-ai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/research-papers/check-saved?paper_id=000aa1d5-6797-4ab4-a308-6146c6395668",
+        "status": 401
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/thumbnails/gpt-4-technical-report---2303.08774.jpg",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/thumbnails/2303.08774.jpg",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      }
+    ],
+    "consoleErrors": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 500 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 500 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 500 ()"
+      },
+      {
+        "type": "error",
+        "text": "Error: API error: 500  - \nInvalid `prisma.model.findMany()` invocation:\n\n\nThe column `(not available)` does not exist in the current database.\n    at n (https://frontieratlas.pages.dev/_next/static/chunks/7824-42cff84218b7efba.js:1:956)\n    at async d (https://frontieratlas.pages.dev/_next/static/chunks/7824-42cff84218b7efba.js:1:6074)"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 500 ()"
+      },
+      {
+        "type": "error",
+        "text": "Error: API error: 500  - \nInvalid `prisma.model.findMany()` invocation:\n\n\nThe column `(not available)` does not exist in the current database.\n    at n (https://frontieratlas.pages.dev/_next/static/chunks/7824-42cff84218b7efba.js:1:956)\n    at async d (https://frontieratlas.pages.dev/_next/static/chunks/7824-42cff84218b7efba.js:1:6074)"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 500 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 500 ()"
+      }
+    ]
+  },
+  "deployedChat": {
+    "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/models/chat",
+    "domLoadedTime": 2556,
+    "totalSettledTime": 8586,
+    "pageDetails": {
+      "title": "Chat Models - AI Model Catalog | Frontier Atlas",
+      "textSnippet": "Tasks Methods Benchmarks Models Organizations Submit Home Models Chat Models Chat Models 481 Models Conversational language models fine-tuned for multi-turn dialogue and helpful assistance. MAPPED PAPERS 14 CATALOG VIEW Capability All Capabilities Reasoning Coding Computer Vision Tool Use Document AI Agentic Sort: Recently Released Sort: Trending Score Sort: Model Name (A-Z) Sort: Price (Lowest First) Sort: Price (Highest First) Sort: Context Window All Vendors (65) timm (9) sentence-transform",
+      "hasGarbled": false,
+      "capabilityCards": 0,
+      "familyCards": 0,
+      "orgCards": 0,
+      "researchCards": 0,
+      "trendingCards": 0,
+      "headings": [
+        "Chat Models",
+        "PRODUCTS",
+        "COMPANY",
+        "CONNECT",
+        "FROM OUR WORLD"
+      ]
+    },
+    "failedRequests": [
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://moonshotai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://prism-ml.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://mistral-ai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://ibm-granite.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://sakana.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://bytedance-seed.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://arcee-ai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/research-papers/check-saved?paper_id=000aa1d5-6797-4ab4-a308-6146c6395668",
+        "status": 401
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/thumbnails/gpt-4-technical-report---2303.08774.jpg",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/thumbnails/2303.08774.jpg",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      }
+    ],
+    "consoleErrors": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 400 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      }
+    ]
+  },
+  "deployedChatReasoning": {
+    "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/models/chat?capability=reasoning",
+    "domLoadedTime": 2763,
+    "totalSettledTime": 8626,
+    "pageDetails": {
+      "title": "Chat Models - AI Model Catalog | Frontier Atlas",
+      "textSnippet": "Tasks Methods Benchmarks Models Organizations Submit Home Models Chat Models Chat Models 481 Models Conversational language models fine-tuned for multi-turn dialogue and helpful assistance. MAPPED PAPERS 64 CATALOG VIEW Capability All Capabilities Reasoning Coding Computer Vision Tool Use Document AI Agentic Sort: Recently Released Sort: Trending Score Sort: Model Name (A-Z) Sort: Price (Lowest First) Sort: Price (Highest First) Sort: Context Window All Vendors (28) OpenAI (28) Alibaba (16) Go",
+      "hasGarbled": false,
+      "capabilityCards": 0,
+      "familyCards": 0,
+      "orgCards": 0,
+      "researchCards": 0,
+      "trendingCards": 0,
+      "headings": [
+        "Chat Models",
+        "PRODUCTS",
+        "COMPANY",
+        "CONNECT",
+        "FROM OUR WORLD"
+      ]
+    },
+    "failedRequests": [
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://moonshotai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://prism-ml.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t3.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://mistral-ai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://ibm-granite.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://sakana.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t0.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://bytedance-seed.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://t2.gstatic.com/faviconV2?client=SOCIAL&type=FAVICON&fallback_opts=TYPE,SIZE,URL&url=http://arcee-ai.com&size=128",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/research-papers/check-saved?paper_id=000aa1d5-6797-4ab4-a308-6146c6395668",
+        "status": 401
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/thumbnails/gpt-4-technical-report---2303.08774.jpg",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/thumbnails/2303.08774.jpg",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      }
+    ],
+    "consoleErrors": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 400 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      }
+    ]
+  },
+  "paperPage": {
+    "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/papers/gpt-4-technical-report---2303.08774",
+    "domLoadedTime": 3665,
+    "totalSettledTime": 11281,
+    "pageDetails": {
+      "title": "GPT-4 Technical Report | FrontierAtlas",
+      "textSnippet": "Tasks Methods Benchmarks Models Organizations Submit Home / arXiv: 2303.08774 GPT-4 Technical Report Ernest K. Ryu , Gregor Reiter , Diego García-Martín • June 23, 2024 View PDF arXiv Code 287 Hugging Face 26 Project Page Save TL;DR State-of-the-art research on How to Score Experts for One-Shot MoE Ex achieving benchmark breakthroughs. ABSTRACT We report the development of GPT-4, a large-scale, multimodal model which can accept image and text inputs and produce text outputs exhibiting human-l",
+      "hasGarbled": false,
+      "capabilityCards": 0,
+      "familyCards": 0,
+      "orgCards": 0,
+      "researchCards": 0,
+      "trendingCards": 0,
+      "headings": [
+        "GPT-4 Technical Report",
+        "ABSTRACT",
+        "RESEARCH TAXONOMY",
+        "TASKS",
+        "METHODS",
+        "MODELS",
+        "DATASETS",
+        "BENCHMARKS",
+        "REPOSITORY",
+        "HUGGING FACE",
+        "CITATION",
+        "PAPER DETAILS",
+        "RELATED PAPERS",
+        "PRODUCTS",
+        "COMPANY"
+      ]
+    },
+    "failedRequests": [
+      {
+        "url": "https://frontieratlas-backend.morningsignal-india.workers.dev/api/v1/research-papers/check-saved?paper_id=000aa1d5-6797-4ab4-a308-6146c6395668",
+        "status": 401
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/",
+        "status": 400
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/thumbnails/gpt-4-technical-report---2303.08774.jpg",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/thumbnails/2303.08774.jpg",
+        "status": 404
+      },
+      {
+        "url": "https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app/api/v1/models/facets",
+        "status": 404
+      }
+    ],
+    "consoleErrors": [
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 401 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 400 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      },
+      {
+        "type": "error",
+        "text": "Failed to load resource: the server responded with a status of 404 ()"
+      }
+    ]
+  }
+}

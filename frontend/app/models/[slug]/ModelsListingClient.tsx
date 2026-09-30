@@ -42,12 +42,13 @@ function formatNumber(value: number | null | undefined): string {
 
 // Helper: format pricing
 function formatPrice(val: number | null | undefined): string {
-  if (val === null || val === undefined || isNaN(val)) return "—";
-  if (val === 0) return "$0.00";
+  if (val === null || val === undefined || isNaN(val) || val < 0) return "Varies";
+  if (val === 0) return "Free";
   if (val < 0.01) return `$${val.toFixed(4)}`;
   if (val < 1) return `$${val.toFixed(2)}`;
   return `$${val.toFixed(2)}`;
 }
+
 
 // Helper: format date
 function formatDate(dateStr: string | null | undefined): string {
@@ -332,7 +333,9 @@ export default function ModelsListingClient({
                   {cardMeta.title}
                 </h1>
                 <span className="bg-[#FF5A1F]/10 text-[#FF5A1F] font-mono text-xs font-semibold px-2.5 py-1 rounded-full border border-[#FF5A1F]/20">
-                  {cardMeta.totalModels || totalCount} Models
+                  {filteredModels.length === (cardMeta.totalModels || totalCount)
+                    ? `${filteredModels.length} Models`
+                    : `${filteredModels.length} of ${cardMeta.totalModels || totalCount} Models`}
                 </span>
               </div>
               <p className="text-sm text-[#4B5563] max-w-3xl leading-relaxed">
@@ -977,8 +980,14 @@ export default function ModelsListingClient({
                                 {p.arxivId && <span>arXiv:{p.arxivId}</span>}
                                 {p.citationCount > 0 && <span>• {p.citationCount} Citations</span>}
                                 {p.role && (
-                                  <span className="capitalize px-1.5 py-0.2 bg-[#E5E7EB] text-[#374151] rounded text-[10px]">
-                                    {p.role}
+                                  <span className={`capitalize px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                                    p.role === "introduced"
+                                      ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      : p.role === "family"
+                                      ? "bg-blue-50 text-blue-700 border-blue-200"
+                                      : "bg-gray-100 text-gray-700 border-gray-200"
+                                  }`}>
+                                    {p.role === "introduced" ? "Introduced In" : p.role === "family" ? "Family Paper" : p.role}
                                   </span>
                                 )}
                               </div>

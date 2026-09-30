@@ -523,3 +523,146 @@ export async function getModelDetailFromDb(slugOrId: string): Promise<any | null
     papers: Array.isArray(row.papers) ? row.papers : [],
   };
 }
+
+export interface HubFacetsData {
+  totalModels: number;
+  vendors: FacetCount[];
+  modalities: FacetCount[];
+  accessTypes: FacetCount[];
+  opennessTypes: FacetCount[];
+  modelFamilies: FacetCount[];
+  capabilities: FacetCount[];
+  researchAreas: FacetCount[];
+}
+
+let cachedHubFacets: { data: HubFacetsData; expiresAt: number } | null = null;
+
+export async function getHubFacetsFromDb(): Promise<HubFacetsData> {
+  const now = Date.now();
+  if (cachedHubFacets && cachedHubFacets.expiresAt > now) {
+    return cachedHubFacets.data;
+  }
+
+  const [
+    totalRows,
+    vendorRows,
+    familyRows,
+    capRows,
+    researchRows,
+    modalityRows,
+    accessRows,
+    opennessRows,
+  ] = await Promise.all([
+    sql`SELECT COUNT(*)::int as count FROM models WHERE is_canonical = true`,
+    sql`
+      SELECT vendor as name, COUNT(*)::int as count
+      FROM models
+      WHERE is_canonical = true AND vendor IS NOT NULL AND vendor != ''
+      GROUP BY vendor
+      ORDER BY count DESC
+      LIMIT 40
+    `,
+    sql`
+      SELECT model_family as name, COUNT(*)::int as count
+      FROM models
+      WHERE is_canonical = true AND model_family IS NOT NULL AND model_family != '' AND model_family != 'General Models'
+      GROUP BY model_family
+      ORDER BY count DESC
+      LIMIT 40
+    `,
+    sql`
+      SELECT jsonb_array_elements_text(capabilities) as cap, COUNT(*)::int as count
+      FROM models
+      WHERE is_canonical = true AND capabilities IS NOT NULL AND jsonb_typeof(capabilities) = 'array'
+      GROUP BY cap
+      ORDER BY count DESC
+    `,
+    sql`
+      SELECT jsonb_array_elements_text(research_areas) as area, COUNT(*)::int as count
+      FROM models
+      WHERE is_canonical = true AND research_areas IS NOT NULL AND jsonb_typeof(research_areas) = 'array'
+      GROUP BY area
+      ORDER BY count DESC
+      LIMIT 40
+    `,
+    sql`
+      SELECT modality as name, COUNT(*)::int as count
+      FROM models
+      WHERE is_canonical = true AND modality IS NOT NULL AND modality != ''
+      GROUP BY modality
+      ORDER BY count DESC
+    `,
+    sql`
+      SELECT access_type as name, COUNT(*)::int as count
+      FROM models
+      WHERE is_canonical = true AND access_type IS NOT NULL AND access_type != ''
+      GROUP BY access_type
+      ORDER BY count DESC
+    `,
+    sql`
+      SELECT openness_type as name, COUNT(*)::int as count
+      FROM models
+      WHERE is_canonical = true AND openness_type IS NOT NULL AND openness_type != ''
+      GROUP BY openness_type
+      ORDER BY count DESC
+    `,
+  ]);
+
+  const rawCapMap = new Map<string, number>();
+  for (const r of capRows as Array<{ cap: string; count: number }>) {
+    rawCapMap.set(r.cap, r.count);
+  }
+
+  const CAPABILITY_DEFS = [
+    { name: "Chat", keys: ["chat"] },
+    { name: "Reasoning", keys: ["reasoning"] },
+    { name: "Computer Vision", keys: ["computer_vision", "vision"] },
+    { name: "Coding", keys: ["coding", "code"] },
+    { name: "Multimodal", keys: ["multimodal"] },
+    { name: "Agentic AI", keys: ["agents", "planning"] },
+    { name: "Tool Use", keys: ["tools", "tool_use"] },
+    { name: "Audio", keys: ["audio", "speech"] },
+    { name: "Document AI", keys: ["document_ai", "ocr"] },
+    { name: "Robotics", keys: ["robotics"] },
+    { name: "Embeddings", keys: ["embeddings"] },
+    { name: "Mathematics", keys: ["math"] },
+    { name: "Translation", keys: ["translation"] },
+    { name: "Search", keys: ["search"] },
+    { name: "Instruction Following", keys: ["instruction_following"] },
+    { name: "Healthcare", keys: ["healthcare"] },
+    { name: "General Purpose", keys: ["general_purpose"] },
+  ];
+
+  const capabilities: FacetCount[] = CAPABILITY_DEFS.map((def) => {
+    let maxCount = 0;
+    for (const k of def.keys) {
+      const c = rawCapMap.get(k) || 0;
+      if (c > maxCount) maxCount = c;
+    }
+    return { name: def.name, count: maxCount };
+  }).filter((c) => c.count > 0);
+
+  const researchAreas: FacetCount[] = (researchRows as Array<{ area: string; count: number }>).map((r) => ({
+    name: r.area,
+    count: r.count,
+  }));
+
+  const data: HubFacetsData = {
+    totalModels: (totalRows[0] as { count: number })?.count || 0,
+    vendors: (vendorRows as Array<{ name: string; count: number }>).map((r) => ({ name: r.name, count: r.count })),
+    modalities: (modalityRows as Array<{ name: string; count: number }>).map((r) => ({ name: r.name, count: r.count })),
+    accessTypes: (accessRows as Array<{ name: string; count: number }>).map((r) => ({ name: r.name, count: r.count })),
+    opennessTypes: (opennessRows as Array<{ name: string; count: number }>).map((r) => ({ name: r.name, count: r.count })),
+    modelFamilies: (familyRows as Array<{ name: string; count: number }>).map((r) => ({ name: r.name, count: r.count })),
+    capabilities,
+    researchAreas,
+  };
+
+  cachedHubFacets = {
+    data,
+    expiresAt: now + 5 * 60 * 1000, // 5 minutes cache
+  };
+
+  return data;
+}
+

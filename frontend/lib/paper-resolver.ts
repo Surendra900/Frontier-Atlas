@@ -20,25 +20,7 @@ export function extractArxivId(slug: string): string | null {
 export async function resolvePaperBySlug(slug: string): Promise<PaperDetail | null> {
   if (!slug) return null;
 
-  // 1. Try upstream worker
-  try {
-    const upstreamUrl = `${PROD_BACKEND}/api/v1/research-papers/${encodeURIComponent(slug)}`;
-    const res = await fetch(upstreamUrl, {
-      headers: { "Content-Type": "application/json" },
-      next: { revalidate: 60 },
-    });
-
-    if (res.ok) {
-      const json = await res.json();
-      if (json?.status === "success" && json?.data) {
-        return normalizePaperDetail(json.data);
-      }
-    }
-  } catch (err) {
-    console.warn(`Upstream fetch for "${slug}" failed:`, err);
-  }
-
-  // 2. Query Neon database shards directly
+  // 1. Query Authoritative Neon database shards directly first
   const arxivId = extractArxivId(slug);
   const cleanArxiv = arxivId ? arxivId.replace(/v\d+$/i, "") : null;
 
@@ -157,6 +139,26 @@ export async function resolvePaperBySlug(slug: string): Promise<PaperDetail | nu
       console.warn(`Direct DB query failed on shard for slug "${slug}":`, e);
     }
   }
+
+  // 2. Try upstream worker as fallback
+  try {
+    const upstreamUrl = `${PROD_BACKEND}/api/v1/research-papers/${encodeURIComponent(slug)}`;
+    const res = await fetch(upstreamUrl, {
+      headers: { "Content-Type": "application/json" },
+      next: { revalidate: 60 },
+    });
+
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.status === "success" && json?.data) {
+        return normalizePaperDetail(json.data);
+      }
+    }
+  } catch (err) {
+    console.warn(`Upstream fetch for "${slug}" failed:`, err);
+  }
+
+
 
   // 3. Fallback: On-demand arXiv resolution for any arXiv paper not yet indexed
   if (arxivId) {

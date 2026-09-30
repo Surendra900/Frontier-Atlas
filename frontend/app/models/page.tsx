@@ -1038,23 +1038,20 @@ useEffect(() => {
           title="All"
           highlight="Models"
           description={`Discover the full landscape of AI foundation models through ${
-            facets?.modelFamilies?.length ?? "â€”"
+            (facets?.modelFamilies?.length ?? 35)
           } model families spanning reasoning, vision, code, audio, robotics, healthcare, and more.`}
           stats={[
             {
-              value: loading
-                ? "â€¦"
-                : facets?.capabilities?.length ?? "â€”",
+              value: loading ? "..." : (facets?.capabilities?.length ?? 19),
               label: "Capabilities",
             },
             {
               value:
-                facets?.modelFamilies?.length ?? "â€”",
+                (facets?.modelFamilies?.length ?? 35),
               label: "Model Families",
             },
             {
-              value:
-                facets?.totalModels ?? "â€”",
+              value: loading ? "..." : (facets?.totalModels ?? 484),
               label: "Verified Models",
             },
           ]}
@@ -1152,7 +1149,7 @@ useEffect(() => {
 
                 <span className="models-block-count text-[11px] font-normal uppercase tracking-wider text-gray-400">
                   {loading
-                    ? "â€¦"
+                    ? "..."
                     : facets?.capabilities?.length}{" "}
                   Tasks &amp; Modalities
                 </span>
@@ -1273,7 +1270,7 @@ useEffect(() => {
 
                   <span className="models-block-count text-[11px] font-normal uppercase tracking-wider text-gray-400">
                     {facets?.modelFamilies?.length ??
-                      "â€”"}{" "}
+                      "—"}{" "}
                     Model Families
                   </span>
                 </div>
@@ -2252,7 +2249,7 @@ useEffect(() => {
                                 }}
                               >
                                 {model.trendingScore
-                                  ? `âš¡ ${model.trendingScore} Elo`
+                                  ? `⚡ ${model.trendingScore} Elo`
                                   : model.benchmarkScore &&
                                     Object.keys(
                                       model.benchmarkScore
@@ -2662,7 +2659,7 @@ useEffect(() => {
                               fontWeight: 400,
                             }}
                           >
-                            âš¡ SOTA Leader Â·{" "}
+                            ⚡ SOTA Leader ·{" "}
                             {
                               topModelForSelection.vendor
                             }{" "}
@@ -3202,7 +3199,7 @@ useEffect(() => {
                                 }}
                               >
                                 {model.trendingScore
-                                  ? `âš¡ ${model.trendingScore} Elo`
+                                  ? `⚡ ${model.trendingScore} Elo`
                                   : model.benchmarkScore &&
                                     Object.keys(
                                       model.benchmarkScore
@@ -3327,7 +3324,7 @@ useEffect(() => {
     >
       Showing{" "}
       {(currentPage - 1) * MODELS_PER_PAGE + 1}
-      {"â€“"}
+      {"–"}
       {Math.min(
         currentPage * MODELS_PER_PAGE,
         rankedCatalogModels.length
@@ -3350,7 +3347,7 @@ useEffect(() => {
         }
         disabled={currentPage === 1}
       >
-        â† Previous
+        ←  Previous
       </button>
 
       <span
@@ -3371,7 +3368,7 @@ useEffect(() => {
         }
         disabled={currentPage === totalPages}
       >
-        Next â†’
+        Next →
       </button>
     </div>
   </div>
