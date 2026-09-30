@@ -1198,21 +1198,25 @@ export async function searchPapers(query: string): Promise<Paper[]> {
     }>(
       `/api/v1/research-papers/search?q=${encodeURIComponent(query)}`
     );
-    return response.data.papers.map(mapBackendPaper).filter(paperHasTags);
+    return (response.data?.papers || []).map(mapBackendPaper);
   } catch (error) {
     console.warn('Backend search unavailable, falling back to client-side filtering', error);
     // Fallback: fetch all and filter locally
     try {
       const result = await getPapers({ limit: 100 });
-      const lowerQuery = query.toLowerCase();
-      return result.papers.filter(paperHasTags).filter((paper) => {
-        return (
-          paper.title.toLowerCase().includes(lowerQuery) ||
-          paper.authors.map(a => a.name).join(' ').toLowerCase().includes(lowerQuery) ||
-          paper.description.toLowerCase().includes(lowerQuery) ||
-          paper.tags.some(t => t.toLowerCase().includes(lowerQuery)) ||
-          (paper.additionalTags || []).some(t => t.toLowerCase().includes(lowerQuery))
-        );
+      const lowerQuery = query.toLowerCase().trim();
+      const words = lowerQuery.replace(/[^\w\s-]/g, " ").split(/[\s-]+/).filter(Boolean);
+      return (result.papers || []).filter((paper) => {
+        const titleLower = paper.title.toLowerCase();
+        const authorsStr = (paper.authors || []).map(a => a.name).join(' ').toLowerCase();
+        const descLower = (paper.description || "").toLowerCase();
+        const tagsStr = (paper.tags || []).join(' ').toLowerCase();
+        const addTagsStr = (paper.additionalTags || []).join(' ').toLowerCase();
+        const fullText = `${titleLower} ${authorsStr} ${descLower} ${tagsStr} ${addTagsStr}`;
+
+        if (fullText.includes(lowerQuery)) return true;
+        if (words.length > 0 && words.every(w => fullText.includes(w))) return true;
+        return false;
       });
     } catch (fallbackError) {
       console.error('Fallback search failed:', fallbackError);

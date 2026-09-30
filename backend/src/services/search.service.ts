@@ -57,22 +57,35 @@ export const globalSearch = async (
 
   // 3. Fast indexed database queries using pg_trgm GIN indexes
   const results = await queryRouter.routeQuery(async (prisma: PrismaClient) => {
-    const pattern = `%${searchTerm}%`;
+    const cleanQuery = searchTerm.replace(/[^\w\s-]/g, " ").trim();
+    const words = cleanQuery.split(/[\s-]+/).filter((w) => w.length > 0);
+    const phrasePattern = `%${words.length > 0 ? words.join("%") : cleanQuery}%`;
+    const prefixPattern = `${words.length > 0 ? words[0] : cleanQuery}%`;
 
     const [papers, methods, tasks, models, datasets] = await Promise.all([
       prisma.$queryRawUnsafe<any[]>(
         `SELECT id, slug, title, github_stars as "githubStars", citation_count as "citationCount", authors, thumbnail_url as "thumbnailUrl", project_url as "projectUrl"
          FROM papers
-         WHERE title ILIKE $1 OR authors ILIKE $1
-         ORDER BY github_stars DESC NULLS LAST
-         LIMIT $2`,
-        pattern,
+         WHERE title ILIKE $1 OR authors ILIKE $1 OR abstract ILIKE $1
+         ORDER BY 
+           CASE
+             WHEN LOWER(title) = LOWER($2) THEN 1
+             WHEN LOWER(title) LIKE LOWER($3) THEN 2
+             WHEN title ILIKE $1 THEN 3
+             ELSE 4
+           END ASC,
+           github_stars DESC NULLS LAST,
+           citation_count DESC NULLS LAST
+         LIMIT $4`,
+        phrasePattern,
+        cleanQuery,
+        prefixPattern,
         limit * 3
       ),
-      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM methods WHERE name ILIKE $1 LIMIT $2`, pattern, limit),
-      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM tasks WHERE name ILIKE $1 LIMIT $2`, pattern, limit),
-      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM models WHERE name ILIKE $1 LIMIT $2`, pattern, limit),
-      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM datasets WHERE name ILIKE $1 LIMIT $2`, pattern, limit),
+      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM methods WHERE name ILIKE $1 OR slug ILIKE $1 LIMIT $2`, phrasePattern, limit),
+      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM tasks WHERE name ILIKE $1 OR slug ILIKE $1 LIMIT $2`, phrasePattern, limit),
+      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM models WHERE name ILIKE $1 OR slug ILIKE $1 LIMIT $2`, phrasePattern, limit),
+      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM datasets WHERE name ILIKE $1 OR slug ILIKE $1 LIMIT $2`, phrasePattern, limit),
     ]);
 
     const safePapers = Array.isArray(papers) ? papers : [];

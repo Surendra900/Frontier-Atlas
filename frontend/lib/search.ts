@@ -159,14 +159,15 @@ async function fallbackSearch(query: string, limit: number): Promise<SearchResul
     }));
 
   const papersFiltered = papersData
-    .filter((p) => p.title.toLowerCase().includes(q))
     .slice(0, limit)
     .map((p) => ({
       type: 'papers' as const,
       id: String(p.id),
       title: p.title,
       slug: p.slug,
-      subtitle: `${p.citations} citation${p.citations !== 1 ? 's' : ''}`,
+      subtitle: p.authors && p.authors.length > 0
+        ? `${p.authors.map((a: any) => a.name).slice(0, 2).join(', ')} • ${p.citations} citation${p.citations !== 1 ? 's' : ''}`
+        : `${p.citations} citation${p.citations !== 1 ? 's' : ''}`,
       metadata: { citationCount: p.citations, date: p.date, projectUrl: p.projectUrl },
     }));
 
