@@ -15,6 +15,7 @@ import discussionRoutes from "./routes/discussion.routes.js";
 import methodRoutes from "./routes/method.routes.js";
 import benchmarkRoutes from "./routes/benchmark.routes.js";
 import searchRoutes from "./routes/search.routes.js";
+import { prewarmCommonViews } from "./controllers/paper.controller.js";
 
 // Environment Bindings and Context Variables
 type Env = {
@@ -86,7 +87,10 @@ app.use("*", async (c, next) => {
     );
   }
 
-  // DatabaseManager and QueryRouter
+  // Prewarm critical views in background on the very first incoming request
+  prewarmCommonViews(undefined, cleanUrl);
+
+  // Fresh DatabaseManager per request to prevent WebSocket channel concurrency locks in workerd
   const databaseManager = new DatabaseManager({
     DATABASE_URL: cleanUrl,
   });
@@ -104,12 +108,17 @@ app.use("*", async (c, next) => {
 });
 
 // Register Routes
-app.get("/health", (c) =>
-  c.json({
+app.get("/health", (c) => {
+  const rawDbUrl = c.env.DATABASE_URL || c.env.SHARD_1_DATABASE_URL;
+  const cleanUrl = rawDbUrl ? rawDbUrl.replace(/^"|"$/g, "").trim() : "";
+  if (cleanUrl) {
+    prewarmCommonViews(undefined, cleanUrl);
+  }
+  return c.json({
     status: "ok",
     message: "FrontierAtlas V1 API is running perfectly! 🚀",
-  }),
-);
+  });
+});
 app.route("/api/v1/auth", authRoutes);
 app.route("/api/v1/research-papers", paperRoutes);
 app.route("/api/v1/authors", authorRoutes);
