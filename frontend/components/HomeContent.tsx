@@ -28,15 +28,28 @@ export default function HomeContent({
   // URL Synchronization Helper
   // ---------------------------------------------------------------------------
 
-  const updateUrl = useCallback((paramName?: string, paramValue?: string) => {
+  const updateUrlParams = useCallback((paramsToSet: Record<string, string | undefined>) => {
     if (typeof window === "undefined") return;
     const url = new URL(window.location.href);
-    url.searchParams.delete("task");
-    url.searchParams.delete("method");
-    url.searchParams.delete("sort");
-    url.searchParams.delete("period");
-    if (paramName && paramValue) {
-      url.searchParams.set(paramName, paramValue);
+
+    // If setting a task or method, clear sort/period unless explicitly passed
+    if (("task" in paramsToSet || "method" in paramsToSet) && !("sort" in paramsToSet)) {
+      url.searchParams.delete("sort");
+      url.searchParams.delete("period");
+    }
+
+    // If setting a feed sort, clear task/method
+    if ("sort" in paramsToSet && !("task" in paramsToSet || "method" in paramsToSet)) {
+      url.searchParams.delete("task");
+      url.searchParams.delete("method");
+    }
+
+    for (const [key, value] of Object.entries(paramsToSet)) {
+      if (value) {
+        url.searchParams.set(key, value);
+      } else {
+        url.searchParams.delete(key);
+      }
     }
     const cleanUrl = url.pathname + (url.search ? url.search : "");
     window.history.pushState({}, "", cleanUrl);
@@ -72,10 +85,8 @@ export default function HomeContent({
           setSelectedPeriod("Latest");
         } else if (sortParam === "stars") {
           setActiveSort("Most GitHub Stars");
-          setSelectedPeriod("All time");
         } else {
           setActiveSort("Trending Papers");
-          setSelectedPeriod("All time");
         }
       }
 
@@ -131,7 +142,7 @@ export default function HomeContent({
       setSelectedMethod(undefined);
       setActiveSort(label);
       setSelectedPeriod("All time");
-      updateUrl("task", normalizedSlug);
+      updateUrlParams({ task: normalizedSlug, method: undefined, sort: undefined, period: undefined });
       return;
     }
 
@@ -140,7 +151,7 @@ export default function HomeContent({
       setSelectedTag(undefined);
       setActiveSort(label);
       setSelectedPeriod("All time");
-      updateUrl("method", slug);
+      updateUrlParams({ method: slug, task: undefined, sort: undefined, period: undefined });
       return;
     }
 
@@ -151,15 +162,15 @@ export default function HomeContent({
     if (label === "Latest Papers" || slug === "latest") {
       setActiveSort("Latest Papers");
       setSelectedPeriod("Latest");
-      updateUrl("sort", "latest");
+      updateUrlParams({ sort: "latest", period: undefined, task: undefined, method: undefined });
     } else if (label === "Most GitHub Stars" || slug === "github-stars") {
       setActiveSort("Most GitHub Stars");
       setSelectedPeriod("All time");
-      updateUrl("sort", "stars");
+      updateUrlParams({ sort: "stars", period: undefined, task: undefined, method: undefined });
     } else {
       setActiveSort("Trending Papers");
       setSelectedPeriod("All time");
-      updateUrl("sort", "trending");
+      updateUrlParams({ sort: "trending", period: undefined, task: undefined, method: undefined });
     }
   };
 
@@ -169,25 +180,45 @@ export default function HomeContent({
 
   const handlePeriodSelect = (period: string) => {
     setSelectedPeriod(period);
-    if (period === "Latest") {
-      updateUrl("sort", "latest");
-    } else if (period === "This Week") {
-      updateUrl("period", "week");
-    } else if (period === "This Month") {
-      updateUrl("period", "month");
+
+    const isSelectingLatest = period === "Latest";
+    const mappedPeriod =
+      isSelectingLatest
+        ? "all"
+        : period === "This Week"
+          ? "week"
+          : period === "This Month"
+            ? "month"
+            : "all";
+
+    const currentSort =
+      isSelectingLatest
+        ? "latest"
+        : activeSort === "Most GitHub Stars"
+          ? "stars"
+          : activeSort === "Latest Papers"
+            ? "latest"
+            : "trending";
+
+    if (isSelectingLatest) {
+      setActiveSort("Latest Papers");
+    }
+
+    if (selectedTag) {
+      updateUrlParams({
+        task: selectedTag,
+        period: mappedPeriod !== "all" ? mappedPeriod : undefined,
+      });
+    } else if (selectedMethod) {
+      updateUrlParams({
+        method: selectedMethod,
+        period: mappedPeriod !== "all" ? mappedPeriod : undefined,
+      });
     } else {
-      // All time
-      if (selectedTag) {
-        updateUrl("task", selectedTag);
-      } else if (selectedMethod) {
-        updateUrl("method", selectedMethod);
-      } else if (activeSort === "Most GitHub Stars") {
-        updateUrl("sort", "stars");
-      } else if (activeSort === "Latest Papers") {
-        updateUrl("sort", "latest");
-      } else {
-        updateUrl("sort", "trending");
-      }
+      updateUrlParams({
+        sort: isSelectingLatest ? "latest" : currentSort,
+        period: mappedPeriod !== "all" ? mappedPeriod : undefined,
+      });
     }
   };
 
@@ -206,7 +237,7 @@ export default function HomeContent({
     if (!resolvedTag) {
       setSelectedTag(undefined);
       setActiveSort("Trending Papers");
-      updateUrl();
+      updateUrlParams({ task: undefined, method: undefined, sort: "trending", period: undefined });
       return;
     }
     const clean = resolvedTag.toLowerCase().trim();
@@ -214,12 +245,12 @@ export default function HomeContent({
       setSelectedMethod("mcp");
       setSelectedTag(undefined);
       setActiveSort("Model Context Protocol");
-      updateUrl("method", "mcp");
+      updateUrlParams({ method: "mcp", task: undefined, sort: undefined, period: undefined });
     } else {
       const normalized = clean === "reasoning" ? "reasoning-models" : clean;
       setSelectedTag(normalized);
       setActiveSort("");
-      updateUrl("task", normalized);
+      updateUrlParams({ task: normalized, method: undefined, sort: undefined, period: undefined });
     }
   };
 
@@ -253,6 +284,7 @@ export default function HomeContent({
 
   const dynamicFilterParams: Record<string, string> = {
     sort: apiSort,
+    period: apiPeriod,
   };
 
   if (selectedMethod) {

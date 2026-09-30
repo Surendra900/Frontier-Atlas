@@ -38,6 +38,10 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "CLOUDFLARE_API_TOKEN is not configured in repository secrets; skipping Cloudflare Worker deploy."
+            exit 0
+          fi
           echo "::group::Wrangler deploy output"
           npx wrangler deploy 2>&1
           EXIT_CODE=$?
@@ -46,3 +50,4 @@ jobs:
             echo "::error::wrangler deploy failed with exit code $EXIT_CODE"
             exit $EXIT_CODE
           fi
+
