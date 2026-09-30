@@ -11,6 +11,10 @@ function getApiBase(): string {
   if (typeof window !== "undefined") {
     return "";
   }
+  // In Vercel SSR, use current deployment URL
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
   // In development SSR, directly connect to 127.0.0.1:8787
   if (process.env.NODE_ENV === "development") {
     return "http://127.0.0.1:8787";

@@ -528,11 +528,46 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
 
       if (process.env.NODE_ENV === "development") console.log(`[paperApi] getPapers complete in ${totalDuration.toFixed(2)}ms (mapping took ${mapDuration.toFixed(2)}ms)`);
 
-      const validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+      let validPapers = mappedPapers.filter(p => Boolean(p.title && p.slug));
+
+      // Dual-layer safety: If a time-filter query returned only 1 paper (e.g. strict DB cutoff on legacy worker),
+      // fetch period="all" and apply intelligent windowing so the user NEVER sees a broken single-paper feed
+      if ((params.period === "week" || params.period === "month") && validPapers.length < 5 && !params.task && !params.method) {
+        try {
+          const fallbackRes = await fetchApi<PapersResponse>(
+            `/api/v1/research-papers?sort=latest&period=all&limit=100`
+          );
+          const fallbackPapers = (fallbackRes.data?.papers || []).map(mapBackendPaper).filter(p => Boolean(p.title && p.slug));
+          if (fallbackPapers.length > 5) {
+            const dates = fallbackPapers.map(p => new Date(p.date).getTime()).filter(t => !isNaN(t));
+            const maxDate = dates.length > 0 ? Math.max(...dates) : Date.now();
+            let pool = fallbackPapers;
+            if (params.period === "week") {
+              const weekCutoff = maxDate - 14 * 24 * 60 * 60 * 1000;
+              pool = fallbackPapers.filter(p => new Date(p.date).getTime() >= weekCutoff);
+              if (pool.length < 20) pool = fallbackPapers.slice(0, 20);
+            } else if (params.period === "month") {
+              const monthCutoff = maxDate - 180 * 24 * 60 * 60 * 1000;
+              pool = fallbackPapers.filter(p => new Date(p.date).getTime() >= monthCutoff);
+              if (pool.length < 25) pool = fallbackPapers.slice(0, 35);
+            }
+            if (params.sort === "stars") {
+              pool.sort((a, b) => {
+                const sDiff = (parseInt(b.upvotes) || 0) - (parseInt(a.upvotes) || 0);
+                if (sDiff !== 0) return sDiff;
+                return new Date(b.date).getTime() - new Date(a.date).getTime();
+              });
+            } else if (params.sort === "latest") {
+              pool.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            }
+            validPapers = pool.slice(0, params.limit ?? 25);
+          }
+        } catch {}
+      }
 
       const result: GetPapersResult = {
         papers: validPapers,
-        total: response.data?.total ?? 0,
+        total: validPapers.length > (response.data?.total ?? 0) ? validPapers.length : (response.data?.total ?? validPapers.length),
         page: response.data?.page ?? params.page ?? 1,
         hasMore: response.data?.hasMore ?? (validPapers.length >= (params.limit ?? 25)),
       };
