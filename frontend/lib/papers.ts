@@ -96,6 +96,10 @@ export interface PaperDetail {
   hfUpvotes: number | null;
   hfUrl?: string | null;
   huggingface_url?: string | null;
+  hf_model_url?: string | null;
+  kaggleUrl?: string | null;
+  replicateUrl?: string | null;
+  ngcUrl?: string | null;
   repositories?: { url: string; owner?: string; name?: string }[];
   trendingScore: number | null;
   discoverySource: string | null;
