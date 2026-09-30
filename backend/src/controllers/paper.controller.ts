@@ -1,7 +1,9 @@
 import { Context } from "hono";
 import * as paperService from "../services/paper.service.js";
+import * as searchService from "../services/search.service.js";
 import { redisManager } from "../lib/redis.js";
 import { QueryRouter } from "../routing/index.js";
+import { DatabaseManager } from "../database/DatabaseManager.js";
 
 // ---------------------------------------------------------------------------
 // Version-counter helpers
@@ -76,38 +78,105 @@ export const makePapersCacheKey = (
 };
 
 let hasPrewarmed = false;
-export const prewarmCommonViews = (queryRouter: QueryRouter): void => {
+export const prewarmCommonViews = (queryRouter?: QueryRouter, databaseUrl?: string): void => {
   if (hasPrewarmed) return;
   hasPrewarmed = true;
 
+  const dbUrl = databaseUrl || process.env.DATABASE_URL;
+  let activeRouter = queryRouter;
+  if (dbUrl) {
+    const standaloneDb = new DatabaseManager({ DATABASE_URL: dbUrl });
+    activeRouter = new QueryRouter(standaloneDb, "30000");
+  }
+  if (!activeRouter) return;
+  const router = activeRouter;
+
   const targets = [
-    // Most GitHub Stars (all time, tabs, and popular chips)
+    // 1. Discovery Links (both limit 20 and limit 25 used by desktop/mobile feeds)
+    // Most GitHub Stars
+    { sort: "stars", period: "all", limit: 20, page: 1 },
     { sort: "stars", period: "all", limit: 25, page: 1 },
+    { sort: "stars", period: "week", limit: 20, page: 1 },
     { sort: "stars", period: "week", limit: 25, page: 1 },
+    { sort: "stars", period: "month", limit: 20, page: 1 },
     { sort: "stars", period: "month", limit: 25, page: 1 },
+    { sort: "stars", period: "today", limit: 20, page: 1 },
     { sort: "stars", period: "today", limit: 25, page: 1 },
-    { sort: "stars", period: "all", task: "agents", limit: 25, page: 1 },
-    { sort: "stars", period: "all", task: "robotics", limit: 25, page: 1 },
-    { sort: "stars", period: "all", method: "model-context-protocol-mcp", limit: 25, page: 1 },
 
-    // Trending (all time, tabs, and popular chips)
+    // Trending Papers
+    { sort: "trending", period: "all", limit: 20, page: 1 },
     { sort: "trending", period: "all", limit: 25, page: 1 },
+    { sort: "trending", period: "week", limit: 20, page: 1 },
     { sort: "trending", period: "week", limit: 25, page: 1 },
+    { sort: "trending", period: "month", limit: 20, page: 1 },
     { sort: "trending", period: "month", limit: 25, page: 1 },
+    { sort: "trending", period: "today", limit: 20, page: 1 },
     { sort: "trending", period: "today", limit: 25, page: 1 },
-    { sort: "trending", period: "all", task: "agents", limit: 25, page: 1 },
-    { sort: "trending", period: "all", task: "robotics", limit: 25, page: 1 },
-    { sort: "trending", period: "all", method: "model-context-protocol-mcp", limit: 25, page: 1 },
 
-    // Latest
+    // Latest Papers
+    { sort: "latest", period: "all", limit: 20, page: 1 },
     { sort: "latest", period: "all", limit: 25, page: 1 },
+    { sort: "latest", period: "week", limit: 20, page: 1 },
+    { sort: "latest", period: "week", limit: 25, page: 1 },
+    { sort: "latest", period: "month", limit: 20, page: 1 },
+    { sort: "latest", period: "month", limit: 25, page: 1 },
+    { sort: "latest", period: "today", limit: 20, page: 1 },
+    { sort: "latest", period: "today", limit: 25, page: 1 },
+
+    // 2. All 6 Topic Chips
+    // Agents
+    { sort: "trending", period: "all", task: "agents", limit: 20, page: 1 },
+    { sort: "stars", period: "all", task: "agents", limit: 20, page: 1 },
+    { sort: "latest", period: "all", task: "agents", limit: 20, page: 1 },
+    { sort: "trending", period: "today", task: "agents", limit: 20, page: 1 },
+    { sort: "latest", period: "today", task: "agents", limit: 20, page: 1 },
+
+    // Reasoning
+    { sort: "trending", period: "all", task: "reasoning-models", limit: 20, page: 1 },
+    { sort: "stars", period: "all", task: "reasoning-models", limit: 20, page: 1 },
+    { sort: "latest", period: "all", task: "reasoning-models", limit: 20, page: 1 },
+    { sort: "trending", period: "all", task: "reasoning", limit: 20, page: 1 },
+    { sort: "trending", period: "today", task: "reasoning-models", limit: 20, page: 1 },
+    { sort: "latest", period: "today", task: "reasoning-models", limit: 20, page: 1 },
+
+    // Vision
+    { sort: "trending", period: "all", task: "vision-language-models", limit: 20, page: 1 },
+    { sort: "stars", period: "all", task: "vision-language-models", limit: 20, page: 1 },
+    { sort: "latest", period: "all", task: "vision-language-models", limit: 20, page: 1 },
+    { sort: "trending", period: "all", task: "vision", limit: 20, page: 1 },
+    { sort: "trending", period: "today", task: "vision-language-models", limit: 20, page: 1 },
+    { sort: "latest", period: "today", task: "vision-language-models", limit: 20, page: 1 },
+
+    // Coding
+    { sort: "trending", period: "all", task: "coding-agents", limit: 20, page: 1 },
+    { sort: "stars", period: "all", task: "coding-agents", limit: 20, page: 1 },
+    { sort: "latest", period: "all", task: "coding-agents", limit: 20, page: 1 },
+    { sort: "trending", period: "all", task: "coding", limit: 20, page: 1 },
+    { sort: "trending", period: "today", task: "coding-agents", limit: 20, page: 1 },
+    { sort: "latest", period: "today", task: "coding-agents", limit: 20, page: 1 },
+
+    // Robotics
+    { sort: "trending", period: "all", task: "robotics", limit: 20, page: 1 },
+    { sort: "stars", period: "all", task: "robotics", limit: 20, page: 1 },
+    { sort: "latest", period: "all", task: "robotics", limit: 20, page: 1 },
+    { sort: "trending", period: "today", task: "robotics", limit: 20, page: 1 },
+    { sort: "latest", period: "today", task: "robotics", limit: 20, page: 1 },
+
+    // MCP
+    { sort: "trending", period: "all", method: "model-context-protocol-mcp", limit: 20, page: 1 },
+    { sort: "stars", period: "all", method: "model-context-protocol-mcp", limit: 20, page: 1 },
+    { sort: "latest", period: "all", method: "model-context-protocol-mcp", limit: 20, page: 1 },
+    { sort: "trending", period: "all", method: "mcp", limit: 20, page: 1 },
+    { sort: "trending", period: "all", task: "model-context-protocol-mcp", limit: 20, page: 1 },
+    { sort: "trending", period: "today", method: "model-context-protocol-mcp", limit: 20, page: 1 },
+    { sort: "latest", period: "today", method: "model-context-protocol-mcp", limit: 20, page: 1 },
   ];
 
   const commonSearchPrefixes = [
-    "trans", "transformer", "llm", "agent", "diff", "diffusion",
-    "vision", "multimodal", "deepseek", "mamba", "robot", "robotics",
-    "reasoning", "eval", "clip", "quantum", "attention", "gpt", "bert",
-    "rl", "reinforcement", "lora", "fine-tuning"
+    "agent", "agents", "reasoning", "vision", "coding", "robotics", "mcp",
+    "trans", "transformer", "transformers", "llm", "diff", "diffusion",
+    "multimodal", "deepseek", "mamba", "robot", "eval", "clip", "attention",
+    "gpt", "bert", "rl", "reinforcement", "lora", "fine-tuning", "vlm", "model"
   ];
 
   setTimeout(async () => {
@@ -117,30 +186,44 @@ export const prewarmCommonViews = (queryRouter: QueryRouter): void => {
         const cacheKey = makePapersCacheKey(version, target);
         if (localMemoryCache.has(cacheKey)) continue;
 
-        const result = await paperService.getPapers(queryRouter, target as any);
-        const response = {
-          status: "success",
-          count: Array.isArray(result?.papers) ? result.papers.length : 0,
-          data: result,
-        };
-        setLocalCache(cacheKey, response);
-        await new Promise((r) => setTimeout(r, 40));
+        try {
+          const result = await paperService.getPapers(router, target as any);
+          const response = {
+            status: "success",
+            count: Array.isArray(result?.papers) ? result.papers.length : 0,
+            data: result,
+          };
+          setLocalCache(cacheKey, response);
+        } catch {
+          // ignore single target failure
+        }
+        await new Promise((r) => setTimeout(r, 20));
       }
 
-      // Prewarm common search terms for 0ms autocomplete responses
+      // Prewarm common search terms for both hero dropdown and global search page
       for (const term of commonSearchPrefixes) {
+        // Hero search dropdown (/api/v1/research-papers/search?q=...)
         const searchCacheKey = `search:${term}:relevance:1:20`;
-        if (localMemoryCache.has(searchCacheKey)) continue;
+        if (!localMemoryCache.has(searchCacheKey)) {
+          try {
+            const result = await paperService.searchPapers(router, { q: term, limit: 20, page: 1, sort: "relevance" });
+            const response = { status: "success", data: result };
+            setLocalCache(searchCacheKey, response, 60 * 60 * 1000);
+          } catch {}
+        }
 
-        const result = await paperService.searchPapers(queryRouter, { q: term, limit: 20, page: 1, sort: "relevance" });
-        const response = { status: "success", data: result };
-        setLocalCache(searchCacheKey, response, 60 * 60 * 1000); // 1 hour TTL
-        await new Promise((r) => setTimeout(r, 40));
+        // Global search page (/api/v1/search?q=...)
+        try {
+          await searchService.globalSearch(router, term, 5);
+          await searchService.globalSearch(router, term, 10);
+        } catch {}
+
+        await new Promise((r) => setTimeout(r, 20));
       }
     } catch {
       // Non-blocking prewarm
     }
-  }, 100);
+  }, 50);
 };
 
 // ---------------------------------------------------------------------------

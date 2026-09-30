@@ -87,6 +87,9 @@ app.use("*", async (c, next) => {
     );
   }
 
+  // Prewarm critical views in background on the very first incoming request
+  prewarmCommonViews(undefined, cleanUrl);
+
   // Fresh DatabaseManager per request to prevent WebSocket channel concurrency locks in workerd
   const databaseManager = new DatabaseManager({
     DATABASE_URL: cleanUrl,
@@ -106,9 +109,10 @@ app.use("*", async (c, next) => {
 
 // Register Routes
 app.get("/health", (c) => {
-  const queryRouter = c.var.queryRouter as QueryRouter;
-  if (queryRouter) {
-    prewarmCommonViews(queryRouter);
+  const rawDbUrl = c.env.DATABASE_URL || c.env.SHARD_1_DATABASE_URL;
+  const cleanUrl = rawDbUrl ? rawDbUrl.replace(/^"|"$/g, "").trim() : "";
+  if (cleanUrl) {
+    prewarmCommonViews(undefined, cleanUrl);
   }
   return c.json({
     status: "ok",

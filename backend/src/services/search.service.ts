@@ -69,72 +69,39 @@ export const globalSearch = async (
         pattern,
         limit * 3
       ),
-
-      prisma.method.findMany({
-        where: {
-          name: {
-            contains: searchTerm,
-            mode: "insensitive",
-          },
-        },
-        take: limit,
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-        },
-      }),
-
-      prisma.task.findMany({
-        where: {
-          name: {
-            contains: searchTerm,
-            mode: "insensitive",
-          },
-        },
-        take: limit,
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-        },
-      }),
-
-      prisma.model.findMany({
-        where: {
-          name: {
-            contains: searchTerm,
-            mode: "insensitive",
-          },
-        },
-        take: limit,
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-        },
-      }),
-
-      prisma.dataset.findMany({
-        where: {
-          name: {
-            contains: searchTerm,
-            mode: "insensitive",
-          },
-        },
-        take: limit,
-        select: {
-          id: true,
-          slug: true,
-          name: true,
-        },
-      }),
+      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM methods WHERE name ILIKE $1 LIMIT $2`, pattern, limit),
+      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM tasks WHERE name ILIKE $1 LIMIT $2`, pattern, limit),
+      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM models WHERE name ILIKE $1 LIMIT $2`, pattern, limit),
+      prisma.$queryRawUnsafe<any[]>(`SELECT id, slug, name FROM datasets WHERE name ILIKE $1 LIMIT $2`, pattern, limit),
     ]);
 
     const safePapers = Array.isArray(papers) ? papers : [];
     const uniquePapers = Array.from(
       new Map(safePapers.map((paper: any) => [paper.slug, paper])).values()
     );
+
+    const seenAuthors = new Set<string>();
+    const authorResults: any[] = [];
+    for (const paper of safePapers) {
+      if (paper.authors) {
+        const names = String(paper.authors).split(",").map((n: string) => n.trim()).filter(Boolean);
+        for (const name of names) {
+          const lowerName = name.toLowerCase();
+          if (lowerName.includes(searchTerm) && !seenAuthors.has(lowerName)) {
+            seenAuthors.add(lowerName);
+            const slug = lowerName.replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+            authorResults.push({
+              type: "authors",
+              id: slug,
+              title: name,
+              slug: slug,
+            });
+            if (authorResults.length >= limit) break;
+          }
+        }
+      }
+      if (authorResults.length >= limit) break;
+    }
 
     return {
       papers: uniquePapers.slice(0, limit).map((p: any) => ({
@@ -146,6 +113,8 @@ export const globalSearch = async (
           ? `${p.authors} • ${p.citationCount || 0} citations`
           : `${p.citationCount || 0} citations`,
       })),
+
+      authors: authorResults,
 
       methods: (methods || []).map((m) => ({
         type: "methods",

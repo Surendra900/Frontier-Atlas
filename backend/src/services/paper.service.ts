@@ -248,8 +248,28 @@ export const getPapers = async (
 
   const where: Prisma.PaperWhereInput = {};
 
-  if (query.task) where.tasks = { some: { task: { slug: query.task } } };
-  if (query.method) where.methods = { some: { method: { slug: query.method } } };
+  if (query.task) {
+    const tSlug = query.task.toLowerCase().trim();
+    if (tSlug === "model-context-protocol-mcp" || tSlug === "mcp") {
+      where.methods = { some: { method: { slug: "model-context-protocol-mcp" } } };
+    } else if (tSlug === "reasoning") {
+      where.tasks = { some: { task: { slug: "reasoning-models" } } };
+    } else if (tSlug === "vision") {
+      where.tasks = { some: { task: { slug: "vision-language-models" } } };
+    } else if (tSlug === "coding") {
+      where.tasks = { some: { task: { slug: "coding-agents" } } };
+    } else {
+      where.tasks = { some: { task: { slug: query.task } } };
+    }
+  }
+  if (query.method) {
+    const mSlug = query.method.toLowerCase().trim();
+    if (mSlug === "mcp") {
+      where.methods = { some: { method: { slug: "model-context-protocol-mcp" } } };
+    } else {
+      where.methods = { some: { method: { slug: query.method } } };
+    }
+  }
   if (query.model) where.models = { some: { model: { slug: query.model } } };
   if (query.organization) {
     const orgName = query.organization.trim();
@@ -345,23 +365,47 @@ export const getPapers = async (
   let pIdx = 1;
 
   if (query.task) {
-    conditions.push(`EXISTS (
-      SELECT 1 FROM paper_tasks pt 
-      JOIN tasks t ON pt.task_id = t.id 
-      WHERE pt.paper_id = p.id AND (t.slug = $${pIdx} OR t.name ILIKE $${pIdx})
-    )`);
-    sqlParams.push(query.task);
-    pIdx++;
+    const tSlug = query.task.toLowerCase().trim();
+    if (tSlug === "model-context-protocol-mcp" || tSlug === "mcp") {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM paper_methods pm 
+        JOIN methods m ON pm.method_id = m.id 
+        WHERE pm.paper_id = p.id AND (m.slug IN ('model-context-protocol-mcp', 'mcp') OR m.name ILIKE '%MCP%' OR m.name ILIKE '%Model Context Protocol%')
+      )`);
+    } else {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM paper_tasks pt 
+        JOIN tasks t ON pt.task_id = t.id 
+        WHERE pt.paper_id = p.id AND (
+          t.slug = $${pIdx} OR 
+          t.slug = $${pIdx} || '-models' OR 
+          t.slug = $${pIdx} || '-agents' OR 
+          t.name ILIKE $${pIdx} OR 
+          t.name ILIKE '%' || $${pIdx} || '%'
+        )
+      )`);
+      sqlParams.push(query.task);
+      pIdx++;
+    }
   }
 
   if (query.method) {
-    conditions.push(`EXISTS (
-      SELECT 1 FROM paper_methods pm 
-      JOIN methods m ON pm.method_id = m.id 
-      WHERE pm.paper_id = p.id AND (m.slug = $${pIdx} OR m.name ILIKE $${pIdx})
-    )`);
-    sqlParams.push(query.method);
-    pIdx++;
+    const mSlug = query.method.toLowerCase().trim();
+    if (mSlug === "mcp" || mSlug === "model-context-protocol-mcp") {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM paper_methods pm 
+        JOIN methods m ON pm.method_id = m.id 
+        WHERE pm.paper_id = p.id AND (m.slug IN ('model-context-protocol-mcp', 'mcp') OR m.name ILIKE '%MCP%' OR m.name ILIKE '%Model Context Protocol%')
+      )`);
+    } else {
+      conditions.push(`EXISTS (
+        SELECT 1 FROM paper_methods pm 
+        JOIN methods m ON pm.method_id = m.id 
+        WHERE pm.paper_id = p.id AND (m.slug = $${pIdx} OR m.name ILIKE $${pIdx} OR m.name ILIKE '%' || $${pIdx} || '%')
+      )`);
+      sqlParams.push(query.method);
+      pIdx++;
+    }
   }
 
   if (query.model) {
@@ -527,28 +571,32 @@ export const getPapers = async (
   const hasMore = safePapers.length > limit;
   const pagePapers = hasMore ? safePapers.slice(0, limit) : safePapers;
 
-  // Fast count optimization:
-  // 1. If page 1 and results are within limit, count is exact without querying the DB!
-  // 2. Otherwise, check in-memory count cache before executing expensive count query.
+  // Ultra-fast count optimization:
+  // 1. If page 1 and results are within limit, count is exact without querying the DB.
+  // 2. If cached, use cached count immediately.
+  // 3. Otherwise, return estimate immediately (0ms) and asynchronously warm exact count in background.
   let totalCount: number;
   if (page === 1 && !hasMore) {
     totalCount = safePapers.length;
   } else {
-    const countCacheKey = JSON.stringify(where);
+    const countCacheKey = JSON.stringify({ where, task: query.task, method: query.method, period });
     const cachedCount = countCache.get(countCacheKey);
     if (cachedCount && Date.now() < cachedCount.expiresAt) {
       totalCount = cachedCount.count;
     } else {
-      totalCount = await queryRouter.routeQuery<number>(
-        async (prisma: PrismaClient) => {
-          return prisma.paper.count({ where });
-        },
-      ).then((cnt) => {
-        if (typeof cnt === "number") {
-          countCache.set(countCacheKey, { count: cnt, expiresAt: Date.now() + 600_000 });
-        }
-        return cnt;
-      }).catch(() => (hasMore ? skip + limit + 1 : skip + pagePapers.length));
+      totalCount = hasMore ? skip + limit + 50 : skip + pagePapers.length;
+
+      // Populate exact count in background using fast SQL count without blocking HTTP response
+      const countSql = `SELECT count(*) as count FROM papers p ${whereClause}`;
+      queryRouter
+        .routeQuery<any[]>(async (prisma: PrismaClient) => prisma.$queryRawUnsafe(countSql, ...sqlParams))
+        .then((res) => {
+          const cnt = Number(res?.[0]?.count ?? 0);
+          if (cnt > 0) {
+            countCache.set(countCacheKey, { count: cnt, expiresAt: Date.now() + 1_800_000 });
+          }
+        })
+        .catch(() => {});
     }
   }
 
