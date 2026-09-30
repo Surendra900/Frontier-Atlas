@@ -1,7 +1,7 @@
 import https from 'https';
 import http from 'http';
 
-const BASE_URL = 'https://frontend-1y4s17f3m-httplocalhost5173planner.vercel.app';
+const BASE_URL = 'https://frontend-httplocalhost5173planner.vercel.app';
 
 function request(urlPath) {
   const fullUrl = BASE_URL + urlPath;
