@@ -34,6 +34,8 @@ export interface BaseModel {
   citationCount: number;
   githubStars: number;
   trendingScore: number;
+  variants?: any[];
+  isCanonical?: boolean;
   papers?: ModelPaper[];
 }
 
@@ -168,6 +170,8 @@ function mapModelItem(m: BackendModelItem): ModelItem {
     citationCount: m.citationCount,
     githubStars: m.githubStars,
     trendingScore: m.trendingScore,
+    variants: Array.isArray(raw.variants) ? raw.variants : [],
+    isCanonical: raw.is_canonical !== false,
     latestPaperDate: null,
     latestPaperTitle: null,
     latestPaperSlug: null,
