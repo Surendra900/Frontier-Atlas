@@ -1,13 +1,15 @@
-/** @type {import('next').NextConfig} */
+const path = require('path');
+
 // Only use Cloudflare assetPrefix when building on Cloudflare Pages.
 // Vercel/other previews must load assets from their own domain.
 const useCfAssets = process.env.CF_PAGES === '1' || process.env.NEXT_PUBLIC_CF_ASSETS === '1';
 
 const nextConfig = {
   reactStrictMode: true,
+  outputFileTracingRoot: path.join(__dirname, '../'),
   
   // This is the new line! It fetches styles from your trusted pages.dev domain in production
-    assetPrefix: useCfAssets ? 'https://frontieratlas.pages.dev' : undefined,
+  assetPrefix: useCfAssets ? 'https://frontieratlas.pages.dev' : undefined,
 
   images: {
     remotePatterns: [

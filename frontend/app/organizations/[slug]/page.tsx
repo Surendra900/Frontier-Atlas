@@ -1,7 +1,5 @@
 import OrganizationDetailClient from "@/components/domain/organizations/OrganizationDetailClient";
 
-export const runtime = "edge";
-
 export default async function OrganizationPage({
   params,
 }: {

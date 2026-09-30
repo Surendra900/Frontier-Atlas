@@ -1,5 +1,3 @@
-export const runtime = "edge";
-
 import { notFound } from "next/navigation";
 import MethodDetailClient from "@/components/domain/methods/MethodDetailClient";
 

@@ -1,5 +1,3 @@
-export const runtime = "edge";
-
 import * as React from "react";
 import Link from "next/link";
 import { TaxonomyView } from "./TaxonomyView";
