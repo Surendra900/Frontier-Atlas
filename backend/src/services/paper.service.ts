@@ -346,10 +346,10 @@ export const getPapers = async (
   );
 
   let activeWhere = where;
-  if ((!papers || papers.length === 0) && skip === 0) {
+  if ((!papers || papers.length < 5) && skip === 0) {
     if (period !== "all") {
       const fallbackCutoff = new Date(baseDate);
-      const lookbackDays = period === "today" ? 7 : period === "week" ? 30 : 90;
+      const lookbackDays = period === "today" ? 14 : period === "week" ? 60 : 180;
       fallbackCutoff.setDate(fallbackCutoff.getDate() - lookbackDays);
 
       activeWhere = { ...where, publicationDate: { gte: fallbackCutoff } };
@@ -369,8 +369,8 @@ export const getPapers = async (
       },
     );
 
-    // If still 0 papers and period was restricted, gracefully fallback to all dates
-    if ((!papers || papers.length === 0) && period !== "all") {
+    // If still < 5 papers and period was restricted, gracefully fallback to all dates
+    if ((!papers || papers.length < 5) && period !== "all") {
       activeWhere = { ...where, publicationDate: { not: null } };
       papers = await queryRouter.routeQuery<any[]>(
         async (prisma: PrismaClient) => {

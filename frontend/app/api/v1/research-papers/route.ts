@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 
-export const runtime = "edge";
-
 const PROD_BACKEND = "https://frontieratlas-backend.morningsignal-india.workers.dev";
 
 export async function GET(request: NextRequest) {
