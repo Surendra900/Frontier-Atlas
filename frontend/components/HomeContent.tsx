@@ -64,7 +64,6 @@ export default function HomeContent({
       label === "Most GitHub Stars"
     ) {
       setActiveSort(label);
-
       // Discover options should always show All time
       setSelectedPeriod("All time");
     }
