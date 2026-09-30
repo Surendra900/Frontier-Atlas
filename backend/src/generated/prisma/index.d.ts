@@ -194,7 +194,7 @@ export class PrismaClient<
    * Read more in our [docs](https://pris.ly/d/client).
    */
 
-  constructor(optionsArg ?: Prisma.Subset<ClientOptions, Prisma.PrismaClientOptions>);
+  constructor(optionsArg ?: Prisma.PrismaClientConstructorArgs<ClientOptions>);
   $on<V extends U>(eventType: V, callback: (event: V extends 'query' ? Prisma.QueryEvent : Prisma.LogEvent) => void): PrismaClient;
 
   /**
@@ -604,8 +604,8 @@ export namespace Prisma {
   export import Exact = $Public.Exact
 
   /**
-   * Prisma Client JS version: 7.8.0
-   * Query Engine version: 3c6e192761c0362d496ed980de936e2f3cebcd3a
+   * Prisma Client JS version: 7.10.0
+   * Query Engine version: 0edf323efd1d98336f3f0a68684b56f689b900d3
    */
   export type PrismaVersion = {
     client: string
@@ -740,6 +740,19 @@ export namespace Prisma {
   };
 
   /**
+   * Resolved type of the argument passed to the `PrismaClient` constructor.
+   *
+   * When called without a narrower options type (the common case), this resolves
+   * to `PrismaClientOptions` directly, which produces a clear TypeScript error
+   * message (`not assignable to parameter of type 'PrismaClientOptions'`) when
+   * the argument is missing or incomplete. When the user supplies a narrower
+   * options type (e.g. via a literal), it falls back to `Subset` to keep
+   * filtering out unknown properties.
+   */
+  export type PrismaClientConstructorArgs<Options extends PrismaClientOptions> =
+    [PrismaClientOptions] extends [Options] ? PrismaClientOptions : Subset<Options, PrismaClientOptions>;
+
+  /**
    * SelectSubset
    * @desc From `T` pick properties that exist in `U`. Simple version of Intersection.
    * Additionally, it validates, if both select and include are present. If the case, it errors.
@@ -771,7 +784,7 @@ export namespace Prisma {
   type XOR<T, U> =
     T extends object ?
     U extends object ?
-      (Without<T, U> & U) | (Without<U, T> & T)
+      ((Without<T, U> & U) | (Without<U, T> & T)) & object
     : U : T
 
 
@@ -3175,11 +3188,26 @@ export namespace Prisma {
       isolationLevel?: Prisma.TransactionIsolationLevel
     }
     /**
-     * Instance of a Driver Adapter, e.g., like one provided by `@prisma/adapter-planetscale`
+     * A driver adapter that PrismaClient uses to connect to your database, such as the ones provided by `@prisma/adapter-pg`, `@prisma/adapter-libsql`, `@prisma/adapter-planetscale`, etc.
+     * 
+     * A driver adapter is **required** unless you connect to your database through Prisma Accelerate (in which case use `accelerateUrl` instead).
+     * 
+     * Learn more: https://pris.ly/d/driver-adapters
+     * 
+     * @example
+     * ```ts
+     * import { PrismaPg } from '@prisma/adapter-pg'
+     * import { PrismaClient } from './generated/prisma/client'
+     * 
+     * const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL })
+     * const prisma = new PrismaClient({ adapter })
+     * ```
      */
     adapter?: runtime.SqlDriverAdapterFactory
     /**
-     * Prisma Accelerate URL allowing the client to connect through Accelerate instead of a direct database.
+     * The Prisma Accelerate connection URL. Use this option to connect to your database through Prisma Accelerate instead of using a driver adapter to connect directly.
+     * 
+     * Learn more: https://pris.ly/d/accelerate
      */
     accelerateUrl?: string
     /**
@@ -16013,7 +16041,6 @@ export namespace Prisma {
     apiUrl: string | null
     contextWindow: string | null
     releaseNotes: string | null
-    role: string | null
   }
 
   export type ModelMaxAggregateOutputType = {
@@ -16052,7 +16079,6 @@ export namespace Prisma {
     apiUrl: string | null
     contextWindow: string | null
     releaseNotes: string | null
-    role: string | null
   }
 
   export type ModelCountAggregateOutputType = {
@@ -16098,7 +16124,6 @@ export namespace Prisma {
     researchAreas: number
     modelVersions: number
     releaseNotes: number
-    role: number
     _all: number
   }
 
@@ -16147,7 +16172,6 @@ export namespace Prisma {
     apiUrl?: true
     contextWindow?: true
     releaseNotes?: true
-    role?: true
   }
 
   export type ModelMaxAggregateInputType = {
@@ -16186,7 +16210,6 @@ export namespace Prisma {
     apiUrl?: true
     contextWindow?: true
     releaseNotes?: true
-    role?: true
   }
 
   export type ModelCountAggregateInputType = {
@@ -16232,7 +16255,6 @@ export namespace Prisma {
     researchAreas?: true
     modelVersions?: true
     releaseNotes?: true
-    role?: true
     _all?: true
   }
 
@@ -16365,7 +16387,6 @@ export namespace Prisma {
     researchAreas: JsonValue | null
     modelVersions: JsonValue | null
     releaseNotes: string | null
-    role: string | null
     _count: ModelCountAggregateOutputType | null
     _avg: ModelAvgAggregateOutputType | null
     _sum: ModelSumAggregateOutputType | null
@@ -16430,7 +16451,6 @@ export namespace Prisma {
     researchAreas?: boolean
     modelVersions?: boolean
     releaseNotes?: boolean
-    role?: boolean
     papers?: boolean | Model$papersArgs<ExtArgs>
     _count?: boolean | ModelCountOutputTypeDefaultArgs<ExtArgs>
   }, ExtArgs["result"]["model"]>
@@ -16478,7 +16498,6 @@ export namespace Prisma {
     researchAreas?: boolean
     modelVersions?: boolean
     releaseNotes?: boolean
-    role?: boolean
   }, ExtArgs["result"]["model"]>
 
   export type ModelSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -16524,7 +16543,6 @@ export namespace Prisma {
     researchAreas?: boolean
     modelVersions?: boolean
     releaseNotes?: boolean
-    role?: boolean
   }, ExtArgs["result"]["model"]>
 
   export type ModelSelectScalar = {
@@ -16570,10 +16588,9 @@ export namespace Prisma {
     researchAreas?: boolean
     modelVersions?: boolean
     releaseNotes?: boolean
-    role?: boolean
   }
 
-  export type ModelOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "slug" | "vendor" | "vendor_logo_url" | "description" | "parameter_count" | "modality" | "access_type" | "openness_type" | "release_date" | "benchmark_score" | "model_family" | "category" | "capabilities" | "research_areas" | "architecture" | "context_window" | "license" | "model_versions" | "release_notes" | "paper_url" | "repository_url" | "api_url" | "created_at" | "updated_at" | "createdAt" | "updatedAt" | "releaseDate" | "parameterCount" | "accessType" | "opennessType" | "benchmarkScore" | "modelFamily" | "trendingScore" | "paperUrl" | "repositoryUrl" | "apiUrl" | "contextWindow" | "researchAreas" | "modelVersions" | "releaseNotes" | "role", ExtArgs["result"]["model"]>
+  export type ModelOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "name" | "slug" | "vendor" | "vendor_logo_url" | "description" | "parameter_count" | "modality" | "access_type" | "openness_type" | "release_date" | "benchmark_score" | "model_family" | "category" | "capabilities" | "research_areas" | "architecture" | "context_window" | "license" | "model_versions" | "release_notes" | "paper_url" | "repository_url" | "api_url" | "created_at" | "updated_at" | "createdAt" | "updatedAt" | "releaseDate" | "parameterCount" | "accessType" | "opennessType" | "benchmarkScore" | "modelFamily" | "trendingScore" | "paperUrl" | "repositoryUrl" | "apiUrl" | "contextWindow" | "researchAreas" | "modelVersions" | "releaseNotes", ExtArgs["result"]["model"]>
   export type ModelInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     papers?: boolean | Model$papersArgs<ExtArgs>
     _count?: boolean | ModelCountOutputTypeDefaultArgs<ExtArgs>
@@ -16629,7 +16646,6 @@ export namespace Prisma {
       researchAreas: Prisma.JsonValue | null
       modelVersions: Prisma.JsonValue | null
       releaseNotes: string | null
-      role: string | null
     }, ExtArgs["result"]["model"]>
     composites: {}
   }
@@ -17096,7 +17112,6 @@ export namespace Prisma {
     readonly researchAreas: FieldRef<"Model", 'Json'>
     readonly modelVersions: FieldRef<"Model", 'Json'>
     readonly releaseNotes: FieldRef<"Model", 'String'>
-    readonly role: FieldRef<"Model", 'String'>
   }
     
 
@@ -36236,8 +36251,7 @@ export namespace Prisma {
     contextWindow: 'contextWindow',
     researchAreas: 'researchAreas',
     modelVersions: 'modelVersions',
-    releaseNotes: 'releaseNotes',
-    role: 'role'
+    releaseNotes: 'releaseNotes'
   };
 
   export type ModelScalarFieldEnum = (typeof ModelScalarFieldEnum)[keyof typeof ModelScalarFieldEnum]
@@ -37593,7 +37607,6 @@ export namespace Prisma {
     researchAreas?: JsonNullableFilter<"Model">
     modelVersions?: JsonNullableFilter<"Model">
     releaseNotes?: StringNullableFilter<"Model"> | string | null
-    role?: StringNullableFilter<"Model"> | string | null
     papers?: PaperModelListRelationFilter
   }
 
@@ -37640,7 +37653,6 @@ export namespace Prisma {
     researchAreas?: SortOrderInput | SortOrder
     modelVersions?: SortOrderInput | SortOrder
     releaseNotes?: SortOrderInput | SortOrder
-    role?: SortOrderInput | SortOrder
     papers?: PaperModelOrderByRelationAggregateInput
   }
 
@@ -37690,7 +37702,6 @@ export namespace Prisma {
     researchAreas?: JsonNullableFilter<"Model">
     modelVersions?: JsonNullableFilter<"Model">
     releaseNotes?: StringNullableFilter<"Model"> | string | null
-    role?: StringNullableFilter<"Model"> | string | null
     papers?: PaperModelListRelationFilter
   }, "id" | "slug">
 
@@ -37737,7 +37748,6 @@ export namespace Prisma {
     researchAreas?: SortOrderInput | SortOrder
     modelVersions?: SortOrderInput | SortOrder
     releaseNotes?: SortOrderInput | SortOrder
-    role?: SortOrderInput | SortOrder
     _count?: ModelCountOrderByAggregateInput
     _avg?: ModelAvgOrderByAggregateInput
     _max?: ModelMaxOrderByAggregateInput
@@ -37791,7 +37801,6 @@ export namespace Prisma {
     researchAreas?: JsonNullableWithAggregatesFilter<"Model">
     modelVersions?: JsonNullableWithAggregatesFilter<"Model">
     releaseNotes?: StringNullableWithAggregatesFilter<"Model"> | string | null
-    role?: StringNullableWithAggregatesFilter<"Model"> | string | null
   }
 
   export type PaperModelWhereInput = {
@@ -40010,7 +40019,6 @@ export namespace Prisma {
     researchAreas?: NullableJsonNullValueInput | InputJsonValue
     modelVersions?: NullableJsonNullValueInput | InputJsonValue
     releaseNotes?: string | null
-    role?: string | null
     papers?: PaperModelCreateNestedManyWithoutModelInput
   }
 
@@ -40057,7 +40065,6 @@ export namespace Prisma {
     researchAreas?: NullableJsonNullValueInput | InputJsonValue
     modelVersions?: NullableJsonNullValueInput | InputJsonValue
     releaseNotes?: string | null
-    role?: string | null
     papers?: PaperModelUncheckedCreateNestedManyWithoutModelInput
   }
 
@@ -40104,7 +40111,6 @@ export namespace Prisma {
     researchAreas?: NullableJsonNullValueInput | InputJsonValue
     modelVersions?: NullableJsonNullValueInput | InputJsonValue
     releaseNotes?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: NullableStringFieldUpdateOperationsInput | string | null
     papers?: PaperModelUpdateManyWithoutModelNestedInput
   }
 
@@ -40151,7 +40157,6 @@ export namespace Prisma {
     researchAreas?: NullableJsonNullValueInput | InputJsonValue
     modelVersions?: NullableJsonNullValueInput | InputJsonValue
     releaseNotes?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: NullableStringFieldUpdateOperationsInput | string | null
     papers?: PaperModelUncheckedUpdateManyWithoutModelNestedInput
   }
 
@@ -40198,7 +40203,6 @@ export namespace Prisma {
     researchAreas?: NullableJsonNullValueInput | InputJsonValue
     modelVersions?: NullableJsonNullValueInput | InputJsonValue
     releaseNotes?: string | null
-    role?: string | null
   }
 
   export type ModelUpdateManyMutationInput = {
@@ -40244,7 +40248,6 @@ export namespace Prisma {
     researchAreas?: NullableJsonNullValueInput | InputJsonValue
     modelVersions?: NullableJsonNullValueInput | InputJsonValue
     releaseNotes?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type ModelUncheckedUpdateManyInput = {
@@ -40290,7 +40293,6 @@ export namespace Prisma {
     researchAreas?: NullableJsonNullValueInput | InputJsonValue
     modelVersions?: NullableJsonNullValueInput | InputJsonValue
     releaseNotes?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type PaperModelCreateInput = {
@@ -42389,7 +42391,6 @@ export namespace Prisma {
     researchAreas?: SortOrder
     modelVersions?: SortOrder
     releaseNotes?: SortOrder
-    role?: SortOrder
   }
 
   export type ModelAvgOrderByAggregateInput = {
@@ -42432,7 +42433,6 @@ export namespace Prisma {
     apiUrl?: SortOrder
     contextWindow?: SortOrder
     releaseNotes?: SortOrder
-    role?: SortOrder
   }
 
   export type ModelMinOrderByAggregateInput = {
@@ -42471,7 +42471,6 @@ export namespace Prisma {
     apiUrl?: SortOrder
     contextWindow?: SortOrder
     releaseNotes?: SortOrder
-    role?: SortOrder
   }
 
   export type ModelSumOrderByAggregateInput = {
@@ -47069,7 +47068,6 @@ export namespace Prisma {
     researchAreas?: NullableJsonNullValueInput | InputJsonValue
     modelVersions?: NullableJsonNullValueInput | InputJsonValue
     releaseNotes?: string | null
-    role?: string | null
   }
 
   export type ModelUncheckedCreateWithoutPapersInput = {
@@ -47115,7 +47113,6 @@ export namespace Prisma {
     researchAreas?: NullableJsonNullValueInput | InputJsonValue
     modelVersions?: NullableJsonNullValueInput | InputJsonValue
     releaseNotes?: string | null
-    role?: string | null
   }
 
   export type ModelCreateOrConnectWithoutPapersInput = {
@@ -47294,7 +47291,6 @@ export namespace Prisma {
     researchAreas?: NullableJsonNullValueInput | InputJsonValue
     modelVersions?: NullableJsonNullValueInput | InputJsonValue
     releaseNotes?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type ModelUncheckedUpdateWithoutPapersInput = {
@@ -47340,7 +47336,6 @@ export namespace Prisma {
     researchAreas?: NullableJsonNullValueInput | InputJsonValue
     modelVersions?: NullableJsonNullValueInput | InputJsonValue
     releaseNotes?: NullableStringFieldUpdateOperationsInput | string | null
-    role?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type PaperUpsertWithoutModelsInput = {

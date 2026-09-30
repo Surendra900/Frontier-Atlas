@@ -73,6 +73,8 @@ model Paper {
   @@index([citationCount])
   @@index([githubStars])
   @@index([trendingScore])
+  @@index([publicationDate(sort: Desc), githubStars(sort: Desc)])
+  @@index([githubStars(sort: Desc), citationCount(sort: Desc)])
 
   @@map("papers")
 }
@@ -126,6 +128,8 @@ model PaperTask {
   task     Task   @relation(fields: [task_id], references: [id])
 
   @@id([paper_id, task_id])
+  @@index([task_id])
+  @@index([paper_id])
   @@map("paper_tasks")
 }
 
@@ -149,6 +153,8 @@ model PaperMethod {
   paper     Paper  @relation(fields: [paper_id], references: [id])
 
   @@id([paper_id, method_id])
+  @@index([method_id])
+  @@index([paper_id])
   @@map("paper_methods")
 }
 
@@ -192,6 +198,8 @@ model SotaClaim {
   paper        Paper     @relation(fields: [paper_id], references: [id])
 
   @@unique([paper_id, benchmark_id])
+  @@index([benchmark_id])
+  @@index([paper_id])
   @@map("sota_claims")
 }
 
@@ -222,6 +230,7 @@ model Ranking {
 
   @@unique([paper_id, benchmark_id])
   @@index([benchmark_id, rank])
+  @@index([paper_id])
   @@map("rankings")
 }
 
@@ -260,7 +269,7 @@ model Model {
   opennessType    String?      @default("Commercial / Permissive")
   benchmarkScore  Json?        @default("{}")
   modelFamily     String?
-  trendingScore   Float?       @default(0)
+  trendingScore   Float?       @default(0) @map("trending_score")
   paperUrl        String?
   repositoryUrl   String?
   apiUrl          String?
@@ -268,7 +277,6 @@ model Model {
   researchAreas   Json?
   modelVersions   Json?
   releaseNotes    String?
-  role            String?
   papers          PaperModel[]
 
   @@map("models")
@@ -282,6 +290,8 @@ model PaperModel {
   paper    Paper   @relation(fields: [paper_id], references: [id], onDelete: Cascade)
 
   @@id([paper_id, model_id])
+  @@index([model_id])
+  @@index([paper_id])
   @@map("paper_models")
 }
 
@@ -305,6 +315,8 @@ model PaperDataset {
   paper      Paper   @relation(fields: [paper_id], references: [id], onDelete: Cascade)
 
   @@id([paper_id, dataset_id])
+  @@index([dataset_id])
+  @@index([paper_id])
   @@map("paper_datasets")
 }
 
@@ -421,6 +433,8 @@ model PaperRepository {
   repository    Repository @relation(fields: [repository_id], references: [id], onDelete: Cascade)
 
   @@id([paper_id, repository_id])
+  @@index([repository_id])
+  @@index([paper_id])
   @@map("paper_repositories")
 }
 

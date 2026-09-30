@@ -2,6 +2,21 @@ import type { PrismaClient } from "../generated/prisma/client.js";
 import { QueryRouter } from "../routing/index.js";
 import { redisManager } from "../lib/redis.js";
 
+// In-memory cache for ultra-fast (0ms) global search responses
+const localGlobalSearchCache = new Map<string, { data: any; expiresAt: number }>();
+const GLOBAL_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
+const MAX_GLOBAL_CACHE_SIZE = 2000;
+
+const setLocalGlobalCache = (key: string, data: any, ttlMs: number = GLOBAL_CACHE_TTL_MS) => {
+  if (localGlobalSearchCache.size >= MAX_GLOBAL_CACHE_SIZE) {
+    const oldestKey = localGlobalSearchCache.keys().next().value;
+    if (oldestKey) {
+      localGlobalSearchCache.delete(oldestKey);
+    }
+  }
+  localGlobalSearchCache.set(key, { data, expiresAt: Date.now() + ttlMs });
+};
+
 export const globalSearch = async (
   queryRouter: QueryRouter,
   query: string,
@@ -19,212 +34,141 @@ export const globalSearch = async (
     };
   }
 
-  const redis = redisManager.getClient();
   const cacheKey = `search:global:${searchTerm}:${limit}`;
 
-  // 1. Check Redis cache first for instant response
+  // 1. Check local in-memory cache first (0ms instant response)
+  const localHit = localGlobalSearchCache.get(cacheKey);
+  if (localHit && Date.now() < localHit.expiresAt) {
+    return localHit.data;
+  }
+
+  // 2. Check Redis cache if configured
+  const redis = redisManager.getClient();
   try {
     const cachedData = await redis.get(cacheKey);
     if (cachedData) {
-      console.log("⚡ GLOBAL SEARCH CACHE HIT", searchTerm);
-      return typeof cachedData === "string" ? JSON.parse(cachedData) : cachedData;
+      const parsed = typeof cachedData === "string" ? JSON.parse(cachedData) : cachedData;
+      setLocalGlobalCache(cacheKey, parsed);
+      return parsed;
     }
   } catch (err) {
-    console.warn("⚠️ Redis get failed, falling back to database:", err);
+    // Redis optional fallback
   }
 
+  // 3. Fast indexed database queries using pg_trgm GIN indexes
   const results = await queryRouter.routeQuery(async (prisma: PrismaClient) => {
-    console.log("🔥 GLOBAL SEARCH DB HIT", searchTerm);
-    const [papers, methods, tasks, models, datasets] =
-      await Promise.all([
-        // Search papers by title, authors, linked models, tasks, methods, datasets
-        prisma.paper.findMany({
-          where: {
-            OR: [
-              {
-                title: {
-                  contains: searchTerm,
-                  mode: "insensitive",
-                },
-              },
-              {
-                authors: {
-                  contains: searchTerm,
-                  mode: "insensitive",
-                },
-              },
-              {
-                abstract: {
-                  contains: searchTerm,
-                  mode: "insensitive",
-                },
-              },
-              {
-                models: {
-                  some: {
-                    model: {
-                      name: {
-                        contains: searchTerm,
-                        mode: "insensitive",
-                      },
-                    },
-                  },
-                },
-              },
-              {
-                tasks: {
-                  some: {
-                    task: {
-                      name: {
-                        contains: searchTerm,
-                        mode: "insensitive",
-                      },
-                    },
-                  },
-                },
-              },
-              {
-                methods: {
-                  some: {
-                    method: {
-                      name: {
-                        contains: searchTerm,
-                        mode: "insensitive",
-                      },
-                    },
-                  },
-                },
-              },
-              {
-                datasets: {
-                  some: {
-                    dataset: {
-                      name: {
-                        contains: searchTerm,
-                        mode: "insensitive",
-                      },
-                    },
-                  },
-                },
-              },
-            ],
-          },
-          take: limit * 3,
-          select: {
-            id: true,
-            slug: true,
-            title: true,
-            githubStars: true,
-            citationCount: true,
-            authors: true,
-            thumbnailUrl: true,
-            projectUrl: true,
-          },
-        }),
+    const pattern = `%${searchTerm}%`;
 
-        prisma.method.findMany({
-          where: {
-            name: {
-              contains: searchTerm,
-              mode: "insensitive",
-            },
-          },
-          take: limit,
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-          },
-        }),
+    const [papers, methods, tasks, models, datasets] = await Promise.all([
+      prisma.$queryRawUnsafe<any[]>(
+        `SELECT id, slug, title, github_stars as "githubStars", citation_count as "citationCount", authors, thumbnail_url as "thumbnailUrl", project_url as "projectUrl"
+         FROM papers
+         WHERE title ILIKE $1 OR authors ILIKE $1
+         ORDER BY github_stars DESC NULLS LAST
+         LIMIT $2`,
+        pattern,
+        limit * 3
+      ),
 
-        prisma.task.findMany({
-          where: {
-            name: {
-              contains: searchTerm,
-              mode: "insensitive",
-            },
+      prisma.method.findMany({
+        where: {
+          name: {
+            contains: searchTerm,
+            mode: "insensitive",
           },
-          take: limit,
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-          },
-        }),
+        },
+        take: limit,
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+        },
+      }),
 
-        prisma.model.findMany({
-          where: {
-            name: {
-              contains: searchTerm,
-              mode: "insensitive",
-            },
+      prisma.task.findMany({
+        where: {
+          name: {
+            contains: searchTerm,
+            mode: "insensitive",
           },
-          take: limit,
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-          },
-        }),
+        },
+        take: limit,
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+        },
+      }),
 
-        prisma.dataset.findMany({
-          where: {
-            name: {
-              contains: searchTerm,
-              mode: "insensitive",
-            },
+      prisma.model.findMany({
+        where: {
+          name: {
+            contains: searchTerm,
+            mode: "insensitive",
           },
-          take: limit,
-          select: {
-            id: true,
-            slug: true,
-            name: true,
-          },
-        }),
-      ]);
+        },
+        take: limit,
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+        },
+      }),
 
+      prisma.dataset.findMany({
+        where: {
+          name: {
+            contains: searchTerm,
+            mode: "insensitive",
+          },
+        },
+        take: limit,
+        select: {
+          id: true,
+          slug: true,
+          name: true,
+        },
+      }),
+    ]);
+
+    const safePapers = Array.isArray(papers) ? papers : [];
     const uniquePapers = Array.from(
-      new Map(
-        papers.map((paper) => [
-          paper.slug,
-          paper,
-        ])
-      ).values()
+      new Map(safePapers.map((paper: any) => [paper.slug, paper])).values()
     );
 
     return {
-      papers: uniquePapers.slice(0, limit).map((p) => ({
+      papers: uniquePapers.slice(0, limit).map((p: any) => ({
         type: "papers",
         id: p.id,
         title: p.title,
         slug: p.slug,
         subtitle: p.authors
-          ? `${p.authors} • ${p.citationCount} citations`
-          : `${p.citationCount} citations`,
+          ? `${p.authors} • ${p.citationCount || 0} citations`
+          : `${p.citationCount || 0} citations`,
       })),
 
-      methods: methods.map((m) => ({
+      methods: (methods || []).map((m) => ({
         type: "methods",
         id: m.id,
         title: m.name,
         slug: m.slug,
       })),
 
-      tasks: tasks.map((t) => ({
+      tasks: (tasks || []).map((t) => ({
         type: "tasks",
         id: t.id,
         title: t.name,
         slug: t.slug,
       })),
 
-      models: models.map((m) => ({
+      models: (models || []).map((m) => ({
         type: "models",
         id: m.id,
         title: m.name,
         slug: m.slug,
       })),
 
-      datasets: datasets.map((d) => ({
+      datasets: (datasets || []).map((d) => ({
         type: "datasets",
         id: d.id,
         title: d.name,
@@ -233,11 +177,14 @@ export const globalSearch = async (
     };
   });
 
-  // 2. Save the formatted results to Redis cache with a 5-minute TTL
+  // 4. Cache in local memory
+  setLocalGlobalCache(cacheKey, results);
+
+  // 5. Asynchronously cache in Redis without blocking
   try {
-    await redis.set(cacheKey, JSON.stringify(results), { ex: 300 });
-  } catch (err) {
-    console.warn("⚠️ Redis set failed:", err);
+    redis.set(cacheKey, JSON.stringify(results), { ex: 300 }).catch(() => {});
+  } catch {
+    // Non-blocking
   }
 
   return results;

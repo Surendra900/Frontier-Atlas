@@ -27,7 +27,7 @@ const exposeThumbnailUrl = <T extends { thumbnailUrl?: string | null; arxivId?: 
 ) => {
   const { thumbnailUrl, ...rest } = paper;
   let cleanUrl = thumbnailUrl === "FAILED_404" ? null : (thumbnailUrl ?? null);
-  if (cleanUrl && cleanUrl.includes("cloudinary.com/xipefqle")) {
+  if (cleanUrl && cleanUrl.includes("cloudinary.com")) {
     cleanUrl = paper.arxivId
       ? `https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${paper.arxivId}.webp`
       : null;
@@ -210,7 +210,8 @@ export const ingestPaper = async (queryRouter: QueryRouter, data: Record<string,
   );
 };
 
-let cachedLatestPaperDate: { date: Date; timestamp: number } | null = null;
+const countCache = new Map<string, { count: number; expiresAt: number }>();
+let cachedLatestPaperDate: { date: Date; timestamp: number } | null = { date: new Date(), timestamp: Date.now() };
 
 export const getPapers = async (
   queryRouter: QueryRouter,
@@ -245,30 +246,32 @@ export const getPapers = async (
     ];
   }
 
-  // Enforce papers must have at least one task/method
-  // Only enforce sotaClaim/ranking on the general feed to avoid flooding
-  const mandatoryConditions: any[] = [
-    {
-      OR: [
-        { tasks: { some: {} } },
-        { methods: { some: {} } }
-      ]
+  // Only apply mandatory task/method/sota filtering when on the general unfiltered feed.
+  // When a user selects a specific task or method chip, applying redundant EXISTS checks damages query performance.
+  if (!query.task && !query.method) {
+    const feedConditions: any[] = [
+      {
+        OR: [
+          { tasks: { some: {} } },
+          { methods: { some: {} } },
+        ],
+      },
+    ];
+
+    if (!query.model && !query.organization) {
+      feedConditions.push({
+        OR: [
+          { sotaClaims: { some: {} } },
+          { rankings: { some: {} } },
+        ],
+      });
     }
-  ];
 
-  if (!query.task && !query.method && !query.model && !query.organization) {
-    mandatoryConditions.push({
-      OR: [
-        { sotaClaims: { some: {} } },
-        { rankings: { some: {} } }
-      ]
-    });
+    where.AND = [
+      ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
+      ...feedConditions,
+    ];
   }
-
-  where.AND = [
-    ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
-    ...mandatoryConditions
-  ];
 
   let baseDate = new Date();
   if (period !== "all") {
@@ -276,17 +279,21 @@ export const getPapers = async (
     if (cachedLatestPaperDate && Date.now() - cachedLatestPaperDate.timestamp < 3600000) {
       latestDbDate = cachedLatestPaperDate.date;
     } else {
-      const latestPaper = await queryRouter.routeQuery<any>(async (prisma: PrismaClient) => {
-        return prisma.paper.findFirst({
-          where: { publicationDate: { not: null } },
-          orderBy: { publicationDate: "desc" },
-          select: { publicationDate: true },
+      try {
+        const latestPaper = await queryRouter.routeQuery<any>(async (prisma: PrismaClient) => {
+          return prisma.paper.findFirst({
+            where: { publicationDate: { not: null } },
+            orderBy: { publicationDate: "desc" },
+            select: { publicationDate: true },
+          });
         });
-      });
-      const now = new Date();
-      const rawDate = latestPaper?.publicationDate ? new Date(latestPaper.publicationDate) : now;
-      latestDbDate = rawDate.getTime() > 0 && rawDate.getTime() <= now.getTime() ? rawDate : now;
-      cachedLatestPaperDate = { date: latestDbDate, timestamp: Date.now() };
+        const now = new Date();
+        const rawDate = latestPaper?.publicationDate ? new Date(latestPaper.publicationDate) : now;
+        latestDbDate = rawDate.getTime() > 0 && rawDate.getTime() <= now.getTime() ? rawDate : now;
+        cachedLatestPaperDate = { date: latestDbDate, timestamp: Date.now() };
+      } catch {
+        latestDbDate = new Date();
+      }
     }
     baseDate = latestDbDate;
 
@@ -320,8 +327,173 @@ export const getPapers = async (
       ? [{ title: "asc" }, { slug: "asc" }]
       : [{ githubStars: "desc" }, { citationCount: "desc" }, { publicationDate: "desc" }, { slug: "asc" }];
 
-  let papers = await queryRouter.routeQuery<any[]>(
-    async (prisma: PrismaClient) => {
+  const conditions: string[] = [];
+  const sqlParams: any[] = [];
+  let pIdx = 1;
+
+  if (query.task) {
+    conditions.push(`EXISTS (
+      SELECT 1 FROM paper_tasks pt 
+      JOIN tasks t ON pt.task_id = t.id 
+      WHERE pt.paper_id = p.id AND (t.slug = $${pIdx} OR t.name ILIKE $${pIdx})
+    )`);
+    sqlParams.push(query.task);
+    pIdx++;
+  }
+
+  if (query.method) {
+    conditions.push(`EXISTS (
+      SELECT 1 FROM paper_methods pm 
+      JOIN methods m ON pm.method_id = m.id 
+      WHERE pm.paper_id = p.id AND (m.slug = $${pIdx} OR m.name ILIKE $${pIdx})
+    )`);
+    sqlParams.push(query.method);
+    pIdx++;
+  }
+
+  if (query.model) {
+    conditions.push(`EXISTS (
+      SELECT 1 FROM paper_models pmo 
+      JOIN models mo ON pmo.model_id = mo.id 
+      WHERE pmo.paper_id = p.id AND mo.slug = $${pIdx}
+    )`);
+    sqlParams.push(query.model);
+    pIdx++;
+  }
+
+  if (query.organization) {
+    conditions.push(`(
+      p.organization ILIKE $${pIdx} OR 
+      EXISTS (
+        SELECT 1 FROM paper_models pmo 
+        JOIN models mo ON pmo.model_id = mo.id 
+        WHERE pmo.paper_id = p.id AND mo.vendor ILIKE $${pIdx}
+      )
+    )`);
+    sqlParams.push(query.organization.trim());
+    pIdx++;
+  }
+
+  if (!query.task && !query.method) {
+    conditions.push(`(
+      EXISTS (SELECT 1 FROM paper_tasks pt WHERE pt.paper_id = p.id) OR
+      EXISTS (SELECT 1 FROM paper_methods pm WHERE pm.paper_id = p.id)
+    )`);
+    if (!query.model && !query.organization) {
+      conditions.push(`(
+        p.id IN (SELECT paper_id FROM sota_claims UNION ALL SELECT paper_id FROM rankings)
+      )`);
+    }
+  }
+
+  let periodCutoff: Date | null = null;
+  if (period !== "all") {
+    const days = period === "today" ? 2 : period === "week" ? 7 : 30;
+    const cutoff = new Date(baseDate);
+    cutoff.setDate(cutoff.getDate() - days);
+    periodCutoff = cutoff;
+    conditions.push(`p.publication_date >= $${pIdx}`);
+    sqlParams.push(cutoff);
+    pIdx++;
+  } else {
+    conditions.push(`p.publication_date IS NOT NULL`);
+  }
+
+  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+
+  let orderSql = `ORDER BY p.github_stars DESC NULLS LAST, p.citation_count DESC NULLS LAST, p.publication_date DESC NULLS LAST, p.slug ASC`;
+  if (sort === "latest" || sort === "recent") {
+    orderSql = `ORDER BY p.publication_date DESC NULLS LAST, p.github_stars DESC NULLS LAST, p.slug ASC`;
+  } else if (sort === "citations") {
+    orderSql = `ORDER BY p.citation_count DESC NULLS LAST, p.github_stars DESC NULLS LAST, p.publication_date DESC NULLS LAST, p.slug ASC`;
+  } else if (sort === "alphabetical") {
+    orderSql = `ORDER BY p.title ASC NULLS LAST, p.slug ASC`;
+  }
+
+  const buildUnifiedSql = (whereStr: string) => `
+    WITH selected_papers AS (
+      SELECT p.*
+      FROM papers p
+      ${whereStr}
+      ${orderSql}
+      LIMIT ${limit + 1} OFFSET ${skip}
+    )
+    SELECT
+      p.id,
+      p.slug,
+      p.title,
+      p.abstract,
+      p.thumbnail_url as "thumbnailUrl",
+      p.publication_date as "publicationDate",
+      p.created_at as "createdAt",
+      p.updated_at as "updatedAt",
+      p.arxiv_id as "arxivId",
+      p.paper_url as "paperUrl",
+      p.pdf_url as "pdfUrl",
+      p.github_url as "githubUrl",
+      p.github_stars as "githubStars",
+      p.github_hourly_increase,
+      p.github_forks as "githubForks",
+      p.hf_url as "hfUrl",
+      p.huggingface_url,
+      p.hf_upvotes as "hfUpvotes",
+      p.project_url as "projectUrl",
+      p.citation_count as "citationCount",
+      p.language,
+      p.authors,
+      COALESCE((
+        SELECT json_agg(json_build_object('task', json_build_object('name', t.name, 'slug', t.slug)))
+        FROM paper_tasks pt
+        JOIN tasks t ON pt.task_id = t.id
+        WHERE pt.paper_id = p.id
+      ), '[]'::json) as tasks,
+      COALESCE((
+        SELECT json_agg(json_build_object('method', json_build_object('name', m.name, 'slug', m.slug)))
+        FROM paper_methods pm
+        JOIN methods m ON pm.method_id = m.id
+        WHERE pm.paper_id = p.id
+      ), '[]'::json) as methods,
+      COALESCE((
+        SELECT json_agg(json_build_object('benchmark', json_build_object('name', b.name, 'slug', b.slug)))
+        FROM sota_claims sc
+        JOIN benchmarks b ON sc.benchmark_id = b.id
+        WHERE sc.paper_id = p.id
+      ), '[]'::json) as "sotaClaims",
+      COALESCE((
+        SELECT json_agg(json_build_object('rank', r.rank, 'benchmark', json_build_object('name', b.name, 'slug', b.slug)))
+        FROM rankings r
+        JOIN benchmarks b ON r.benchmark_id = b.id
+        WHERE r.paper_id = p.id
+      ), '[]'::json) as rankings,
+      COALESCE((
+        SELECT json_agg(json_build_object('repository', json_build_object('url', repo.url, 'owner', repo.owner, 'name', repo.name)))
+        FROM paper_repositories pr
+        JOIN repositories repo ON pr.repository_id = repo.id
+        WHERE pr.paper_id = p.id
+      ), '[]'::json) as repositories
+    FROM selected_papers p
+    ${orderSql};
+  `;
+
+  let papers: any[] = [];
+  try {
+    papers = await queryRouter.routeQuery<any[]>(async (prisma: PrismaClient) => {
+      return prisma.$queryRawUnsafe<any[]>(buildUnifiedSql(whereClause), ...sqlParams);
+    });
+
+    if ((!papers || papers.length === 0) && skip === 0 && period !== "all" && periodCutoff) {
+      const fallbackCutoff = new Date(baseDate);
+      const lookbackDays = period === "today" ? 7 : period === "week" ? 30 : 90;
+      fallbackCutoff.setDate(fallbackCutoff.getDate() - lookbackDays);
+      const fallbackParams = [...sqlParams];
+      fallbackParams[fallbackParams.length - 1] = fallbackCutoff;
+      papers = await queryRouter.routeQuery<any[]>(async (prisma: PrismaClient) => {
+        return prisma.$queryRawUnsafe<any[]>(buildUnifiedSql(whereClause), ...fallbackParams);
+      });
+    }
+  } catch (rawErr) {
+    console.warn("Unified SQL query error, falling back to Prisma findMany:", rawErr);
+    papers = await queryRouter.routeQuery<any[]>(async (prisma: PrismaClient) => {
       return prisma.paper.findMany({
         where,
         orderBy,
@@ -329,43 +501,37 @@ export const getPapers = async (
         skip,
         select: paperSelect,
       });
-    },
-  );
-
-  let activeWhere = where;
-  if ((!papers || papers.length === 0) && skip === 0) {
-    if (period !== "all") {
-      const fallbackCutoff = new Date(baseDate);
-      const lookbackDays = period === "today" ? 7 : period === "week" ? 30 : 90;
-      fallbackCutoff.setDate(fallbackCutoff.getDate() - lookbackDays);
-
-      activeWhere = { ...where, publicationDate: { gte: fallbackCutoff } };
-    } else {
-      activeWhere = { ...where, publicationDate: { not: null } };
-    }
-
-    papers = await queryRouter.routeQuery<any[]>(
-      async (prisma: PrismaClient) => {
-        return prisma.paper.findMany({
-          where: activeWhere,
-          orderBy,
-          take: limit + 1,
-          skip,
-          select: paperSelect,
-        });
-      },
-    );
+    });
   }
 
   const safePapers = Array.isArray(papers) ? papers : [];
   const hasMore = safePapers.length > limit;
   const pagePapers = hasMore ? safePapers.slice(0, limit) : safePapers;
 
-  const totalCount = await queryRouter.routeQuery<number>(
-    async (prisma: PrismaClient) => {
-      return prisma.paper.count({ where: activeWhere });
-    },
-  ).catch(() => (hasMore ? skip + limit + 1 : skip + pagePapers.length));
+  // Fast count optimization:
+  // 1. If page 1 and results are within limit, count is exact without querying the DB!
+  // 2. Otherwise, check in-memory count cache before executing expensive count query.
+  let totalCount: number;
+  if (page === 1 && !hasMore) {
+    totalCount = safePapers.length;
+  } else {
+    const countCacheKey = JSON.stringify(where);
+    const cachedCount = countCache.get(countCacheKey);
+    if (cachedCount && Date.now() < cachedCount.expiresAt) {
+      totalCount = cachedCount.count;
+    } else {
+      totalCount = await queryRouter.routeQuery<number>(
+        async (prisma: PrismaClient) => {
+          return prisma.paper.count({ where });
+        },
+      ).then((cnt) => {
+        if (typeof cnt === "number") {
+          countCache.set(countCacheKey, { count: cnt, expiresAt: Date.now() + 600_000 });
+        }
+        return cnt;
+      }).catch(() => (hasMore ? skip + limit + 1 : skip + pagePapers.length));
+    }
+  }
 
   return {
     papers: pagePapers.map((paper) => ({
@@ -499,7 +665,7 @@ export const getPaperBySlug = async (queryRouter: QueryRouter, slug: string) => 
       if (!paperData) return null;
 
       let resolvedThumb = paperData.thumbnailUrl === "FAILED_404" ? null : paperData.thumbnailUrl;
-      if (resolvedThumb && resolvedThumb.includes("cloudinary.com/xipefqle")) {
+      if (resolvedThumb && resolvedThumb.includes("cloudinary.com")) {
         resolvedThumb = paperData.arxivId
           ? `https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${paperData.arxivId}.webp`
           : null;
@@ -593,22 +759,24 @@ export const searchPapers = async (
   const skip = (page - 1) * limit;
   const sort = query.sort || "relevance";
 
+  const orderClause =
+    sort === "latest"
+      ? `publication_date DESC NULLS LAST, github_stars DESC NULLS LAST`
+      : `github_stars DESC NULLS LAST, publication_date DESC NULLS LAST`;
+
   const papers = await queryRouter.routeQuery<any[]>(
     async (prisma: PrismaClient) => {
-      return prisma.paper.findMany({
-        where: {
-          OR: [
-            { title: { contains: searchTerm, mode: "insensitive" } },
-          ],
-        },
-        orderBy:
-          sort === "latest"
-            ? [{ publicationDate: "desc" }, { githubStars: "desc" }]
-            : [{ githubStars: "desc" }, { publicationDate: "desc" }],
-        take: limit,
-        skip,
-        select: paperSearchSelect,
-      });
+      return prisma.$queryRawUnsafe<any[]>(
+        `SELECT id, slug, title, github_stars as "githubStars", github_hourly_increase as "github_hourly_increase",
+                citation_count as "citationCount", thumbnail_url as "thumbnailUrl", authors, project_url as "projectUrl"
+         FROM papers
+         WHERE title ILIKE $1 OR authors ILIKE $1
+         ORDER BY ${orderClause}
+         LIMIT $2 OFFSET $3`,
+        `%${searchTerm}%`,
+        limit,
+        skip
+      );
     },
   );
 
@@ -617,9 +785,7 @@ export const searchPapers = async (
   return {
     papers: safePapers.map((paper) => ({
       ...exposeThumbnailUrl(paper),
-      repositories: paper.repositories?.map(
-        ({ repository }: any) => repository
-      ) || [],
+      repositories: [],
       authors: parseAuthors(paper.authors),
     })),
     total: safePapers.length,
@@ -633,55 +799,28 @@ export const searchPapers = async (
  */
 export async function getOrganizationMetrics(queryRouter: QueryRouter, organization?: string) {
   return queryRouter.routeQuery(async (prisma: PrismaClient) => {
-    // Fetch all papers with their associated models and vendors to aggregate metrics
-    const papers = await prisma.paper.findMany({
-      select: {
-        citationCount: true,
-        githubStars: true,
-        github_hourly_increase: true,
-        models: {
-          select: {
-            model: {
-              select: {
-                vendor: true,
-              },
-            },
-          },
-        },
-      },
-    });
+    let sql = `
+      SELECT 
+        LOWER(TRIM(m.vendor)) AS organization,
+        COUNT(DISTINCT p.id)::int AS "paperCount",
+        COALESCE(SUM(p.citation_count), 0)::int AS citations,
+        COALESCE(SUM(p.github_stars), 0)::int AS stars,
+        COALESCE(SUM(p.github_hourly_increase), 0)::float AS "trendingScore"
+      FROM papers p
+      JOIN paper_models pm ON p.id = pm.paper_id
+      JOIN models m ON pm.model_id = m.id
+      WHERE m.vendor IS NOT NULL AND TRIM(m.vendor) != ''
+    `;
 
-    const metricsMap = new Map<string, { paperCount: number; citations: number; stars: number; trendingScore: number }>();
+    const params: any[] = [];
+    if (organization && organization.trim()) {
+      sql += ` AND LOWER(TRIM(m.vendor)) = LOWER(TRIM($1))`;
+      params.push(organization.trim());
+    }
 
-    papers.forEach((paper) => {
-      const vendors = new Set<string>();
-      paper.models?.forEach((m) => {
-        if (m?.model?.vendor && typeof m.model.vendor === "string") {
-          const v = m.model.vendor.trim();
-          if (v) vendors.add(v);
-        }
-      });
+    sql += ` GROUP BY LOWER(TRIM(m.vendor)) ORDER BY "paperCount" DESC;`;
 
-      vendors.forEach((vendor) => {
-        const key = vendor.toLowerCase();
-        const current = metricsMap.get(key) || { paperCount: 0, citations: 0, stars: 0, trendingScore: 0 };
-        
-        current.paperCount += 1;
-        current.citations += Number(paper.citationCount || 0);
-        current.stars += Number(paper.githubStars || 0);
-        current.trendingScore += Number(paper.github_hourly_increase || 0);
-        
-        metricsMap.set(key, current);
-      });
-    });
-
-    const data = Array.from(metricsMap.entries()).map(([orgKey, stats]) => ({
-      organization: orgKey,
-      paperCount: stats.paperCount,
-      citations: stats.citations,
-      stars: stats.stars,
-      trendingScore: stats.trendingScore,
-    }));
+    const data = await prisma.$queryRawUnsafe<any[]>(sql, ...params);
 
     return {
       status: "success",
