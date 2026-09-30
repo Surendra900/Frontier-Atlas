@@ -20,16 +20,29 @@ export interface BaseModel {
   capabilities: string[] | null;
   researchAreas: string[] | null;
   architecture: string | null;
-  contextWindow: string | null;
+  contextWindow: string | number | null;
+  maxOutputTokens?: number | null;
+  inputCostPerMtoken?: number;
+  outputCostPerMtoken?: number;
   license: string | null;
   paperUrl: string | null;
   repositoryUrl: string | null;
   apiUrl: string | null;
+  huggingFaceId?: string | null;
   createdAt: string;
   paperCount: number;
   citationCount: number;
   githubStars: number;
   trendingScore: number;
+  papers?: ModelPaper[];
+}
+
+export interface CardMeta {
+  slug: string;
+  title: string;
+  type: string;
+  description: string;
+  totalModels: number;
 }
 
 export interface BackendModelItem extends BaseModel {
@@ -48,12 +61,15 @@ export interface ModelPaper {
   id: string;
   title: string;
   slug: string;
+  arxivId?: string | null;
   citationCount: number;
   githubStars: number;
+  role?: string | null;
+  confidence?: number | null;
 }
 
-export interface BackendModelDetail extends BackendModelItem {
-  papers: { paper_id: string; model_id: string; paper: ModelPaper }[];
+export interface BackendModelDetail extends Omit<BackendModelItem, "papers"> {
+  papers: Array<{ paper_id?: string; model_id?: string; paper?: ModelPaper } | ModelPaper>;
   tasks: ModelTask[];
   methods: { id: string; name: string; slug: string; category: string }[];
   datasets: { id: string; name: string; slug: string }[];
@@ -66,6 +82,7 @@ export interface ModelItem extends BaseModel {
   latestPaperTitle: string | null;
   latestPaperSlug: string | null;
   tasks: ModelTask[];
+  papers?: ModelPaper[];
 }
 
 export interface ModelDetail extends BaseModel {
@@ -92,6 +109,10 @@ export interface ModelFacets {
 interface GetModelsResponse {
   status: string;
   count: number;
+  total?: number;
+  page?: number;
+  limit?: number;
+  totalPages?: number;
   data: BackendModelItem[];
 }
 
@@ -114,12 +135,13 @@ const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 const modelsCache = new Map<string, CacheEntry<unknown>>();
 
 function mapModelItem(m: BackendModelItem): ModelItem {
+  const raw = m as any;
   return {
     id: m.id,
     name: m.name,
     slug: m.slug,
     vendor: m.vendor,
-    vendorLogoUrl: m.vendorLogoUrl || (m as unknown as { vendor_logo_url?: string }).vendor_logo_url,
+    vendorLogoUrl: m.vendorLogoUrl || raw.vendor_logo_url,
     releaseDate: m.releaseDate,
     parameterCount: m.parameterCount,
     modality: m.modality,
@@ -132,13 +154,17 @@ function mapModelItem(m: BackendModelItem): ModelItem {
     capabilities: m.capabilities,
     researchAreas: m.researchAreas,
     architecture: m.architecture,
-    contextWindow: m.contextWindow,
+    contextWindow: m.contextWindow || raw.context_window,
+    maxOutputTokens: raw.maxOutputTokens || raw.max_output_tokens || 4096,
+    inputCostPerMtoken: raw.inputCostPerMtoken ?? (raw.input_cost_per_mtoken ? parseFloat(raw.input_cost_per_mtoken) : 0),
+    outputCostPerMtoken: raw.outputCostPerMtoken ?? (raw.output_cost_per_mtoken ? parseFloat(raw.output_cost_per_mtoken) : 0),
     license: m.license,
     paperUrl: m.paperUrl,
     repositoryUrl: m.repositoryUrl,
     apiUrl: m.apiUrl,
+    huggingFaceId: raw.huggingFaceId || raw.hugging_face_id,
     createdAt: m.createdAt,
-    paperCount: m.paperCount,
+    paperCount: m.paperCount || (Array.isArray(raw.papers) ? raw.papers.length : 0),
     citationCount: m.citationCount,
     githubStars: m.githubStars,
     trendingScore: m.trendingScore,
@@ -146,6 +172,7 @@ function mapModelItem(m: BackendModelItem): ModelItem {
     latestPaperTitle: null,
     latestPaperSlug: null,
     tasks: [],
+    papers: Array.isArray(raw.papers) ? raw.papers : [],
   };
 }
 
@@ -338,8 +365,8 @@ export async function getModelBySlug(slug: string): Promise<ModelDetail> {
       githubStars: data.githubStars,
       trendingScore: data.trendingScore,
       papers: (data.papers ?? [])
-        .map((item) => item?.paper || item)
-        .filter((paper): paper is ModelPaper => Boolean(paper && paper.id && paper.title)),
+        .map((item) => (item && typeof item === "object" && "paper" in item && item.paper ? item.paper : item))
+        .filter((paper): paper is ModelPaper => Boolean(paper && typeof paper === "object" && "id" in paper && paper.id && "title" in paper && paper.title)),
       tasks: data.tasks ?? [],
     };
 
@@ -388,3 +415,31 @@ if (typeof window !== 'undefined') {
     setTimeout(prefetchModels, 500);
   }
 }
+
+export async function getModelCardMeta(slug: string): Promise<CardMeta> {
+  const cleanSlug = slug.toLowerCase().trim();
+  const cacheKey = `card_meta_${cleanSlug}`;
+  const cached = getCached<CardMeta>(cacheKey);
+  if (cached) return cached;
+
+  try {
+    const res = await fetchApi<{ status: string; data: CardMeta }>(
+      `/api/v1/models/card-meta?slug=${encodeURIComponent(cleanSlug)}`
+    );
+    if (res?.data) {
+      setCached(cacheKey, res.data);
+      return res.data;
+    }
+  } catch (err) {
+    console.error("Failed to fetch card meta:", err);
+  }
+
+  const formatted = cleanSlug.charAt(0).toUpperCase() + cleanSlug.slice(1).replace(/-/g, " ");
+  return {
+    slug: cleanSlug,
+    title: `${formatted} AI Models`,
+    type: "general",
+    description: `Explore frontier AI models, pricing specifications, and mapped research papers for ${formatted}.`,
+    totalModels: 0,
+  };
+}

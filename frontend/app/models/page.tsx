@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import React, { useState, useEffect, useMemo } from "react";
 import PageHero from "@/components/shared/PageHero";
@@ -618,95 +618,30 @@ function ModelsContent() {
     }, 100);
   };
 
+  const toCardSlug = (str: string) => {
+    return str.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  };
+
   const handleCapabilityClick = (cap: string) => {
-    const next = selectedCapability === cap ? null : cap;
-
-    setSelectedCapability(next);
-    setSelectedVendor(null);
-    setSelectedDomain(null);
-    setSelectedFamily(null);
-    setSelectedCollection(null);
-
-    updateURL({
-      capability: next,
-      vendor: null,
-      domain: null,
-      family: null,
-      collection: null,
-    });
+    router.push(`/models/${toCardSlug(cap)}`);
   };
 
   const handleFamilyClick = (fam: string) => {
-    const next = selectedFamily === fam ? null : fam;
-
-    setSelectedFamily(next);
-    setSelectedVendor(null);
-    setSelectedDomain(null);
-    setSelectedCapability(null);
-    setSelectedCollection(null);
-
-    updateURL({
-      family: next,
-      vendor: null,
-      domain: null,
-      capability: null,
-      collection: null,
-    });
+    router.push(`/models/${toCardSlug(fam)}`);
   };
 
   const handleVendorClick = (vName: string) => {
-    const next = selectedVendor === vName ? null : vName;
-
-    setSelectedVendor(next);
-    setSelectedDomain(null);
-    setSelectedCapability(null);
-    setSelectedFamily(null);
-    setSelectedCollection(null);
-
-    updateURL({
-      vendor: next,
-      domain: null,
-      capability: null,
-      family: null,
-      collection: null,
-    });
+    router.push(`/models/${toCardSlug(vName)}`);
   };
 
   const handleDomainClick = (dName: string) => {
-    const next = selectedDomain === dName ? null : dName;
-
-    setSelectedDomain(next);
-    setSelectedVendor(null);
-    setSelectedCapability(null);
-    setSelectedFamily(null);
-    setSelectedCollection(null);
-
-    updateURL({
-      domain: next,
-      vendor: null,
-      capability: null,
-      family: null,
-      collection: null,
-    });
+    router.push(`/models/${toCardSlug(dName)}`);
   };
 
   const handleCollectionClick = (col: string) => {
-    const next = selectedCollection === col ? null : col;
-
-    setSelectedCollection(next);
-    setSelectedVendor(null);
-    setSelectedDomain(null);
-    setSelectedCapability(null);
-    setSelectedFamily(null);
-
-    updateURL({
-      collection: next,
-      vendor: null,
-      domain: null,
-      capability: null,
-      family: null,
-    });
+    router.push(`/models/${toCardSlug(col)}`);
   };
+
 
   const activeFilterLabel =
     selectedVendor ||
