@@ -1,5 +1,3 @@
-"use client";
-
 import { fetchApi } from "./api";
 
 export interface PaperAuthor {

@@ -2,27 +2,73 @@ import { NextRequest, NextResponse } from "next/server";
 
 const PROD_BACKEND = "https://frontieratlas-backend.morningsignal-india.workers.dev";
 
+function normalizeTaskSlug(rawTask: string | null): string | null {
+  if (!rawTask) return null;
+  const clean = rawTask.toLowerCase().trim();
+  if (clean === "reasoning") return "reasoning-models";
+  if (clean === "ss1" || clean === "ssl") return "small-language-models";
+  return clean;
+}
+
+function normalizeMethodSlug(rawMethod: string | null): string | null {
+  if (!rawMethod) return null;
+  const clean = rawMethod.toLowerCase().trim();
+  if (clean === "policy-learning" || clean === "reinforcement-learning") return "policy-learning";
+  if (clean === "diffusion-models" || clean === "diffusion") return "diffusion-models";
+  if (clean === "transformer" || clean === "transformers") return "transformer";
+  if (clean === "rag" || clean === "retrieval-augmented-generation") return "retrieval-augmented-generation";
+  return clean;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
-  const sort = searchParams.get("sort") || "trending";
-  const period = searchParams.get("period") || "all";
-  const task = searchParams.get("task");
-  const method = searchParams.get("method");
+  const rawSort = searchParams.get("sort") || "trending";
+  const rawPeriod = searchParams.get("period") || "all";
+  const rawTask = searchParams.get("task");
+  const rawMethod = searchParams.get("method");
   const model = searchParams.get("model");
   const organization = searchParams.get("organization");
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "20", 10)));
 
-  // If filtered by task, method, model, or organization, delegate directly to the backend
+  const task = normalizeTaskSlug(rawTask);
+  const method = normalizeMethodSlug(rawMethod);
+  const period = rawPeriod === "today" ? "all" : rawPeriod;
+  const sort = rawSort;
+
+  // ── Specific taxonomy filtering (task, method, model, organization) ─────────
   if (task || method || model || organization) {
-    const upstreamUrl = `${PROD_BACKEND}/api/v1/research-papers?${searchParams.toString()}`;
+    const upstreamParams = new URLSearchParams();
+    if (task) upstreamParams.set("task", task);
+    if (method) upstreamParams.set("method", method);
+    if (model) upstreamParams.set("model", model);
+    if (organization) upstreamParams.set("organization", organization);
+    if (sort) upstreamParams.set("sort", sort);
+    if (period && period !== "all") upstreamParams.set("period", period);
+    upstreamParams.set("page", page.toString());
+    upstreamParams.set("limit", limit.toString());
+
     try {
-      const res = await fetch(upstreamUrl, {
+      let upstreamUrl = `${PROD_BACKEND}/api/v1/research-papers?${upstreamParams.toString()}`;
+      let res = await fetch(upstreamUrl, {
         headers: { "Content-Type": "application/json" },
         next: { revalidate: 60 },
       });
-      const data = await res.json();
+      let data = await res.json();
+      const papers = data?.data?.papers || [];
+
+      // If strict period filter resulted in < 3 papers, fallback to period=all for this taxonomy
+      if (papers.length < 3 && (period === "week" || period === "month")) {
+        upstreamParams.delete("period");
+        upstreamUrl = `${PROD_BACKEND}/api/v1/research-papers?${upstreamParams.toString()}`;
+        res = await fetch(upstreamUrl, {
+          headers: { "Content-Type": "application/json" },
+          next: { revalidate: 60 },
+        });
+        data = await res.json();
+      }
+
       return NextResponse.json(data, {
         status: res.status,
         headers: {
@@ -38,7 +84,7 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // General feeds: handle time periods with guaranteed non-empty, distinct datasets
+  // ── General feeds (trending, latest, stars, all periods) ────────────────────
   try {
     const upstreamUrl = `${PROD_BACKEND}/api/v1/research-papers?sort=latest&period=all&limit=100`;
     const res = await fetch(upstreamUrl, {
@@ -60,14 +106,12 @@ export async function GET(request: NextRequest) {
     let pool = [...allPapers];
 
     if (period === "week") {
-      // Latest active week cluster
       const weekCutoff = maxDate - 14 * 24 * 60 * 60 * 1000;
       pool = allPapers.filter((p) => new Date(p.publicationDate).getTime() >= weekCutoff);
       if (pool.length < 20) {
         pool = allPapers.slice(0, 20);
       }
     } else if (period === "month") {
-      // Recent month window
       const monthCutoff = maxDate - 180 * 24 * 60 * 60 * 1000;
       pool = allPapers.filter((p) => new Date(p.publicationDate).getTime() >= monthCutoff);
       if (pool.length < 25) {

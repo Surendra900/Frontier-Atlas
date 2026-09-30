@@ -1,7 +1,7 @@
 'use client';
 
 import { useRecentPapers } from '@/lib/useRecentPapers';
-import { RelatedPaperCard } from './PaperDetail'; 
+import { RelatedPaperCard } from './RelatedPaperCard'; 
 
 export default function RecentlyViewed() {
   const { recentPapers } = useRecentPapers();
