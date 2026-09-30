@@ -6,7 +6,6 @@ const useCfAssets = process.env.CF_PAGES === '1' || process.env.NEXT_PUBLIC_CF_A
 
 const nextConfig = {
   reactStrictMode: true,
-  outputFileTracingRoot: path.join(__dirname, '../'),
   
   // This is the new line! It fetches styles from your trusted pages.dev domain in production
   assetPrefix: useCfAssets ? 'https://frontieratlas.pages.dev' : undefined,
