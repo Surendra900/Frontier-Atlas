@@ -10,7 +10,7 @@ import { DatabaseManager } from "../database/DatabaseManager.js";
 // Maintains a lightweight integer version in Redis for list cache invalidation.
 // ---------------------------------------------------------------------------
 
-let cachedPapersVersion = "4_0";
+let cachedPapersVersion = "5_0";
 let cachedVersionExpiresAt = 0;
 
 const getPapersVersion = async (): Promise<string> => {
@@ -20,7 +20,7 @@ const getPapersVersion = async (): Promise<string> => {
   try {
     const redis = redisManager.getClient();
     const v = await redis.get("papers:version");
-    cachedPapersVersion = v ? `4_${String(v)}` : "4_0";
+    cachedPapersVersion = v ? `5_${String(v)}` : "5_0";
     cachedVersionExpiresAt = Date.now() + 60_000; // cache version locally for 60s
     return cachedPapersVersion;
   } catch {
