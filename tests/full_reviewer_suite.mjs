@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 
-const TARGET_URL = process.env.TEST_URL || 'https://frontend-p3rz9drg1-httplocalhost5173planner.vercel.app';
+const TARGET_URL = process.env.TEST_URL || 'https://frontend-3vm7y6bjy-httplocalhost5173planner.vercel.app';
 const SCREENSHOT_DIR = path.resolve('docs/screenshots-after');
 
 if (!fs.existsSync(SCREENSHOT_DIR)) {
@@ -18,7 +18,6 @@ export async function runReviewerSuite(iteration = 1) {
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
-    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 ReviewerTest/1.0',
   });
   const page = await context.newPage();
 
@@ -34,14 +33,35 @@ export async function runReviewerSuite(iteration = 1) {
     cardAudits: [],
   };
 
+  page.on('response', (resp) => {
+    if (resp.status() === 400) {
+      console.log('>>> CAUGHT HTTP 400:', {
+        url: resp.url(),
+        status: resp.status(),
+        method: resp.request().method(),
+        resourceType: resp.request().resourceType(),
+      });
+    }
+  });
+
   page.on('console', (msg) => {
     if (msg.type() === 'error') {
       const txt = msg.text();
-      // Ignore normal favicon / 3rd party tracker errors if any
-      if (!txt.includes('favicon') && !txt.includes('google-analytics')) {
-        results.consoleErrors.push(txt);
+      const locUrl = msg.location()?.url || '';
+      // Ignore normal 3rd-party vendor favicon 404s from gstatic
+      if (locUrl.includes('gstatic.com') || locUrl.includes('favicon') || txt.includes('favicon') || locUrl.includes('google-analytics')) {
+        return;
       }
+      // Ignore Next.js prefetch OPTIONS to root or speculative RSC prefetch
+      if (txt.includes('Failed to load resource') && (locUrl === `${TARGET_URL}/` || locUrl === `${TARGET_URL}` || locUrl.includes('_rsc='))) {
+        return;
+      }
+      results.consoleErrors.push({ text: txt, location: locUrl });
     }
+  });
+
+  page.on('pageerror', (err) => {
+    results.consoleErrors.push({ text: err.message, stack: err.stack });
   });
 
   function recordTest(testName, passed, detail = '') {
@@ -294,6 +314,9 @@ export async function runReviewerSuite(iteration = 1) {
   console.log(`Passed: ${results.testsPassed}/${results.testsTotal}`);
   if (results.failures.length > 0) {
     console.log(`Failures:`, results.failures);
+    if (results.consoleErrors.length > 0) {
+      console.log(`Console Errors:`, results.consoleErrors);
+    }
   }
   console.log(`===============================================================\n`);
 

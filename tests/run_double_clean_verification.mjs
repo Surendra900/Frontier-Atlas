@@ -7,7 +7,7 @@ async function main() {
   fs.mkdirSync(path.dirname(logFile), { recursive: true });
 
   let log = `# QA Loop Ledger & Test Iteration Log (Hardened Production Review)\n\n`;
-  log += `**Target URL**: \`https://frontend-p3rz9drg1-httplocalhost5173planner.vercel.app\`\n`;
+  log += `**Target URL**: \`https://frontend-3vm7y6bjy-httplocalhost5173planner.vercel.app\`\n`;
   log += `**Branch**: \`feat/models-module-production-hardening\`\n`;
   log += `**Objective**: Verify 100% adherence to all 8 acceptance criteria across 2 consecutive clean Playwright browser runs.\n\n`;
   log += `| Run # | Timestamp | Tests Total | Tests Passed | Failures | Status |\n`;
