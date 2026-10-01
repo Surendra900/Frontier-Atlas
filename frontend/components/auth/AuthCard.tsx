@@ -15,7 +15,7 @@ export default function AuthCard() {
       {/* Logo */}
       <div className="mb-0 flex justify-center">
         <img
-          src="https://frontieratlas.pages.dev/logo.png"
+          src="/logo.png"
           alt="FrontierAtlas"
           width={165}
           height={34}
