@@ -62,6 +62,7 @@ const paperSelect = {
   citationCount: true,
   language: true,
   authors: true,
+  task: true,
   tasks: {
     select: {
       task: {
@@ -245,6 +246,7 @@ export const getPapers = async (
   const skip = Number(query.skip) || (page - 1) * limit;
   const sort = query.sort || "trending";
   const period = query.period || "all";
+  const isStarsSort = sort === "stars" || sort === "github-stars" || sort === "most-stars";
 
   const where: Prisma.PaperWhereInput = {};
 
@@ -279,31 +281,48 @@ export const getPapers = async (
     ];
   }
 
+  // For stars sort, ensure papers have GitHub stars (> 0)
+  if (isStarsSort) {
+    where.githubStars = { gt: 0 };
+  }
+
   // Only apply mandatory task/method/sota filtering when on the general unfiltered feed.
   // When a user selects a specific task or method chip, applying redundant EXISTS checks damages query performance.
   if (!query.task && !query.method) {
-    const feedConditions: any[] = [
-      {
-        OR: [
-          { tasks: { some: {} } },
-          { methods: { some: {} } },
-        ],
-      },
-    ];
+    if (isStarsSort) {
+      // For Most GitHub Stars feed:
+      // Require papers to have tags, methods, SOTA claims, rankings, or a category task so frontend renders them with tags
+      where.OR = [
+        { tasks: { some: {} } },
+        { methods: { some: {} } },
+        { sotaClaims: { some: {} } },
+        { rankings: { some: {} } },
+        { task: { not: null } },
+      ];
+    } else {
+      const feedConditions: any[] = [
+        {
+          OR: [
+            { tasks: { some: {} } },
+            { methods: { some: {} } },
+          ],
+        },
+      ];
 
-    if (!query.model && !query.organization) {
-      feedConditions.push({
-        OR: [
-          { sotaClaims: { some: {} } },
-          { rankings: { some: {} } },
-        ],
-      });
+      if (!query.model && !query.organization) {
+        feedConditions.push({
+          OR: [
+            { sotaClaims: { some: {} } },
+            { rankings: { some: {} } },
+          ],
+        });
+      }
+
+      where.AND = [
+        ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
+        ...feedConditions,
+      ];
     }
-
-    where.AND = [
-      ...(where.AND ? (Array.isArray(where.AND) ? where.AND : [where.AND]) : []),
-      ...feedConditions,
-    ];
   }
 
   let baseDate = new Date();
@@ -431,15 +450,30 @@ export const getPapers = async (
     pIdx++;
   }
 
+  if (isStarsSort) {
+    conditions.push(`p.github_stars > 0`);
+  }
+
   if (!query.task && !query.method) {
-    conditions.push(`(
-      EXISTS (SELECT 1 FROM paper_tasks pt WHERE pt.paper_id = p.id) OR
-      EXISTS (SELECT 1 FROM paper_methods pm WHERE pm.paper_id = p.id)
-    )`);
-    if (!query.model && !query.organization) {
+    if (isStarsSort) {
+      // For Most GitHub Stars, allow any paper with tasks, methods, SOTA claims, rankings, or a defined task string
       conditions.push(`(
-        p.id IN (SELECT paper_id FROM sota_claims UNION ALL SELECT paper_id FROM rankings)
+        EXISTS (SELECT 1 FROM paper_tasks pt WHERE pt.paper_id = p.id) OR
+        EXISTS (SELECT 1 FROM paper_methods pm WHERE pm.paper_id = p.id) OR
+        EXISTS (SELECT 1 FROM sota_claims sc WHERE sc.paper_id = p.id) OR
+        EXISTS (SELECT 1 FROM rankings r WHERE r.paper_id = p.id) OR
+        (p.task IS NOT NULL AND TRIM(p.task) != '')
       )`);
+    } else {
+      conditions.push(`(
+        EXISTS (SELECT 1 FROM paper_tasks pt WHERE pt.paper_id = p.id) OR
+        EXISTS (SELECT 1 FROM paper_methods pm WHERE pm.paper_id = p.id)
+      )`);
+      if (!query.model && !query.organization) {
+        conditions.push(`(
+          p.id IN (SELECT paper_id FROM sota_claims UNION ALL SELECT paper_id FROM rankings)
+        )`);
+      }
     }
   }
 
@@ -503,7 +537,11 @@ export const getPapers = async (
         FROM paper_tasks pt
         JOIN tasks t ON pt.task_id = t.id
         WHERE pt.paper_id = p.id
-      ), '[]'::json) as tasks,
+      ), 
+      CASE WHEN p.task IS NOT NULL AND TRIM(p.task) != ''
+           THEN json_build_array(json_build_object('task', json_build_object('name', p.task, 'slug', lower(regexp_replace(trim(p.task), '[^a-zA-Z0-9]+', '-', 'g')))))
+           ELSE '[]'::json
+      END) as tasks,
       COALESCE((
         SELECT json_agg(json_build_object('method', json_build_object('name', m.name, 'slug', m.slug)))
         FROM paper_methods pm
@@ -610,7 +648,12 @@ export const getPapers = async (
         ? paper.models.map(({ model }: any) => model)
         : [],
       authors: parseAuthors(paper.authors),
-      tasks: Array.isArray(paper.tasks) ? paper.tasks.map(({ task }: any) => task) : [],
+      tasks:
+        Array.isArray(paper.tasks) && paper.tasks.length > 0
+          ? paper.tasks.map(({ task }: any) => task).filter(Boolean)
+          : paper.task
+          ? [{ name: paper.task, slug: String(paper.task).toLowerCase().replace(/[^a-z0-9]+/g, "-") }]
+          : [],
       methods: Array.isArray(paper.methods) ? paper.methods.map(({ method }: any) => method) : [],
     })),
     total: typeof totalCount === "number" && totalCount > 0 ? totalCount : (hasMore ? skip + limit + 1 : skip + pagePapers.length),
