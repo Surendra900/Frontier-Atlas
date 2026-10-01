@@ -2,7 +2,7 @@ import { chromium } from 'playwright';
 import fs from 'fs';
 import path from 'path';
 
-const TARGET_URL = process.env.TEST_URL || 'https://frontend-3vm7y6bjy-httplocalhost5173planner.vercel.app';
+const TARGET_URL = process.env.TEST_URL || 'https://frontend-qwhgpwy9o-httplocalhost5173planner.vercel.app';
 const SCREENSHOT_DIR = path.resolve('docs/screenshots-after');
 
 if (!fs.existsSync(SCREENSHOT_DIR)) {
