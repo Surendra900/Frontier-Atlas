@@ -34,31 +34,33 @@ import type { ModelDbFacets } from "@/lib/models-db";
 
 // Helper: format large numbers
 function formatNumber(value: number | null | undefined): string {
-  if (value === null || value === undefined || isNaN(value)) return "—";
+  if (value === null || value === undefined || isNaN(value)) return "N/A";
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}M`;
   if (value >= 1_000) return `${(value / 1_000).toFixed(value % 1_000 === 0 ? 0 : 0)}K`;
   return value.toLocaleString();
 }
 
 // Helper: format pricing
-function formatPrice(val: number | null | undefined): string {
-  if (val === null || val === undefined || isNaN(val) || val < 0) return "Varies";
-  if (val === 0) return "Free";
+function formatPrice(val: number | null | undefined, sourceCatalog?: string | null): string {
+  if (val === null || val === undefined || isNaN(val) || val < 0) return "N/A";
+  if (val === 0) {
+    if (sourceCatalog && sourceCatalog !== "openrouter") return "N/A";
+    return "Free";
+  }
   if (val < 0.01) return `$${val.toFixed(4)}`;
   if (val < 1) return `$${val.toFixed(2)}`;
   return `$${val.toFixed(2)}`;
 }
 
-
 // Helper: format date
 function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return "—";
+  if (!dateStr) return "N/A";
   try {
     const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return "—";
+    if (isNaN(d.getTime())) return "N/A";
     return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
   } catch {
-    return "—";
+    return "N/A";
   }
 }
 
@@ -333,9 +335,11 @@ export default function ModelsListingClient({
                   {cardMeta.title}
                 </h1>
                 <span className="bg-[#FF5A1F]/10 text-[#FF5A1F] font-mono text-xs font-semibold px-2.5 py-1 rounded-full border border-[#FF5A1F]/20">
-                  {filteredModels.length === (cardMeta.totalModels || totalCount)
-                    ? `${filteredModels.length} Models`
-                    : `${filteredModels.length} of ${cardMeta.totalModels || totalCount} Models`}
+                  {filteredModels.length === 0
+                    ? `0 of ${cardMeta.totalModels || totalCount} Models`
+                    : hasActiveFilters
+                    ? `Showing ${filteredModels.length} filtered models (of ${cardMeta.totalModels || totalCount} total)`
+                    : `Showing 1-${filteredModels.length} of ${cardMeta.totalModels || totalCount} Models`}
                 </span>
               </div>
               <p className="text-sm text-[#4B5563] max-w-3xl leading-relaxed">
@@ -677,28 +681,41 @@ export default function ModelsListingClient({
 
                         {/* Input Price */}
                         <td className="py-3 px-4 text-right font-mono font-semibold text-[#111827]">
-                          {formatPrice(m.inputCostPerMtoken)}
+                          {formatPrice(m.inputCostPerMtoken, m.sourceCatalog)}
                         </td>
 
                         {/* Output Price */}
                         <td className="py-3 px-4 text-right font-mono font-semibold text-[#111827]">
-                          {formatPrice(m.outputCostPerMtoken)}
+                          {formatPrice(m.outputCostPerMtoken, m.sourceCatalog)}
                         </td>
 
                         {/* Mapped Academic Paper */}
                         <td className="py-3 px-4 max-w-xs">
                           {paper ? (
-                            <Link
-                              href={`/papers/${paper.slug}`}
-                              onClick={(e) => e.stopPropagation()}
-                              className="flex items-center gap-1.5 text-[#FF5A1F] hover:underline font-medium truncate"
-                            >
-                              <BookOpen size={12} className="shrink-0" />
-                              <span className="truncate">{paper.title}</span>
-                              <ExternalLink size={10} className="shrink-0 text-[#9CA3AF]" />
-                            </Link>
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span
+                                className={`shrink-0 capitalize px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
+                                  paper.role === "introduced"
+                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : paper.role === "family"
+                                    ? "bg-blue-50 text-blue-700 border-blue-200"
+                                    : "bg-gray-100 text-gray-700 border-gray-200"
+                                }`}
+                              >
+                                {paper.role === "introduced" ? "Introduced" : paper.role === "family" ? "Family" : "Paper"}
+                              </span>
+                              <Link
+                                href={`/papers/${paper.slug}`}
+                                onClick={(e) => e.stopPropagation()}
+                                className="flex items-center gap-1 text-[#FF5A1F] hover:underline font-medium truncate"
+                              >
+                                <BookOpen size={12} className="shrink-0" />
+                                <span className="truncate">{paper.title}</span>
+                                <ExternalLink size={10} className="shrink-0 text-[#9CA3AF]" />
+                              </Link>
+                            </div>
                           ) : (
-                            <span className="text-xs text-[#9CA3AF]">—</span>
+                            <span className="text-xs text-[#9CA3AF]">None</span>
                           )}
                         </td>
                       </tr>
@@ -786,7 +803,7 @@ export default function ModelsListingClient({
                           Cost / 1M Tokens
                         </span>
                         <span className="font-semibold text-[#111827]">
-                          {formatPrice(m.inputCostPerMtoken)}
+                          {formatPrice(m.inputCostPerMtoken, m.sourceCatalog)}
                         </span>
                       </div>
                     </div>
@@ -907,13 +924,13 @@ export default function ModelsListingClient({
                     <div className="p-3 rounded-lg bg-[#FAF9F5] border border-[#E5E5E0]">
                       <span className="text-[#8B8B8B] block mb-1">Input Price / 1M</span>
                       <span className="font-bold text-[#111827] text-sm">
-                        {formatPrice(activeModelDetails.inputCostPerMtoken)}
+                        {formatPrice(activeModelDetails.inputCostPerMtoken, activeModelDetails.sourceCatalog)}
                       </span>
                     </div>
                     <div className="p-3 rounded-lg bg-[#FAF9F5] border border-[#E5E5E0]">
                       <span className="text-[#8B8B8B] block mb-1">Output Price / 1M</span>
                       <span className="font-bold text-[#111827] text-sm">
-                        {formatPrice(activeModelDetails.outputCostPerMtoken)}
+                        {formatPrice(activeModelDetails.outputCostPerMtoken, activeModelDetails.sourceCatalog)}
                       </span>
                     </div>
                   </div>

@@ -22,8 +22,8 @@ export interface BaseModel {
   architecture: string | null;
   contextWindow: string | number | null;
   maxOutputTokens?: number | null;
-  inputCostPerMtoken?: number;
-  outputCostPerMtoken?: number;
+  inputCostPerMtoken?: number | null;
+  outputCostPerMtoken?: number | null;
   license: string | null;
   paperUrl: string | null;
   repositoryUrl: string | null;
@@ -37,6 +37,7 @@ export interface BaseModel {
   variants?: any[];
   isCanonical?: boolean;
   papers?: ModelPaper[];
+  sourceCatalog?: string | null;
 }
 
 export interface CardMeta {
@@ -156,10 +157,16 @@ function mapModelItem(m: BackendModelItem): ModelItem {
     capabilities: m.capabilities,
     researchAreas: m.researchAreas,
     architecture: m.architecture,
-    contextWindow: m.contextWindow || raw.context_window,
-    maxOutputTokens: raw.maxOutputTokens || raw.max_output_tokens || 4096,
-    inputCostPerMtoken: raw.inputCostPerMtoken ?? (raw.input_cost_per_mtoken ? parseFloat(raw.input_cost_per_mtoken) : 0),
-    outputCostPerMtoken: raw.outputCostPerMtoken ?? (raw.output_cost_per_mtoken ? parseFloat(raw.output_cost_per_mtoken) : 0),
+    contextWindow: (m.contextWindow !== undefined && m.contextWindow !== null)
+      ? m.contextWindow
+      : (raw.context_window !== undefined && raw.context_window !== null ? raw.context_window : null),
+    maxOutputTokens: raw.maxOutputTokens || raw.max_output_tokens || null,
+    inputCostPerMtoken: (raw.inputCostPerMtoken !== undefined && raw.inputCostPerMtoken !== null)
+      ? raw.inputCostPerMtoken
+      : (raw.input_cost_per_mtoken != null && raw.input_cost_per_mtoken !== "" ? parseFloat(raw.input_cost_per_mtoken) : null),
+    outputCostPerMtoken: (raw.outputCostPerMtoken !== undefined && raw.outputCostPerMtoken !== null)
+      ? raw.outputCostPerMtoken
+      : (raw.output_cost_per_mtoken != null && raw.output_cost_per_mtoken !== "" ? parseFloat(raw.output_cost_per_mtoken) : null),
     license: m.license,
     paperUrl: m.paperUrl,
     repositoryUrl: m.repositoryUrl,
@@ -172,6 +179,7 @@ function mapModelItem(m: BackendModelItem): ModelItem {
     trendingScore: m.trendingScore,
     variants: Array.isArray(raw.variants) ? raw.variants : [],
     isCanonical: raw.is_canonical !== false,
+    sourceCatalog: raw.sourceCatalog || raw.source_catalog || null,
     latestPaperDate: null,
     latestPaperTitle: null,
     latestPaperSlug: null,

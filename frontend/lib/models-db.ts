@@ -7,6 +7,56 @@ const DATABASE_URL =
 
 const sql = neon(DATABASE_URL);
 
+export const CAPABILITY_SQL_CONDITIONS: Record<string, string> = {
+  chat: `(m.capabilities @> '["chat"]'::jsonb AND NOT (COALESCE(m.architecture->'output_modalities', '[]'::jsonb) @> '["image"]'::jsonb) AND m.category NOT IN ('Audio', 'Robotics', 'Embeddings', 'Document AI') AND (m.architecture->>'pipeline_tag' IS NULL OR m.architecture->>'pipeline_tag' IN ('text-generation', 'conversational')))`,
+  reasoning: `((m.category = 'Reasoning' OR m.capabilities @> '["reasoning"]'::jsonb) AND NOT (COALESCE(m.architecture->'output_modalities', '[]'::jsonb) @> '["image"]'::jsonb) AND m.category NOT IN ('Audio', 'Robotics', 'Embeddings', 'Document AI'))`,
+  coding: `(m.category IN ('Code Generation', 'Code') OR m.capabilities @> '["coding"]'::jsonb OR m.capabilities @> '["code"]'::jsonb)`,
+  code: `(m.category IN ('Code Generation', 'Code') OR m.capabilities @> '["coding"]'::jsonb OR m.capabilities @> '["code"]'::jsonb)`,
+  "computer-vision": `(m.category = 'Vision' OR m.capabilities @> '["computer_vision"]'::jsonb OR m.capabilities @> '["vision"]'::jsonb OR m.architecture->>'pipeline_tag' IN ('image-classification', 'text-to-image'))`,
+  vision: `(m.category = 'Vision' OR m.capabilities @> '["computer_vision"]'::jsonb OR m.capabilities @> '["vision"]'::jsonb OR m.architecture->>'pipeline_tag' IN ('image-classification', 'text-to-image'))`,
+  multimodal: `(m.modality = 'multimodal' OR m.capabilities @> '["multimodal"]'::jsonb OR COALESCE(m.architecture->'output_modalities', '[]'::jsonb) @> '["image"]'::jsonb)`,
+  audio: `(m.category = 'Audio' OR m.capabilities @> '["audio"]'::jsonb OR m.capabilities @> '["speech"]'::jsonb OR m.architecture->>'pipeline_tag' IN ('text-to-speech', 'automatic-speech-recognition'))`,
+  speech: `(m.category = 'Audio' OR m.capabilities @> '["audio"]'::jsonb OR m.capabilities @> '["speech"]'::jsonb OR m.architecture->>'pipeline_tag' IN ('text-to-speech', 'automatic-speech-recognition'))`,
+  "document-ai": `(m.category = 'Document AI' OR m.capabilities @> '["document_ai"]'::jsonb OR m.capabilities @> '["ocr"]'::jsonb OR m.architecture->>'pipeline_tag' = 'document-question-answering')`,
+  ocr: `(m.category = 'Document AI' OR m.capabilities @> '["document_ai"]'::jsonb OR m.capabilities @> '["ocr"]'::jsonb OR m.architecture->>'pipeline_tag' = 'document-question-answering')`,
+  robotics: `(m.category = 'Robotics' OR m.capabilities @> '["robotics"]'::jsonb OR m.architecture->>'pipeline_tag' = 'robotics')`,
+  "embodied-ai": `(m.category = 'Robotics' OR m.capabilities @> '["robotics"]'::jsonb OR m.architecture->>'pipeline_tag' = 'robotics')`,
+  embeddings: `(m.category = 'Embeddings' OR m.capabilities @> '["embeddings"]'::jsonb OR m.capabilities @> '["search"]'::jsonb OR m.architecture->>'pipeline_tag' = 'sentence-similarity')`,
+  search: `(m.category = 'Embeddings' OR m.capabilities @> '["embeddings"]'::jsonb OR m.capabilities @> '["search"]'::jsonb OR m.architecture->>'pipeline_tag' = 'sentence-similarity')`,
+  "tool-use": `(m.capabilities @> '["tools"]'::jsonb OR m.capabilities @> '["tool_use"]'::jsonb)`,
+  tools: `(m.capabilities @> '["tools"]'::jsonb OR m.capabilities @> '["tool_use"]'::jsonb)`,
+  planning: `(m.capabilities @> '["planning"]'::jsonb OR m.capabilities @> '["agents"]'::jsonb)`,
+  agents: `(m.capabilities @> '["agents"]'::jsonb OR m.capabilities @> '["planning"]'::jsonb)`,
+  "agentic-ai": `(m.capabilities @> '["agents"]'::jsonb OR m.capabilities @> '["planning"]'::jsonb)`,
+  mathematics: `(m.capabilities @> '["math"]'::jsonb)`,
+  math: `(m.capabilities @> '["math"]'::jsonb)`,
+  translation: `(m.capabilities @> '["translation"]'::jsonb)`,
+  "instruction-following": `(m.capabilities @> '["instruction_following"]'::jsonb)`,
+  "general-purpose": `(m.capabilities @> '["general_purpose"]'::jsonb AND m.category NOT IN ('Audio', 'Robotics', 'Embeddings', 'Document AI') AND NOT (COALESCE(m.architecture->'output_modalities', '[]'::jsonb) @> '["image"]'::jsonb))`,
+  healthcare: `(m.capabilities @> '["healthcare"]'::jsonb)`,
+  "image-generation": `(m.capabilities @> '["image_generation"]'::jsonb OR m.architecture->>'pipeline_tag' = 'text-to-image' OR COALESCE(m.architecture->'output_modalities', '[]'::jsonb) @> '["image"]'::jsonb)`,
+};
+
+export const CAPABILITY_FACET_LIST = [
+  { name: "Chat", slug: "chat" },
+  { name: "Reasoning", slug: "reasoning" },
+  { name: "Computer Vision", slug: "computer-vision" },
+  { name: "Coding", slug: "coding" },
+  { name: "Multimodal", slug: "multimodal" },
+  { name: "Agentic AI", slug: "agentic-ai" },
+  { name: "Tool Use", slug: "tool-use" },
+  { name: "Audio", slug: "audio" },
+  { name: "Document AI", slug: "document-ai" },
+  { name: "Robotics", slug: "robotics" },
+  { name: "Embeddings", slug: "embeddings" },
+  { name: "Mathematics", slug: "mathematics" },
+  { name: "Translation", slug: "translation" },
+  { name: "Instruction Following", slug: "instruction-following" },
+  { name: "General Purpose", slug: "general-purpose" },
+  { name: "Healthcare", slug: "healthcare" },
+  { name: "Image Generation", slug: "image-generation" },
+];
+
 export interface ModelsQueryParams {
   cardSlug?: string;
   search?: string;
@@ -105,13 +155,30 @@ export async function getModelsFromDb(params: ModelsQueryParams): Promise<ModelD
       pIdx++;
     }
 
+    // Apply contract capability
+    if (contract.filters.capability) {
+      const cleanContractCap = contract.filters.capability.toLowerCase().trim();
+      if (CAPABILITY_SQL_CONDITIONS[cleanContractCap]) {
+        conditions.push(CAPABILITY_SQL_CONDITIONS[cleanContractCap]);
+      } else {
+        conditions.push(`m.capabilities @> to_jsonb(ARRAY[$${pIdx}]::text[])`);
+        queryParams.push(cleanContractCap);
+        pIdx++;
+      }
+    }
+
     // Apply contract capabilitiesAny (e.g. Chat, Coding, Tool Use, etc.)
     if (contract.filters.capabilitiesAny && contract.filters.capabilitiesAny.length > 0) {
       const capClauses: string[] = [];
       for (const cap of contract.filters.capabilitiesAny) {
-        capClauses.push(`m.capabilities @> to_jsonb(ARRAY[$${pIdx}]::text[])`);
-        queryParams.push(cap.toLowerCase());
-        pIdx++;
+        const cleanCap = cap.toLowerCase().trim();
+        if (CAPABILITY_SQL_CONDITIONS[cleanCap]) {
+          capClauses.push(CAPABILITY_SQL_CONDITIONS[cleanCap]);
+        } else {
+          capClauses.push(`m.capabilities @> to_jsonb(ARRAY[$${pIdx}]::text[])`);
+          queryParams.push(cleanCap);
+          pIdx++;
+        }
       }
       conditions.push(`(${capClauses.join(" OR ")})`);
     }
@@ -176,12 +243,8 @@ export async function getModelsFromDb(params: ModelsQueryParams): Promise<ModelD
 
   if (capability && capability !== "all") {
     const cleanCap = capability.toLowerCase().trim();
-    if (cleanCap === "reasoning") {
-      conditions.push(`(m.category = 'Reasoning' OR m.capabilities @> '["reasoning"]'::jsonb)`);
-    } else if (cleanCap === "coding" || cleanCap === "code") {
-      conditions.push(`(m.capabilities @> '["code"]'::jsonb OR m.capabilities @> '["coding"]'::jsonb)`);
-    } else if (cleanCap === "vision" || cleanCap === "computer-vision") {
-      conditions.push(`(m.category = 'Vision' OR m.capabilities @> '["vision"]'::jsonb)`);
+    if (CAPABILITY_SQL_CONDITIONS[cleanCap]) {
+      conditions.push(CAPABILITY_SQL_CONDITIONS[cleanCap]);
     } else {
       conditions.push(`m.capabilities @> to_jsonb(ARRAY[$${pIdx}]::text[])`);
       queryParams.push(cleanCap);
@@ -315,10 +378,10 @@ export async function getModelsFromDb(params: ModelsQueryParams): Promise<ModelD
     capabilities: Array.isArray(row.capabilities) ? row.capabilities : [],
     researchAreas: Array.isArray(row.research_areas) ? row.research_areas : [],
     architecture: row.architecture || {},
-    contextWindow: row.context_window || 128000,
-    maxOutputTokens: row.max_output_tokens || 4096,
-    inputCostPerMtoken: parseFloat(row.input_cost_per_mtoken) || 0,
-    outputCostPerMtoken: parseFloat(row.output_cost_per_mtoken) || 0,
+    contextWindow: row.context_window !== null && row.context_window !== undefined && row.context_window !== "" ? Number(row.context_window) : null,
+    maxOutputTokens: row.max_output_tokens !== null && row.max_output_tokens !== undefined && row.max_output_tokens !== "" ? Number(row.max_output_tokens) : null,
+    inputCostPerMtoken: row.input_cost_per_mtoken !== null && row.input_cost_per_mtoken !== undefined ? parseFloat(row.input_cost_per_mtoken) : null,
+    outputCostPerMtoken: row.output_cost_per_mtoken !== null && row.output_cost_per_mtoken !== undefined ? parseFloat(row.output_cost_per_mtoken) : null,
     license: row.license || "Commercial",
     paperUrl: row.paper_url,
     repositoryUrl: row.repository_url,
@@ -333,33 +396,7 @@ export async function getModelsFromDb(params: ModelsQueryParams): Promise<ModelD
     papers: Array.isArray(row.papers) ? row.papers : [],
   }));
 
-  // 7. Calculate Facets for current card scope (without user filter narrowing) so filter chips always know available counts
-  const facetSql = `
-    SELECT
-      jsonb_build_object(
-        'vendors', (
-          SELECT jsonb_agg(jsonb_build_object('name', vendor, 'count', cnt))
-          FROM (SELECT vendor, COUNT(*)::int as cnt FROM models WHERE is_canonical = true GROUP BY vendor ORDER BY cnt DESC LIMIT 20) v
-        ),
-        'modalities', (
-          SELECT jsonb_agg(jsonb_build_object('name', modality, 'count', cnt))
-          FROM (SELECT modality, COUNT(*)::int as cnt FROM models WHERE is_canonical = true AND modality IS NOT NULL GROUP BY modality ORDER BY cnt DESC) m
-        ),
-        'openness', (
-          SELECT jsonb_agg(jsonb_build_object('name', openness_type, 'count', cnt))
-          FROM (SELECT openness_type, COUNT(*)::int as cnt FROM models WHERE is_canonical = true AND openness_type IS NOT NULL GROUP BY openness_type ORDER BY cnt DESC) o
-        ),
-        'capabilities', (
-          SELECT jsonb_agg(jsonb_build_object('name', cap, 'count', cnt))
-          FROM (
-            SELECT jsonb_array_elements_text(capabilities) as cap, COUNT(*)::int as cnt 
-            FROM models WHERE is_canonical = true 
-            GROUP BY cap ORDER BY cnt DESC LIMIT 25
-          ) c
-        )
-      ) as facets
-  `;
-
+  // 7. Use authoritative cached Hub Facets for filter options
   let facets: ModelDbFacets = {
     vendors: [],
     modalities: [],
@@ -369,16 +406,14 @@ export async function getModelsFromDb(params: ModelsQueryParams): Promise<ModelD
   };
 
   try {
-    const [facetRow] = (await sql.query(facetSql)) as Array<{ facets: any }>;
-    if (facetRow?.facets) {
-      facets = {
-        vendors: Array.isArray(facetRow.facets.vendors) ? facetRow.facets.vendors : [],
-        modalities: Array.isArray(facetRow.facets.modalities) ? facetRow.facets.modalities : [],
-        openness: Array.isArray(facetRow.facets.openness) ? facetRow.facets.openness : [],
-        capabilities: Array.isArray(facetRow.facets.capabilities) ? facetRow.facets.capabilities : [],
-        families: [],
-      };
-    }
+    const hubFacets = await getHubFacetsFromDb();
+    facets = {
+      vendors: hubFacets.vendors,
+      modalities: hubFacets.modalities,
+      openness: hubFacets.opennessTypes,
+      capabilities: hubFacets.capabilities,
+      families: hubFacets.modelFamilies,
+    };
   } catch (facetErr) {
     console.warn("Facet calculation warning:", facetErr);
   }
@@ -505,10 +540,10 @@ export async function getModelDetailFromDb(slugOrId: string): Promise<any | null
     capabilities: Array.isArray(row.capabilities) ? row.capabilities : [],
     researchAreas: Array.isArray(row.research_areas) ? row.research_areas : [],
     architecture: row.architecture || {},
-    contextWindow: row.context_window || 128000,
-    maxOutputTokens: row.max_output_tokens || 4096,
-    inputCostPerMtoken: parseFloat(row.input_cost_per_mtoken) || 0,
-    outputCostPerMtoken: parseFloat(row.output_cost_per_mtoken) || 0,
+    contextWindow: row.context_window !== null && row.context_window !== undefined && row.context_window !== "" ? Number(row.context_window) : null,
+    maxOutputTokens: row.max_output_tokens !== null && row.max_output_tokens !== undefined && row.max_output_tokens !== "" ? Number(row.max_output_tokens) : null,
+    inputCostPerMtoken: row.input_cost_per_mtoken !== null && row.input_cost_per_mtoken !== undefined ? parseFloat(row.input_cost_per_mtoken) : null,
+    outputCostPerMtoken: row.output_cost_per_mtoken !== null && row.output_cost_per_mtoken !== undefined ? parseFloat(row.output_cost_per_mtoken) : null,
     license: row.license || "Commercial",
     paperUrl: row.paper_url,
     repositoryUrl: row.repository_url,
@@ -543,6 +578,10 @@ export async function getHubFacetsFromDb(): Promise<HubFacetsData> {
     return cachedHubFacets.data;
   }
 
+  const capSelectClauses = CAPABILITY_FACET_LIST.map(
+    (item, idx) => `COUNT(*) FILTER (WHERE ${CAPABILITY_SQL_CONDITIONS[item.slug]})::int as cap_${idx}`
+  ).join(",\n");
+
   const [
     totalRows,
     vendorRows,
@@ -570,13 +609,7 @@ export async function getHubFacetsFromDb(): Promise<HubFacetsData> {
       ORDER BY count DESC
       LIMIT 40
     `,
-    sql`
-      SELECT jsonb_array_elements_text(capabilities) as cap, COUNT(*)::int as count
-      FROM models
-      WHERE is_canonical = true AND capabilities IS NOT NULL AND jsonb_typeof(capabilities) = 'array'
-      GROUP BY cap
-      ORDER BY count DESC
-    `,
+    sql.query(`SELECT ${capSelectClauses} FROM models m WHERE m.is_canonical = true`),
     sql`
       SELECT jsonb_array_elements_text(research_areas) as area, COUNT(*)::int as count
       FROM models
@@ -608,39 +641,11 @@ export async function getHubFacetsFromDb(): Promise<HubFacetsData> {
     `,
   ]);
 
-  const rawCapMap = new Map<string, number>();
-  for (const r of capRows as Array<{ cap: string; count: number }>) {
-    rawCapMap.set(r.cap, r.count);
-  }
-
-  const CAPABILITY_DEFS = [
-    { name: "Chat", keys: ["chat"] },
-    { name: "Reasoning", keys: ["reasoning"] },
-    { name: "Computer Vision", keys: ["computer_vision", "vision"] },
-    { name: "Coding", keys: ["coding", "code"] },
-    { name: "Multimodal", keys: ["multimodal"] },
-    { name: "Agentic AI", keys: ["agents", "planning"] },
-    { name: "Tool Use", keys: ["tools", "tool_use"] },
-    { name: "Audio", keys: ["audio", "speech"] },
-    { name: "Document AI", keys: ["document_ai", "ocr"] },
-    { name: "Robotics", keys: ["robotics"] },
-    { name: "Embeddings", keys: ["embeddings"] },
-    { name: "Mathematics", keys: ["math"] },
-    { name: "Translation", keys: ["translation"] },
-    { name: "Search", keys: ["search"] },
-    { name: "Instruction Following", keys: ["instruction_following"] },
-    { name: "Healthcare", keys: ["healthcare"] },
-    { name: "General Purpose", keys: ["general_purpose"] },
-  ];
-
-  const capabilities: FacetCount[] = CAPABILITY_DEFS.map((def) => {
-    let maxCount = 0;
-    for (const k of def.keys) {
-      const c = rawCapMap.get(k) || 0;
-      if (c > maxCount) maxCount = c;
-    }
-    return { name: def.name, count: maxCount };
-  }).filter((c) => c.count > 0);
+  const capRow = ((capRows as unknown) as Array<Record<string, number>>)[0] || {};
+  const capabilities: FacetCount[] = CAPABILITY_FACET_LIST.map((item, idx) => ({
+    name: item.name,
+    count: Number(capRow[`cap_${idx}`] || 0),
+  })).filter((c) => c.count > 0);
 
   const researchAreas: FacetCount[] = (researchRows as Array<{ area: string; count: number }>).map((r) => ({
     name: r.area,

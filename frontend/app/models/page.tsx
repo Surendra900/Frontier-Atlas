@@ -1042,16 +1042,15 @@ useEffect(() => {
           } model families spanning reasoning, vision, code, audio, robotics, healthcare, and more.`}
           stats={[
             {
-              value: loading ? "..." : (facets?.capabilities?.length ?? 19),
+              value: facets?.capabilities?.length ?? 17,
               label: "Capabilities",
             },
             {
-              value:
-                (facets?.modelFamilies?.length ?? 35),
+              value: facets?.modelFamilies?.length ?? 35,
               label: "Model Families",
             },
             {
-              value: loading ? "..." : (facets?.totalModels ?? 484),
+              value: facets?.totalModels ?? 484,
               label: "Verified Models",
             },
           ]}
@@ -2515,10 +2514,13 @@ useEffect(() => {
                     >
                       Model Directory (
                       {
-                        filteredCatalogModels.length
+                        activeFilterLabel || searchQuery
+                          ? filteredCatalogModels.length
+                          : (filteredCatalogModels.length || allModels.length || facets?.totalModels || 484)
                       }{" "}
-                      {filteredCatalogModels.length ===
-                      1
+                      {(activeFilterLabel || searchQuery
+                        ? filteredCatalogModels.length
+                        : (filteredCatalogModels.length || allModels.length || facets?.totalModels || 484)) === 1
                         ? "Model"
                         : "Models"}
                       )
