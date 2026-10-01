@@ -32,21 +32,33 @@ import {
 } from "@/lib/models";
 import type { ModelDbFacets } from "@/lib/models-db";
 
-// Helper: format large numbers
+// Helper: format large numbers (Base 1024 for power-of-two: 32K, 64K, 128K, 256K, 512K, 1M; Base 1000 otherwise)
 function formatNumber(value: number | null | undefined): string {
-  if (value === null || value === undefined || isNaN(value)) return "N/A";
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(value % 1_000_000 === 0 ? 0 : 1)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(value % 1_000 === 0 ? 0 : 0)}K`;
+  if (value === null || value === undefined || isNaN(value) || value <= 0) return "N/A";
+
+  const isPowerOfTwo = (value > 0) && ((value & (value - 1)) === 0);
+  if (isPowerOfTwo && value >= 1024) {
+    if (value >= 1024 * 1024) {
+      return `${value / (1024 * 1024)}M`;
+    }
+    return `${value / 1024}K`;
+  }
+
+  if (value >= 1_000_000) {
+    const m = value / 1_000_000;
+    return `${m % 1 === 0 ? m : Number(m.toFixed(2))}M`;
+  }
+  if (value >= 1_000) {
+    const k = value / 1_000;
+    return `${k % 1 === 0 ? k : Number(k.toFixed(1))}K`;
+  }
   return value.toLocaleString();
 }
 
-// Helper: format pricing
-function formatPrice(val: number | null | undefined, sourceCatalog?: string | null): string {
+// Helper: format pricing (null -> 'N/A', 0 -> 'Free')
+function formatPrice(val: number | null | undefined): string {
   if (val === null || val === undefined || isNaN(val) || val < 0) return "N/A";
-  if (val === 0) {
-    if (sourceCatalog && sourceCatalog !== "openrouter") return "N/A";
-    return "Free";
-  }
+  if (val === 0) return "Free";
   if (val < 0.01) return `$${val.toFixed(4)}`;
   if (val < 1) return `$${val.toFixed(2)}`;
   return `$${val.toFixed(2)}`;
@@ -223,12 +235,16 @@ export default function ModelsListingClient({
         if (!match) return false;
       }
 
-      const ctxNum = typeof m.contextWindow === "number" ? m.contextWindow : parseInt(String(m.contextWindow || 0), 10);
       const minCtx = parseInt(selectedContext, 10);
-      if (minCtx > 0 && ctxNum < minCtx) return false;
+      if (minCtx > 0) {
+        const ctxNum = typeof m.contextWindow === "number" ? m.contextWindow : (m.contextWindow ? parseInt(String(m.contextWindow), 10) : null);
+        if (ctxNum == null || isNaN(ctxNum) || ctxNum < minCtx) return false;
+      }
 
       const maxP = parseFloat(selectedPrice);
-      if (maxP > 0 && (m.inputCostPerMtoken || 0) > maxP) return false;
+      if (maxP > 0) {
+        if (m.inputCostPerMtoken == null || isNaN(m.inputCostPerMtoken) || m.inputCostPerMtoken > maxP) return false;
+      }
 
       return true;
     });
@@ -243,21 +259,30 @@ export default function ModelsListingClient({
     selectedPrice,
   ]);
 
-  // Sorted models
+  // Sorted models (nulls last for numerical properties)
   const sortedModels = useMemo(() => {
     return [...filteredModels].sort((a, b) => {
       if (sortBy === "name") {
         return (a.name || "").localeCompare(b.name || "");
       }
       if (sortBy === "price_asc") {
-        return (a.inputCostPerMtoken ?? 0) - (b.inputCostPerMtoken ?? 0);
+        if (a.inputCostPerMtoken == null && b.inputCostPerMtoken == null) return 0;
+        if (a.inputCostPerMtoken == null) return 1;
+        if (b.inputCostPerMtoken == null) return -1;
+        return a.inputCostPerMtoken - b.inputCostPerMtoken;
       }
       if (sortBy === "price_desc") {
-        return (b.inputCostPerMtoken ?? 0) - (a.inputCostPerMtoken ?? 0);
+        if (a.inputCostPerMtoken == null && b.inputCostPerMtoken == null) return 0;
+        if (a.inputCostPerMtoken == null) return 1;
+        if (b.inputCostPerMtoken == null) return -1;
+        return b.inputCostPerMtoken - a.inputCostPerMtoken;
       }
       if (sortBy === "context_desc" || sortBy === "context") {
-        const ca = typeof a.contextWindow === "number" ? a.contextWindow : parseInt(String(a.contextWindow || 0), 10);
-        const cb = typeof b.contextWindow === "number" ? b.contextWindow : parseInt(String(b.contextWindow || 0), 10);
+        const ca = typeof a.contextWindow === "number" ? a.contextWindow : (a.contextWindow ? parseInt(String(a.contextWindow), 10) : null);
+        const cb = typeof b.contextWindow === "number" ? b.contextWindow : (b.contextWindow ? parseInt(String(b.contextWindow), 10) : null);
+        if (ca == null && cb == null) return 0;
+        if (ca == null) return 1;
+        if (cb == null) return -1;
         return cb - ca;
       }
       if (sortBy === "trending") {
@@ -681,12 +706,12 @@ export default function ModelsListingClient({
 
                         {/* Input Price */}
                         <td className="py-3 px-4 text-right font-mono font-semibold text-[#111827]">
-                          {formatPrice(m.inputCostPerMtoken, m.sourceCatalog)}
+                          {formatPrice(m.inputCostPerMtoken)}
                         </td>
 
                         {/* Output Price */}
                         <td className="py-3 px-4 text-right font-mono font-semibold text-[#111827]">
-                          {formatPrice(m.outputCostPerMtoken, m.sourceCatalog)}
+                          {formatPrice(m.outputCostPerMtoken)}
                         </td>
 
                         {/* Mapped Academic Paper */}
@@ -803,7 +828,7 @@ export default function ModelsListingClient({
                           Cost / 1M Tokens
                         </span>
                         <span className="font-semibold text-[#111827]">
-                          {formatPrice(m.inputCostPerMtoken, m.sourceCatalog)}
+                          {formatPrice(m.inputCostPerMtoken)}
                         </span>
                       </div>
                     </div>
@@ -853,6 +878,7 @@ export default function ModelsListingClient({
         {/* Slide-Out Details Drawer (Extra Specifications, Variants & Papers) */}
         {activeModelDetails && (
           <div
+            data-testid="model-drawer"
             className="fixed inset-0 z-50 overflow-hidden flex justify-end bg-black/40 backdrop-blur-xs animate-in fade-in duration-200"
             onClick={closeDrawer}
           >
@@ -924,13 +950,13 @@ export default function ModelsListingClient({
                     <div className="p-3 rounded-lg bg-[#FAF9F5] border border-[#E5E5E0]">
                       <span className="text-[#8B8B8B] block mb-1">Input Price / 1M</span>
                       <span className="font-bold text-[#111827] text-sm">
-                        {formatPrice(activeModelDetails.inputCostPerMtoken, activeModelDetails.sourceCatalog)}
+                        {formatPrice(activeModelDetails.inputCostPerMtoken)}
                       </span>
                     </div>
                     <div className="p-3 rounded-lg bg-[#FAF9F5] border border-[#E5E5E0]">
                       <span className="text-[#8B8B8B] block mb-1">Output Price / 1M</span>
                       <span className="font-bold text-[#111827] text-sm">
-                        {formatPrice(activeModelDetails.outputCostPerMtoken, activeModelDetails.sourceCatalog)}
+                        {formatPrice(activeModelDetails.outputCostPerMtoken)}
                       </span>
                     </div>
                   </div>

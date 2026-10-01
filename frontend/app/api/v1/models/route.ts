@@ -19,8 +19,8 @@ export async function GET(request: NextRequest) {
   const modality = searchParams.get("modality") || "";
   const openness = searchParams.get("openness") || "";
   const capability = searchParams.get("capability") || "";
-  const minContext = parseInt(searchParams.get("min_context") || "0", 10);
-  const maxPrice = parseFloat(searchParams.get("max_price") || "0");
+  const minContext = parseInt(searchParams.get("min_context") || searchParams.get("minContext") || "0", 10);
+  const maxPrice = parseFloat(searchParams.get("max_price") || searchParams.get("maxPrice") || searchParams.get("price") || "0");
   const sort = searchParams.get("sort") || "newest";
   const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
   const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "50", 10)));

@@ -559,8 +559,8 @@ async function main() {
 
     const promptPrice = m.pricing?.prompt ? parseFloat(m.pricing.prompt) * 1_000_000 : (llm.input_cost_per_token ? llm.input_cost_per_token * 1_000_000 : null);
     const compPrice = m.pricing?.completion ? parseFloat(m.pricing.completion) * 1_000_000 : (llm.output_cost_per_token ? llm.output_cost_per_token * 1_000_000 : null);
-    const contextWindow = m.context_length || llm.max_input_tokens || llm.max_tokens || 128000;
-    const maxOutput = m.top_provider?.max_completion_tokens || llm.max_output_tokens || 8192;
+    const contextWindow = m.context_length || llm.max_input_tokens || llm.max_tokens || null;
+    const maxOutput = m.top_provider?.max_completion_tokens || llm.max_output_tokens || null;
 
     const isOpen = (m.description || '').toLowerCase().includes('open weight') ||
                    (m.description || '').toLowerCase().includes('open source') ||
@@ -640,10 +640,10 @@ async function main() {
         capabilities: caps,
         research_areas: areas,
         architecture: { pipeline_tag: hf.pipelineTag },
-        context_window: 128000,
-        max_output_tokens: 8192,
-        input_cost_per_mtoken: 0,
-        output_cost_per_mtoken: 0,
+        context_window: null,
+        max_output_tokens: null,
+        input_cost_per_mtoken: null,
+        output_cost_per_mtoken: null,
         license: 'Open Weights / Apache 2.0',
         paper_url: null,
         repository_url: `https://huggingface.co/${hf.id}`,

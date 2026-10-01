@@ -178,8 +178,8 @@ function normalizeAndMerge(sources) {
       if (!isNaN(parsed.getTime())) releaseDate = parsed;
     }
 
-    const contextWindow = m.context_length || m.top_provider?.context_length || (mdInfo?.limit?.context) || 128000;
-    const maxOutputTokens = m.top_provider?.max_completion_tokens || (mdInfo?.limit?.output) || 4096;
+    const contextWindow = m.context_length || m.top_provider?.context_length || (mdInfo?.limit?.context) || null;
+    const maxOutputTokens = m.top_provider?.max_completion_tokens || (mdInfo?.limit?.output) || null;
 
     let trendingScore = 50;
     if (capabilities.has("reasoning")) trendingScore += 30;
