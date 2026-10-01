@@ -196,14 +196,14 @@ export default function SearchBar({
       className={`relative ${
         variant === "compact"
           ? "w-full max-w-[360px]"
-          : "w-full max-w-[640px] mx-auto"
+          : "w-[90%] max-w-[640px] mx-auto"
       }`}
     >
       <motion.form
         layoutId={layoutIdPrefix ? `${layoutIdPrefix}-container` : undefined}
         transition={{ type: "spring", stiffness: 250, damping: 25 }}
         onSubmit={handleSubmit}
-        className={`relative flex items-center px-3 md:px-5 bg-white border border-[#E5E5E0] h-10 md:h-12
+        className={`relative flex items-center px-3 md:px-5 bg-white border border-[#E5E5E0] h-9 md:h-12
         shadow-[0_8px_30px_rgb(0,0,0,0.06)]
         hover:shadow-[0_12px_32px_rgb(0,0,0,0.10)]
         focus-within:border-[#FF5A1F]/40
