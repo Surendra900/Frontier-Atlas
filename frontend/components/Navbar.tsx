@@ -105,7 +105,7 @@ export default function Navbar({
             className="flex items-center justify-center lg:justify-start cursor-pointer absolute left-1/2 -translate-x-1/2 lg:relative lg:left-auto lg:-translate-x-0 w-[160px] sm:w-[200px] xl:w-[240px] h-12 xl:h-14"
           >
             <img
-              src="https://frontieratlas.pages.dev/logo.png"
+              src="/logo.png"
               alt="Frontier Atlas"
               className="w-full h-full object-contain object-center lg:object-left"
             />
@@ -314,7 +314,7 @@ export default function Navbar({
             className="relative block w-[170px] h-10 cursor-pointer"
           >
             <img
-              src="https://frontieratlas.pages.dev/logo.png"
+              src="/logo.png"
               alt="Frontier Atlas"
               className="w-full h-full object-contain object-left"
             />
