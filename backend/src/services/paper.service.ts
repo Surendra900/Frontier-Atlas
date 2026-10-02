@@ -939,61 +939,95 @@ export const searchPapers = async (
   const skip = (page - 1) * limit;
   const sort = query.sort || "relevance";
 
-  const cleanQuery = searchTerm.replace(/[^\w\s-]/g, " ").trim();
+  // 1. Detect arXiv ID or arXiv URL
+  const arxivMatch = searchTerm.match(
+    /(?:arxiv\.org\/(?:abs|pdf)\/|arxiv:\s*|^)(\d{4}\.\d{4,5}(?:v\d+)?|[a-z\-]+(?:\.[a-z\-]+)?\/\d+)/i
+  );
+  const detectedArxivId = arxivMatch ? arxivMatch[1].replace(/\.pdf$/i, "") : "";
+
+  // 2. Normalize query variants
+  const alphaNumQuery = searchTerm.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const slugCandidate = searchTerm.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+  const cleanQuery = searchTerm.replace(/[^\w\s-]/g, " ").replace(/\s+/g, " ").trim();
   const words = cleanQuery.split(/[\s-]+/).filter((w) => w.length > 0);
+
   const phrasePattern = `%${words.length > 0 ? words.join("%") : cleanQuery}%`;
-  const prefixPattern = `${words.length > 0 ? words[0] : cleanQuery}%`;
+  const rawContains = `%${cleanQuery || searchTerm}%`;
+  const prefixPattern = `${cleanQuery}%`;
 
-  const sqlParams: any[] = [phrasePattern, prefixPattern, cleanQuery];
-  let pIdx = 4;
+  const sqlParams: any[] = [
+    detectedArxivId,
+    slugCandidate,
+    alphaNumQuery,
+    cleanQuery,
+    phrasePattern,
+    rawContains,
+    prefixPattern,
+  ];
 
-  const wordConditions: string[] = [];
-  if (words.length > 1) {
-    for (const word of words) {
-      wordConditions.push(`(
-        p.title ILIKE $${pIdx} 
-        OR p.authors ILIKE $${pIdx} 
-        OR p.abstract ILIKE $${pIdx}
-        OR EXISTS (
-          SELECT 1 FROM paper_tasks pt 
-          JOIN tasks t ON pt.task_id = t.id 
-          WHERE pt.paper_id = p.id AND (t.name ILIKE $${pIdx} OR t.slug ILIKE $${pIdx})
-        )
-        OR EXISTS (
-          SELECT 1 FROM paper_methods pm 
-          JOIN methods m ON pm.method_id = m.id 
-          WHERE pm.paper_id = p.id AND (m.name ILIKE $${pIdx} OR m.slug ILIKE $${pIdx})
-        )
-      )`);
-      sqlParams.push(`%${word}%`);
-      pIdx++;
-    }
+  let pIdx = 8;
+  const allWordsInTitleConditions: string[] = [];
+  const allWordsAnywhereConditions: string[] = [];
+
+  for (const word of words) {
+    allWordsInTitleConditions.push(`p.title ILIKE $${pIdx}`);
+    allWordsAnywhereConditions.push(`(
+      p.title ILIKE $${pIdx} 
+      OR p.authors ILIKE $${pIdx} 
+      OR p.abstract ILIKE $${pIdx}
+      OR EXISTS (
+        SELECT 1 FROM paper_tasks pt 
+        JOIN tasks t ON pt.task_id = t.id 
+        WHERE pt.paper_id = p.id AND (t.name ILIKE $${pIdx} OR t.slug ILIKE $${pIdx})
+      )
+      OR EXISTS (
+        SELECT 1 FROM paper_methods pm 
+        JOIN methods m ON pm.method_id = m.id 
+        WHERE pm.paper_id = p.id AND (m.name ILIKE $${pIdx} OR m.slug ILIKE $${pIdx})
+      )
+    )`);
+    sqlParams.push(`%${word}%`);
+    pIdx++;
   }
 
+  const titleAllWordsSql = allWordsInTitleConditions.length > 0 ? allWordsInTitleConditions.join(" AND ") : "false";
+  const anywhereAllWordsSql = allWordsAnywhereConditions.length > 0 ? allWordsAnywhereConditions.join(" AND ") : "false";
+
   const whereCondition = `(
-    p.title ILIKE $1 
-    OR p.authors ILIKE $1 
-    OR p.abstract ILIKE $1
-    ${wordConditions.length > 0 ? `OR (${wordConditions.join(" AND ")})` : ""}
-    OR EXISTS (
-      SELECT 1 FROM paper_tasks pt 
-      JOIN tasks t ON pt.task_id = t.id 
-      WHERE pt.paper_id = p.id AND (t.name ILIKE $1 OR t.slug ILIKE $1)
-    )
-    OR EXISTS (
-      SELECT 1 FROM paper_methods pm 
-      JOIN methods m ON pm.method_id = m.id 
-      WHERE pm.paper_id = p.id AND (m.name ILIKE $1 OR m.slug ILIKE $1)
-    )
+    ($1::text != '' AND p.arxiv_id = $1::text)
+    OR ($2::text != '' AND p.slug = $2::text)
+    OR ($3::text != '' AND REGEXP_REPLACE(LOWER(p.title), '[^a-z0-9]', '', 'g') = $3::text)
+    OR p.title ILIKE $5
+    OR p.title ILIKE $6
+    OR p.slug ILIKE $5
+    OR p.authors ILIKE $5
+    OR p.authors ILIKE $6
+    OR p.abstract ILIKE $5
+    OR (${titleAllWordsSql})
+    OR (${anywhereAllWordsSql})
   )`;
 
   let orderClause = `
     ORDER BY 
       CASE
-        WHEN LOWER(p.title) = LOWER($3) THEN 1
-        WHEN LOWER(p.title) LIKE LOWER($2) THEN 2
-        WHEN p.title ILIKE $1 THEN 3
-        ELSE 4
+        -- Rank 1: Exact matches (ArXiv ID, slug, or normalized title ignoring punctuation/spacing)
+        WHEN $1::text != '' AND p.arxiv_id = $1::text THEN 1
+        WHEN $2::text != '' AND p.slug = $2::text THEN 1
+        WHEN $3::text != '' AND REGEXP_REPLACE(LOWER(p.title), '[^a-z0-9]', '', 'g') = $3::text THEN 1
+        -- Rank 2: Title exactly equals clean query
+        WHEN LOWER(p.title) = LOWER($4) THEN 2
+        -- Rank 3: Title starts with normalized query or prefix
+        WHEN $3::text != '' AND REGEXP_REPLACE(LOWER(p.title), '[^a-z0-9]', '', 'g') LIKE ($3::text || '%') THEN 3
+        WHEN LOWER(p.title) LIKE LOWER($7) THEN 4
+        -- Rank 4: Title contains the search phrase
+        WHEN p.title ILIKE $6 THEN 5
+        WHEN p.title ILIKE $5 THEN 6
+        -- Rank 5: Title contains all search words
+        WHEN ${titleAllWordsSql} THEN 7
+        -- Rank 6: Authors or abstract contains phrase or words
+        WHEN p.authors ILIKE $5 OR p.authors ILIKE $6 THEN 8
+        WHEN ${anywhereAllWordsSql} THEN 9
+        ELSE 10
       END ASC,
       p.github_stars DESC NULLS LAST,
       p.citation_count DESC NULLS LAST,
