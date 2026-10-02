@@ -35,6 +35,10 @@ const indexStatements = [
   "CREATE INDEX IF NOT EXISTS idx_paper_datasets_paper_id ON paper_datasets(paper_id)",
   "CREATE INDEX IF NOT EXISTS idx_paper_repositories_repository_id ON paper_repositories(repository_id)",
   "CREATE INDEX IF NOT EXISTS idx_paper_repositories_paper_id ON paper_repositories(paper_id)",
+  "CREATE INDEX IF NOT EXISTS idx_paper_conferences_paper_id ON paper_conferences(paper_id)",
+  "CREATE INDEX IF NOT EXISTS idx_paper_conferences_conf_id ON paper_conferences(conference_id)",
+  "CREATE INDEX IF NOT EXISTS idx_papers_slug ON papers(slug)",
+  "CREATE INDEX IF NOT EXISTS idx_papers_arxiv_id ON papers(arxiv_id)",
   "CREATE INDEX IF NOT EXISTS idx_papers_pubdate_stars ON papers(publication_date DESC, github_stars DESC)",
   "CREATE INDEX IF NOT EXISTS idx_papers_stars_citations ON papers(github_stars DESC, citation_count DESC)",
 ];
