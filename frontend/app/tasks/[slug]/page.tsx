@@ -2,6 +2,7 @@ export const runtime = "edge";
 import Navbar from "@/components/Navbar";
 import Link from "next/link";
 import TaskDetailClient from "@/components/domain/tasks/TaskDetailClient";
+import { getPapers, type GetPapersResult } from "@/lib/paperApi";
 
 type TaskPageProps = {
   params: Promise<{ slug: string }>;
@@ -365,6 +366,19 @@ export default async function TaskPage({ params }: TaskPageProps) {
   const { slug } = await params;
   const metadata = getTaskMetadata(slug);
 
+  let initialPapers: GetPapersResult | null = null;
+  try {
+    initialPapers = await getPapers({
+      page: 1,
+      task: slug,
+      sort: "popular",
+      period: "all",
+      limit: 25,
+    });
+  } catch (error) {
+    console.error("Failed to load initial papers for task:", error);
+  }
+
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#F8F7F2] text-[#111111]">
       <Navbar />
@@ -413,7 +427,7 @@ export default async function TaskPage({ params }: TaskPageProps) {
         <div className="w-full px-3 sm:px-6 md:px-12 xl:px-16 pt-0 pb-12">
           <div className="w-full">
             <main className="w-full max-w-none min-w-0">
-              <TaskDetailClient slug={slug} />
+              <TaskDetailClient slug={slug} initialPapers={initialPapers} />
             </main>
           </div>
         </div>

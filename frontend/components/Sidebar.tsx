@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 
 import {
   Fire,
@@ -65,8 +66,9 @@ function SidebarItem({
   const IconComponent = item.icon;
 
   return (
-    <a
+    <Link
       href={href}
+      prefetch={true}
       onClick={onClick}
       onMouseEnter={onMouseEnter}
       className={`
@@ -128,7 +130,7 @@ function SidebarItem({
       >
         {item.label}
       </span>
-    </a>
+    </Link>
   );
 }
 
@@ -502,6 +504,8 @@ export default function Sidebar({
                     page: 1,
                     task: item.slug,
                     sort: "popular",
+                    period: "all",
+                    limit: 25,
                   });
                 }
               }}

@@ -940,7 +940,12 @@ export default function PaperList({
 
   const [page, setPage] = useState(() => initialPapers?.page ?? 1);
   const [hasMore, setHasMore] = useState(() => initialPapers?.hasMore ?? true);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(
+    () => !initialPapers || (initialPapers.papers?.length === 0 && !initialError),
+  );
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(
+    () => Boolean(initialPapers?.papers && initialPapers.papers.length > 0),
+  );
   const [error, setError] = useState<string | null>(initialError ?? null);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   const [totalPapers, setTotalPapers] = useState(
@@ -1153,6 +1158,7 @@ export default function PaperList({
           : cached.papers).filter(paperHasTags);
         setPapers(visibleCached);
         setLoading(false);
+        setHasLoadedOnce(true);
         setError(null);
         onFilterDoneRef.current?.();
 
@@ -1179,6 +1185,7 @@ export default function PaperList({
         setTotalPapers(result.total);
         setHasMore(result.hasMore);
         setPapers(visiblePapers);
+        setHasLoadedOnce(true);
 
         // Pre-fetch next page if possible
         if (result.hasMore) {
@@ -1189,6 +1196,7 @@ export default function PaperList({
         console.error("Failed to load papers:", err);
         setError("Failed to load papers. Please try again later.");
         setPapers([]);
+        setHasLoadedOnce(true);
       } finally {
         if (requestId === activeRequestIdRef.current) {
           loadingRef.current = false;
@@ -1258,6 +1266,7 @@ export default function PaperList({
         : cached.papers;
       setPapers(visible);
       setLoading(false);
+      setHasLoadedOnce(true);
       void loadPage(1, itemsPerPage, true);
     } else {
       setPapers([]);
@@ -1324,7 +1333,8 @@ export default function PaperList({
       >
         {isTransitioning ||
         isFilterChanging ||
-        (loading && papers.length === 0) ? (
+        loading ||
+        (!hasLoadedOnce && papers.length === 0) ? (
           <>
             <PaperCardSkeleton />
             <PaperCardSkeleton />
@@ -1502,7 +1512,7 @@ export default function PaperList({
           </div>
         )}
 
-        {!loading && papers.length === 0 && (
+        {!loading && hasLoadedOnce && papers.length === 0 && !error && (
           <div className="flex flex-col items-center justify-center py-24 px-4 text-center animate-fade-in w-full col-span-full">
             <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mb-6 border border-[#E5E5E0] shadow-sm">
               <svg
