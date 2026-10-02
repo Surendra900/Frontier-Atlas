@@ -170,6 +170,24 @@ export const prewarmCommonViews = (queryRouter?: QueryRouter, databaseUrl?: stri
     { sort: "trending", period: "all", task: "model-context-protocol-mcp", limit: 20, page: 1 },
     { sort: "trending", period: "today", method: "model-context-protocol-mcp", limit: 20, page: 1 },
     { sort: "latest", period: "today", method: "model-context-protocol-mcp", limit: 20, page: 1 },
+
+    // 3. Homepage Sidebar Tasks Section
+    ...[
+      "large-language-models",
+      "agents",
+      "reasoning-models",
+      "vision-language-models",
+      "multimodal-models",
+      "world-models",
+      "image-generation",
+      "automatic-speech-recognition",
+      "robotics",
+    ].flatMap((taskSlug) => [
+      { sort: "popular", period: "all", task: taskSlug, limit: 25, page: 1 },
+      { sort: "popular", period: "all", task: taskSlug, limit: 20, page: 1 },
+      { sort: "latest", period: "all", task: taskSlug, limit: 25, page: 1 },
+      { sort: "citations", period: "all", task: taskSlug, limit: 25, page: 1 },
+    ]),
   ];
 
   const commonSearchPrefixes = [

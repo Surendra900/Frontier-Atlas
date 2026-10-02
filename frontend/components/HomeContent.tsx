@@ -48,6 +48,29 @@ export default function HomeContent({
       }).catch(() => {});
 
       prefetchMethods();
+
+      const commonTasks = [
+        "large-language-models",
+        "agents",
+        "reasoning-models",
+        "vision-language-models",
+        "multimodal-models",
+        "world-models",
+        "image-generation",
+        "automatic-speech-recognition",
+        "robotics",
+      ];
+      commonTasks.forEach((taskSlug, idx) => {
+        setTimeout(() => {
+          getPapers({
+            page: 1,
+            task: taskSlug,
+            sort: "popular",
+            period: "all",
+            limit: 25,
+          }).catch(() => {});
+        }, idx * 250);
+      });
     }, 1500);
 
     return () => clearTimeout(timer);

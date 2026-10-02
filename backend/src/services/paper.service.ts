@@ -39,6 +39,53 @@ const exposeThumbnailUrl = <T extends { thumbnailUrl?: string | null; arxivId?: 
   };
 };
 
+const taskIdCache = new Map<string, { ids: string[]; expiresAt: number }>();
+const methodIdCache = new Map<string, { ids: string[]; expiresAt: number }>();
+
+async function getMatchingTaskIds(queryRouter: QueryRouter, taskSlugOrName: string): Promise<string[]> {
+  const key = taskSlugOrName.toLowerCase().trim();
+  const cached = taskIdCache.get(key);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.ids;
+  }
+
+  try {
+    const rows = await queryRouter.routeQuery<any[]>(async (prisma: PrismaClient) => {
+      return prisma.$queryRawUnsafe<any[]>(
+        `SELECT id FROM tasks WHERE slug = $1 OR slug = $1 || '-models' OR slug = $1 || '-agents' OR name ILIKE $1 OR name ILIKE '%' || $1 || '%'`,
+        taskSlugOrName
+      );
+    });
+    const ids = Array.isArray(rows) ? rows.map(r => r.id).filter(Boolean) : [];
+    taskIdCache.set(key, { ids, expiresAt: Date.now() + 3600_000 });
+    return ids;
+  } catch {
+    return [];
+  }
+}
+
+async function getMatchingMethodIds(queryRouter: QueryRouter, methodSlugOrName: string): Promise<string[]> {
+  const key = methodSlugOrName.toLowerCase().trim();
+  const cached = methodIdCache.get(key);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.ids;
+  }
+
+  try {
+    const rows = await queryRouter.routeQuery<any[]>(async (prisma: PrismaClient) => {
+      return prisma.$queryRawUnsafe<any[]>(
+        `SELECT id FROM methods WHERE slug = $1 OR name ILIKE $1 OR name ILIKE '%' || $1 || '%'`,
+        methodSlugOrName
+      );
+    });
+    const ids = Array.isArray(rows) ? rows.map(r => r.id).filter(Boolean) : [];
+    methodIdCache.set(key, { ids, expiresAt: Date.now() + 3600_000 });
+    return ids;
+  } catch {
+    return [];
+  }
+}
+
 const paperSelect = {
   id: true,
   slug: true,
@@ -392,19 +439,29 @@ export const getPapers = async (
         WHERE pm.paper_id = p.id AND (m.slug IN ('model-context-protocol-mcp', 'mcp') OR m.name ILIKE '%MCP%' OR m.name ILIKE '%Model Context Protocol%')
       )`);
     } else {
-      conditions.push(`EXISTS (
-        SELECT 1 FROM paper_tasks pt 
-        JOIN tasks t ON pt.task_id = t.id 
-        WHERE pt.paper_id = p.id AND (
-          t.slug = $${pIdx} OR 
-          t.slug = $${pIdx} || '-models' OR 
-          t.slug = $${pIdx} || '-agents' OR 
-          t.name ILIKE $${pIdx} OR 
-          t.name ILIKE '%' || $${pIdx} || '%'
-        )
-      )`);
-      sqlParams.push(query.task);
-      pIdx++;
+      const taskIds = await getMatchingTaskIds(queryRouter, query.task);
+      if (taskIds.length > 0) {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM paper_tasks pt 
+          WHERE pt.paper_id = p.id AND pt.task_id = ANY($${pIdx}::text[])
+        )`);
+        sqlParams.push(taskIds);
+        pIdx++;
+      } else {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM paper_tasks pt 
+          JOIN tasks t ON pt.task_id = t.id 
+          WHERE pt.paper_id = p.id AND (
+            t.slug = $${pIdx} OR 
+            t.slug = $${pIdx} || '-models' OR 
+            t.slug = $${pIdx} || '-agents' OR 
+            t.name ILIKE $${pIdx} OR 
+            t.name ILIKE '%' || $${pIdx} || '%'
+          )
+        )`);
+        sqlParams.push(query.task);
+        pIdx++;
+      }
     }
   }
 
@@ -417,13 +474,23 @@ export const getPapers = async (
         WHERE pm.paper_id = p.id AND (m.slug IN ('model-context-protocol-mcp', 'mcp') OR m.name ILIKE '%MCP%' OR m.name ILIKE '%Model Context Protocol%')
       )`);
     } else {
-      conditions.push(`EXISTS (
-        SELECT 1 FROM paper_methods pm 
-        JOIN methods m ON pm.method_id = m.id 
-        WHERE pm.paper_id = p.id AND (m.slug = $${pIdx} OR m.name ILIKE $${pIdx} OR m.name ILIKE '%' || $${pIdx} || '%')
-      )`);
-      sqlParams.push(query.method);
-      pIdx++;
+      const methodIds = await getMatchingMethodIds(queryRouter, query.method);
+      if (methodIds.length > 0) {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM paper_methods pm 
+          WHERE pm.paper_id = p.id AND pm.method_id = ANY($${pIdx}::text[])
+        )`);
+        sqlParams.push(methodIds);
+        pIdx++;
+      } else {
+        conditions.push(`EXISTS (
+          SELECT 1 FROM paper_methods pm 
+          JOIN methods m ON pm.method_id = m.id 
+          WHERE pm.paper_id = p.id AND (m.slug = $${pIdx} OR m.name ILIKE $${pIdx} OR m.name ILIKE '%' || $${pIdx} || '%')
+        )`);
+        sqlParams.push(query.method);
+        pIdx++;
+      }
     }
   }
 

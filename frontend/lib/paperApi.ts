@@ -883,7 +883,7 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
 
       const page = Math.max(Number(params.page) || 1, 1);
       const requestedLimit = Math.min(Math.max(Number(params.limit) || 20, 1), 30);
-      const fetchLimit = Math.min(requestedLimit, 20);
+      const fetchLimit = Math.min(requestedLimit, 25);
 
       const rawSort = (params.sort || "trending").toLowerCase();
       const rawPeriod = (params.period || "all").toLowerCase();
@@ -896,7 +896,9 @@ export async function getPapers(params: GetPapersParams = {}): Promise<GetPapers
       const sort =
         rawSort === "latest" || rawSort === "latest papers" || rawSort === "recent" ? "latest" :
         rawSort === "stars" || rawSort === "most github stars" || rawSort === "github-stars" || rawSort === "most-stars" ? "stars" :
-        rawSort === "hourly" || rawSort === "github hourly" || rawSort === "velocity" ? "hourly" : "trending";
+        rawSort === "hourly" || rawSort === "github hourly" || rawSort === "velocity" ? "hourly" :
+        rawSort === "citations" || rawSort === "citation" ? "citations" :
+        rawSort === "popular" ? "popular" : "trending";
 
       const isTopicFilter = Boolean(params.task || params.method || params.model || params.organization);
 
