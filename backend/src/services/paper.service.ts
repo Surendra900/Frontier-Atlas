@@ -730,166 +730,154 @@ export const getPapers = async (
   };
 };
 
+async function fetchFullPaperRaw(prisma: PrismaClient, column: "slug" | "id", value: string) {
+  const whereSql = column === "slug" ? `p.slug = $1` : `p.id = $1`;
+  const rows = await prisma.$queryRawUnsafe<any[]>(
+    `SELECT 
+       p.id,
+       p.slug,
+       p.title,
+       p.short_title as "shortTitle",
+       p.abstract,
+       p.tl_dr as "tlDr",
+       p.publication_date as "publicationDate",
+       p.submission_date as "submissionDate",
+       p.arxiv_id as "arxivId",
+       p.doi,
+       p.paper_url as "paperUrl",
+       p.pdf_url as "pdfUrl",
+       p.thumbnail_url as "thumbnailUrl",
+       p.source_url as "sourceUrl",
+       p.project_url as "projectUrl",
+       p.citation_count as "citationCount",
+       p.reference_count as "referenceCount",
+       p.page_count as "pageCount",
+       p.paper_type as "paperType",
+       p.status,
+       p.language,
+       p.license,
+       p.created_at as "createdAt",
+       p.updated_at as "updatedAt",
+       p.github_forks as "githubForks",
+       p.github_stars as "githubStars",
+       p.github_hourly_increase,
+       p.github_url as "githubUrl",
+       p.hf_url as "hfUrl",
+       p.is_official_code as "isOfficialCode",
+       p.discovery_source as "discoverySource",
+       p.authors,
+       p.huggingface_url,
+       p.hf_model_url as "hf_model_url",
+       p.hf_upvotes as "hfUpvotes",
+       p.trending_score as "trendingScore",
+       COALESCE((
+         SELECT json_agg(json_build_object(
+           'role', pm.role,
+           'model', json_build_object(
+             'id', m.id, 'name', m.name, 'slug', m.slug,
+             'parameterCount', m.parameter_count, 'architecture', m.architecture,
+             'vendor', m.vendor, 'vendor_logo_url', m.vendor_logo_url,
+             'modelFamily', m.model_family, 'description', m.description,
+             'repositoryUrl', m.repository_url
+           )
+         ))
+         FROM paper_models pm
+         JOIN models m ON pm.model_id = m.id
+         WHERE pm.paper_id = p.id
+       ), '[]'::json) as models,
+       COALESCE((
+         SELECT json_agg(json_build_object('id', d.id, 'name', d.name, 'slug', d.slug))
+         FROM paper_datasets pd
+         JOIN datasets d ON pd.dataset_id = d.id
+         WHERE pd.paper_id = p.id
+       ), '[]'::json) as datasets,
+       COALESCE((
+         SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'slug', t.slug, 'color', t.color) ORDER BY t.name ASC)
+         FROM paper_tasks pt
+         JOIN tasks t ON pt.task_id = t.id
+         WHERE pt.paper_id = p.id
+       ), '[]'::json) as tasks,
+       COALESCE((
+         SELECT json_agg(json_build_object('id', m.id, 'name', m.name, 'slug', m.slug) ORDER BY m.name ASC)
+         FROM paper_methods pm
+         JOIN methods m ON pm.method_id = m.id
+         WHERE pm.paper_id = p.id
+       ), '[]'::json) as methods,
+       COALESCE((
+         SELECT json_agg(json_build_object('id', c.id, 'name', c.name, 'slug', c.slug))
+         FROM paper_conferences pc
+         JOIN conferences c ON pc.conference_id = c.id
+         WHERE pc.paper_id = p.id
+       ), '[]'::json) as conferences,
+       COALESCE((
+         SELECT json_agg(json_build_object(
+           'id', r.id, 'paper_id', r.paper_id, 'benchmark_id', r.benchmark_id,
+           'rank', r.rank, 'previous_rank', r.previous_rank,
+           'benchmark', json_build_object('id', b.id, 'name', b.name, 'slug', b.slug)
+         ))
+         FROM rankings r
+         JOIN benchmarks b ON r.benchmark_id = b.id
+         WHERE r.paper_id = p.id
+       ), '[]'::json) as rankings,
+       COALESCE((
+         SELECT json_agg(json_build_object(
+           'id', sc.id, 'paper_id', sc.paper_id, 'benchmark_id', sc.benchmark_id,
+           'benchmark', json_build_object('id', b.id, 'name', b.name, 'slug', b.slug)
+         ))
+         FROM sota_claims sc
+         JOIN benchmarks b ON sc.benchmark_id = b.id
+         WHERE sc.paper_id = p.id
+       ), '[]'::json) as "sotaClaims",
+       COALESCE((
+         SELECT json_agg(json_build_object('url', repo.url, 'owner', repo.owner, 'name', repo.name))
+         FROM paper_repositories pr
+         JOIN repositories repo ON pr.repository_id = repo.id
+         WHERE pr.paper_id = p.id
+       ), '[]'::json) as repositories
+     FROM papers p
+     WHERE ${whereSql}
+     LIMIT 1`,
+    value
+  );
+
+  const paperData = Array.isArray(rows) && rows.length > 0 ? rows[0] : null;
+  if (!paperData) return null;
+
+  let resolvedThumb = paperData.thumbnailUrl === "FAILED_404" ? null : paperData.thumbnailUrl;
+  if (resolvedThumb && resolvedThumb.includes("cloudinary.com")) {
+    resolvedThumb = paperData.arxivId
+      ? `https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${paperData.arxivId}.webp`
+      : null;
+  }
+
+  return {
+    ...paperData,
+    thumbnailUrl: resolvedThumb,
+    thumbnail_url: resolvedThumb,
+    authors: parseAuthors(paperData.authors),
+    models: Array.isArray(paperData.models) ? paperData.models : [],
+    datasets: Array.isArray(paperData.datasets) ? paperData.datasets : [],
+    tasks: Array.isArray(paperData.tasks) ? paperData.tasks : [],
+    methods: Array.isArray(paperData.methods) ? paperData.methods : [],
+    conferences: Array.isArray(paperData.conferences) ? paperData.conferences : [],
+    rankings: Array.isArray(paperData.rankings) ? paperData.rankings : [],
+    sotaClaims: Array.isArray(paperData.sotaClaims) ? paperData.sotaClaims : [],
+    repositories: Array.isArray(paperData.repositories) ? paperData.repositories : [],
+  };
+}
+
 export const getPaperBySlug = async (queryRouter: QueryRouter, slug: string) => {
   if (!slug) return null;
-
-  return queryRouter.routeQuery(
-    async (prisma: PrismaClient) => {
-      const paperData = await prisma.paper.findUnique({
-        where: { slug },
-        select: {
-          id: true,
-          slug: true,
-          title: true,
-          abstract: true,
-          tlDr: true,
-          publicationDate: true,
-          submissionDate: true,
-          arxivId: true,
-          doi: true,
-          paperUrl: true,
-          pdfUrl: true,
-          thumbnailUrl: true,
-          sourceUrl: true,
-          projectUrl: true,
-          citationCount: true,
-          referenceCount: true,
-          pageCount: true,
-          paperType: true,
-          status: true,
-          language: true,
-          license: true,
-          updatedAt: true,
-          githubForks: true,
-          githubStars: true,
-          github_hourly_increase: true,
-          githubUrl: true,
-          hfUrl: true,
-          isOfficialCode: true,
-          discoverySource: true,
-          authors: true,
-          models: {
-            include: {
-              model: {
-                select: {
-                  id: true,
-                  name: true,
-                  slug: true,
-                  parameterCount: true,
-                  architecture: true,
-                  vendor: true,
-                  vendor_logo_url: true,
-                  modelFamily: true,
-                  description: true,
-                  repositoryUrl: true,
-                },
-              },
-            },
-          },
-          datasets: {
-            select: {
-              dataset: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          tasks: {
-            orderBy: { task: { name: "asc" } },
-            select: {
-              task: { select: { id: true, name: true, slug: true, color: true } },
-            },
-          },
-          methods: {
-            orderBy: { method: { name: "asc" } },
-            select: {
-              method: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          conferences: {
-            select: {
-              conference: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          rankings: {
-            select: {
-              id: true,
-              paper_id: true,
-              benchmark_id: true,
-              rank: true,
-              previous_rank: true,
-              benchmark: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          sotaClaims: {
-            select: {
-              id: true,
-              paper_id: true,
-              benchmark_id: true,
-              benchmark: { select: { id: true, name: true, slug: true } },
-            },
-          },
-          repositories: {
-            select: {
-              repository: {
-                select: {
-                  url: true,
-                  owner: true,
-                  name: true,
-                },
-              },
-            },
-          },
-          huggingface_url: true,
-          hfUpvotes: true,
-        },
-      });
-
-      if (!paperData) return null;
-
-      let resolvedThumb = paperData.thumbnailUrl === "FAILED_404" ? null : paperData.thumbnailUrl;
-      if (resolvedThumb && resolvedThumb.includes("cloudinary.com")) {
-        resolvedThumb = paperData.arxivId
-          ? `https://pub-c9b7a41de3434a4ab7c7f137edbec13b.r2.dev/papers/real_page1_gcp/${paperData.arxivId}.webp`
-          : null;
-      }
-
-      return {
-        ...paperData,
-        thumbnailUrl: resolvedThumb,
-        thumbnail_url: resolvedThumb,
-        authors: parseAuthors(paperData.authors),
-        models: Array.isArray(paperData.models)
-          ? paperData.models.map((r: any) => ({ role: r.role, model: r.model }))
-          : [],
-        datasets: Array.isArray(paperData.datasets)
-          ? paperData.datasets.map((r: any) => r.dataset)
-          : [],
-        tasks: Array.isArray(paperData.tasks)
-          ? paperData.tasks.map((r: any) => r.task)
-          : [],
-        methods: Array.isArray(paperData.methods)
-          ? paperData.methods.map((r: any) => r.method)
-          : [],
-        conferences: Array.isArray(paperData.conferences)
-          ? paperData.conferences.map((r: any) => r.conference)
-          : [],
-        rankings: paperData.rankings || [],
-        sotaClaims: paperData.sotaClaims || [],
-        repositories: Array.isArray(paperData.repositories)
-          ? paperData.repositories.map((r: any) => r.repository)
-          : [],
-      };
-    },
-  );
+  return queryRouter.routeQuery(async (prisma: PrismaClient) => {
+    return fetchFullPaperRaw(prisma, "slug", slug);
+  });
 };
 
 export const getPaperById = async (queryRouter: QueryRouter, id: string) => {
   if (!id) return null;
-  const paper = await queryRouter.routeQuery(async (prisma: PrismaClient) => {
-    return prisma.paper.findUnique({
-      where: { id },
-      select: paperSelect,
-    });
+  return queryRouter.routeQuery(async (prisma: PrismaClient) => {
+    return fetchFullPaperRaw(prisma, "id", id);
   });
-  return paper ? exposeThumbnailUrl(paper) : null;
 };
 
 export const updatePaper = async (

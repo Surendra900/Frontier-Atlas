@@ -406,7 +406,7 @@ export const getPaperBySlug = async (c: Context) => {
       const response404 = { status: "error", message: "Paper not found", is404: true };
       setLocalCache(cacheKey, response404, 60_000);
       try {
-        await redis.set(cacheKey, response404, { ex: 60 });
+        redis.set(cacheKey, response404, { ex: 60 }).catch(() => {});
       } catch (err) {
         console.error("Redis SET 404 failed:", err);
       }
@@ -414,15 +414,15 @@ export const getPaperBySlug = async (c: Context) => {
     }
 
     const response = { status: "success", data: paper };
-    setLocalCache(cacheKey, response);
+    setLocalCache(cacheKey, response, 30 * 60 * 1000);
 
     try {
-      await redis.set(cacheKey, response, { ex: 1800 });
+      redis.set(cacheKey, response, { ex: 3600 }).catch(() => {});
     } catch (err) {
       console.error("Redis SET failed:", err);
     }
 
-    c.header("Cache-Control", "public, max-age=180, s-maxage=900, stale-while-revalidate=1800");
+    c.header("Cache-Control", "public, max-age=300, s-maxage=1800, stale-while-revalidate=3600");
     return c.json(response, 200);
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error);
@@ -605,6 +605,33 @@ export const searchPapers = async (c: Context) => {
         redis.set(cacheKey, response, { ex: 300 }).catch(() => {});
       } catch {
         // Non-blocking
+      }
+
+      // Prewarm top search result paper details in background non-blocking (0ms click latency)
+      if (hasPapers) {
+        const prewarmPromise = (async () => {
+          for (const p of (result.papers as any[]).slice(0, 3)) {
+            if (!p?.slug) continue;
+            const paperCacheKey = `paper:${p.slug}`;
+            if (!localMemoryCache.has(paperCacheKey)) {
+              try {
+                const detail = await paperService.getPaperBySlug(queryRouter, p.slug);
+                if (detail) {
+                  const resp = { status: "success", data: detail };
+                  setLocalCache(paperCacheKey, resp, 30 * 60 * 1000);
+                  const redisClient = redisManager.getClient();
+                  redisClient.set(paperCacheKey, resp, { ex: 3600 }).catch(() => {});
+                }
+              } catch {}
+            }
+          }
+        })();
+
+        if ((c as any).executionCtx?.waitUntil) {
+          (c as any).executionCtx.waitUntil(prewarmPromise);
+        } else {
+          prewarmPromise.catch(() => {});
+        }
       }
 
       c.header("Cache-Control", "public, max-age=60, s-maxage=300, stale-while-revalidate=600");
