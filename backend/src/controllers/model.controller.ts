@@ -5,7 +5,7 @@ import { redisManager } from '../lib/redis.js';
 
 interface CacheEntry<T> {
   data: T;
-  expiresAt: number;
+  timestamp: number;
 }
 
 const memoryCache = new Map<string, CacheEntry<unknown>>();
@@ -14,24 +14,18 @@ const MEMORY_CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes TTL
 function getFromMemoryCache<T>(key: string): T | null {
   const item = memoryCache.get(key);
   if (!item) return null;
-  if (Date.now() > item.expiresAt) {
+  if (Date.now() - item.timestamp > MEMORY_CACHE_TTL_MS) {
     memoryCache.delete(key);
     return null;
   }
   return item.data as T;
 }
 
-function setToMemoryCache<T>(key: string, data: T, ttlMs: number = MEMORY_CACHE_TTL_MS): void {
-  memoryCache.set(key, { data, expiresAt: Date.now() + ttlMs });
-  if (memoryCache.size > 500) {
-    const now = Date.now();
-    for (const [k, v] of memoryCache.entries()) {
-      if (now > v.expiresAt) memoryCache.delete(k);
-    }
-    if (memoryCache.size > 500) {
-      const firstKey = memoryCache.keys().next().value;
-      if (firstKey) memoryCache.delete(firstKey);
-    }
+function setToMemoryCache<T>(key: string, data: T): void {
+  memoryCache.set(key, { data, timestamp: Date.now() });
+  if (memoryCache.size > 3000) {
+    const firstKey = memoryCache.keys().next().value;
+    if (firstKey) memoryCache.delete(firstKey);
   }
 }
 
@@ -82,9 +76,8 @@ export const getModels = async (c: Context) => {
   ].join(':');
 
   try {
-    const memCached = getFromMemoryCache<any>(cacheKey);
+    const memCached = getFromMemoryCache(cacheKey);
     if (memCached) {
-      c.header('Cache-Control', 'public, max-age=300, s-maxage=1800, stale-while-revalidate=3600');
       return c.json(memCached, 200);
     }
 
@@ -97,10 +90,9 @@ export const getModels = async (c: Context) => {
       console.error('Redis GET failed:', err);
     }
 
-    const parsedRedis = parseRedisCachedData<any>(redisRaw);
+    const parsedRedis = parseRedisCachedData(redisRaw);
     if (parsedRedis) {
       setToMemoryCache(cacheKey, parsedRedis);
-      c.header('Cache-Control', 'public, max-age=300, s-maxage=1800, stale-while-revalidate=3600');
       return c.json(parsedRedis, 200);
     }
 
@@ -128,15 +120,11 @@ export const getModels = async (c: Context) => {
     setToMemoryCache(cacheKey, response);
 
     try {
-      const p = redis.set(cacheKey, response, { ex: 900 }).catch(() => {});
-      if ((c as any).executionCtx?.waitUntil) {
-        (c as any).executionCtx.waitUntil(p);
-      }
+      await redis.set(cacheKey, response, { ex: 900 });
     } catch (err) {
       console.error('Redis SET failed:', err);
     }
 
-    c.header('Cache-Control', 'public, max-age=300, s-maxage=1800, stale-while-revalidate=3600');
     return c.json(response, 200);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
@@ -157,9 +145,8 @@ export const getModelFacets = async (c: Context) => {
   const cacheKey = 'models:facets';
 
   try {
-    const memCached = getFromMemoryCache<any>(cacheKey);
+    const memCached = getFromMemoryCache(cacheKey);
     if (memCached) {
-      c.header('Cache-Control', 'public, max-age=600, s-maxage=3600, stale-while-revalidate=7200');
       return c.json(memCached, 200);
     }
 
@@ -172,10 +159,9 @@ export const getModelFacets = async (c: Context) => {
       console.error('Redis GET failed:', err);
     }
 
-    const parsedRedis = parseRedisCachedData<any>(redisRaw);
+    const parsedRedis = parseRedisCachedData(redisRaw);
     if (parsedRedis) {
       setToMemoryCache(cacheKey, parsedRedis);
-      c.header('Cache-Control', 'public, max-age=600, s-maxage=3600, stale-while-revalidate=7200');
       return c.json(parsedRedis, 200);
     }
 
@@ -189,15 +175,11 @@ export const getModelFacets = async (c: Context) => {
     setToMemoryCache(cacheKey, response);
 
     try {
-      const p = redis.set(cacheKey, response, { ex: 1800 }).catch(() => {});
-      if ((c as any).executionCtx?.waitUntil) {
-        (c as any).executionCtx.waitUntil(p);
-      }
+      await redis.set(cacheKey, response, { ex: 900 });
     } catch (err) {
       console.error('Redis SET failed:', err);
     }
 
-    c.header('Cache-Control', 'public, max-age=600, s-maxage=3600, stale-while-revalidate=7200');
     return c.json(response, 200);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
@@ -231,12 +213,8 @@ export const getModelBySlug = async (c: Context) => {
   const cacheKey = `model:${slug}`;
 
   try {
-    const memCached = getFromMemoryCache<any>(cacheKey);
+    const memCached = getFromMemoryCache(cacheKey);
     if (memCached) {
-      if (memCached.is404) {
-        return c.json(memCached, 404);
-      }
-      c.header('Cache-Control', 'public, max-age=300, s-maxage=1800, stale-while-revalidate=3600');
       return c.json(memCached, 200);
     }
 
@@ -249,34 +227,22 @@ export const getModelBySlug = async (c: Context) => {
       console.error('Redis GET failed:', err);
     }
 
-    const parsedRedis = parseRedisCachedData<any>(redisRaw);
+    const parsedRedis = parseRedisCachedData(redisRaw);
     if (parsedRedis) {
       setToMemoryCache(cacheKey, parsedRedis);
-      if (parsedRedis.is404) {
-        return c.json(parsedRedis, 404);
-      }
-      c.header('Cache-Control', 'public, max-age=300, s-maxage=1800, stale-while-revalidate=3600');
       return c.json(parsedRedis, 200);
     }
 
     const model = await modelService.getModelBySlug(queryRouter, slug);
 
     if (!model) {
-      const response404 = {
-        status: 'error',
-        message: 'Model not found',
-        is404: true,
-      };
-      setToMemoryCache(cacheKey, response404, 60_000);
-      try {
-        const p404 = redis.set(cacheKey, response404, { ex: 60 }).catch(() => {});
-        if ((c as any).executionCtx?.waitUntil) {
-          (c as any).executionCtx.waitUntil(p404);
-        }
-      } catch (err) {
-        console.error('Redis SET 404 failed:', err);
-      }
-      return c.json(response404, 404);
+      return c.json(
+        {
+          status: 'error',
+          message: 'Model not found',
+        },
+        404
+      );
     }
 
     const response = {
@@ -287,15 +253,11 @@ export const getModelBySlug = async (c: Context) => {
     setToMemoryCache(cacheKey, response);
 
     try {
-      const p = redis.set(cacheKey, response, { ex: 3600 }).catch(() => {});
-      if ((c as any).executionCtx?.waitUntil) {
-        (c as any).executionCtx.waitUntil(p);
-      }
+      await redis.set(cacheKey, response, { ex: 600 });
     } catch (err) {
       console.error('Redis SET failed:', err);
     }
 
-    c.header('Cache-Control', 'public, max-age=300, s-maxage=1800, stale-while-revalidate=3600');
     return c.json(response, 200);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';

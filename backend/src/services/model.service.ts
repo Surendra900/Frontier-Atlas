@@ -1,141 +1,53 @@
-import { PrismaClient } from "../generated/prisma/client.js";
 import { QueryRouter } from "../routing/index.js";
+import { QueryIntent, QueryType } from "../routing/types.js";
 
-export interface ModelTaskItem {
+interface PaperRef {
   id: string;
-  name: string;
-  slug: string;
-  color: string | null;
-}
-
-export interface ModelListItem {
-  id: string;
-  name: string;
-  slug: string;
-  vendor: string | null;
-  vendorLogoUrl: string | null;
-  releaseDate: string | null;
-  parameterCount: string | null;
-  modality: string | null;
-  accessType: string | null;
-  opennessType: string | null;
-  description: string | null;
-  benchmarkScore: Record<string, unknown> | null;
-  modelFamily: string | null;
-  category: string | null;
-  capabilities: string[] | null;
-  researchAreas: string[] | null;
-  architecture: string | null;
-  contextWindow: string | null;
-  license: string | null;
-  modelVersions: string[] | null;
-  releaseNotes: string | null;
-  paperUrl: string | null;
-  repositoryUrl: string | null;
-  apiUrl: string | null;
-  createdAt: string;
-  trendingScore: number;
-  paperCount: number;
-  citationCount: number;
-  githubStars: number;
-  latestPaperTitle: string | null;
-  latestPaperSlug: string | null;
-  latestPaperDate: string | null;
-  tasks: ModelTaskItem[];
-}
-
-export interface ModelDetailPaper {
-  id: string;
-  title: string;
-  slug: string;
   citationCount: number;
   githubStars: number;
 }
 
-export interface ModelDetailItem extends ModelListItem {
-  papers: ModelDetailPaper[];
-  methods: Array<{ id: string; name: string; slug: string; category: string }>;
-  datasets: Array<{ id: string; name: string; slug: string }>;
-  benchmarks: Array<{ rank?: number; benchmark: { id: string; name: string; slug: string } }>;
-  relatedModels: Array<{ id: string; name: string; slug: string; paperCount: number }>;
+interface RelationItem {
+  paper: PaperRef;
 }
 
-export interface FacetItem {
+interface ModelRecord {
+  id: string;
   name: string;
-  count: number;
-}
-
-export interface ModelFacets {
-  totalModels: number;
-  vendors: FacetItem[];
-  modalities: FacetItem[];
-  accessTypes: FacetItem[];
-  opennessTypes: FacetItem[];
-  modelFamilies: FacetItem[];
-  capabilities: FacetItem[];
-  researchAreas: FacetItem[];
-}
-
-function safeParseJson<T>(val: unknown, fallback: T): T {
-  if (val === null || val === undefined) return fallback;
-  if (typeof val === "string") {
-    try {
-      return JSON.parse(val) as T;
-    } catch {
-      return fallback;
-    }
-  }
-  return val as T;
-}
-
-function safeDateIso(val: unknown): string | null {
-  if (!val) return null;
-  const d = new Date(val as string | number | Date);
-  return isNaN(d.getTime()) ? null : d.toISOString();
-}
-
-function mapModelRow(row: any): ModelListItem {
-  const paperCount = Number(row.paperCount) || 0;
-  const citationCount = Number(row.citationCount) || 0;
-  const githubStars = Number(row.githubStars) || 0;
-  const rawTrendingScore = Number(row.trendingScore) || 0;
-  const computedTrendingScore = rawTrendingScore > 0 ? rawTrendingScore : (citationCount + githubStars);
-
-  return {
-    id: row.id,
-    name: row.name,
-    slug: row.slug,
-    vendor: row.vendor ?? null,
-    vendorLogoUrl: row.vendorLogoUrl ?? null,
-    releaseDate: safeDateIso(row.releaseDate),
-    parameterCount: row.parameterCount ?? null,
-    modality: row.modality ?? null,
-    accessType: row.accessType ?? null,
-    opennessType: row.opennessType ?? null,
-    description: row.description ?? null,
-    benchmarkScore: safeParseJson<Record<string, unknown> | null>(row.benchmarkScore, null),
-    modelFamily: row.modelFamily ?? null,
-    category: row.category ?? null,
-    capabilities: safeParseJson<string[] | null>(row.capabilities, null),
-    researchAreas: safeParseJson<string[] | null>(row.researchAreas, null),
-    architecture: row.architecture ?? null,
-    contextWindow: row.contextWindow ?? null,
-    license: row.license ?? null,
-    modelVersions: safeParseJson<string[] | null>(row.modelVersions, null),
-    releaseNotes: row.releaseNotes ?? null,
-    paperUrl: row.paperUrl ?? null,
-    repositoryUrl: row.repositoryUrl ?? null,
-    apiUrl: row.apiUrl ?? null,
-    createdAt: safeDateIso(row.createdAt) ?? new Date().toISOString(),
-    trendingScore: computedTrendingScore,
-    paperCount,
-    citationCount,
-    githubStars,
-    latestPaperTitle: row.latestPaperTitle ?? null,
-    latestPaperSlug: row.latestPaperSlug ?? null,
-    latestPaperDate: safeDateIso(row.latestPaperDate),
-    tasks: Array.isArray(row.tasks) ? row.tasks : [],
-  };
+  slug: string;
+  vendor: string;
+  vendor_logo_url?: string | null;
+  releaseDate?: Date | string | null;
+  parameterCount?: string | null;
+  modality?: string | null;
+  accessType?: string | null;
+  opennessType?: string | null;
+  description?: string | null;
+  benchmark_score?: Record<string, unknown> | null;
+  modelFamily?: string | null;
+  model_family?: string | null;
+  category?: string | null;
+  capabilities?: string[] | null;
+  researchAreas?: string[] | null;
+  research_areas?: string[] | null;
+  architecture?: string | null;
+  contextWindow?: string | null;
+  context_window?: string | null;
+  license?: string | null;
+  modelVersions?: string[] | null;
+  model_versions?: string[] | null;
+  releaseNotes?: string | null;
+  release_notes?: string | null;
+  paperUrl?: string | null;
+  paper_url?: string | null;
+  repositoryUrl?: string | null;
+  repository_url?: string | null;
+  apiUrl?: string | null;
+  api_url?: string | null;
+  trendingScore?: number | null;
+  createdAt: Date | string;
+  _count: { papers: number };
+  papers?: RelationItem[];
 }
 
 export const getModels = async (
@@ -151,427 +63,701 @@ export const getModels = async (
   category?: string,
   capability?: string,
   researchArea?: string
-): Promise<ModelListItem[]> => {
-  const conditions: string[] = [];
-  const params: any[] = [];
+) => {
+  const intent: QueryIntent = {
+    type: QueryType.READ,
+    entity: "model",
+    operation: "findMany",
+  };
 
-  if (vendor && vendor.trim()) {
-    params.push(vendor.trim());
-    conditions.push(`LOWER(m.vendor) = LOWER($${params.length})`);
-  }
+  const isTrending = sort === "trending";
+  const needsFullSort = isTrending || sort === "benchmark" || sort === "papers";
 
-  if (modality && modality.trim()) {
-    params.push(modality.trim());
-    conditions.push(`LOWER(m.modality) = LOWER($${params.length})`);
-  }
-
-  if (accessType && accessType.trim()) {
-    params.push(accessType.trim());
-    conditions.push(`LOWER(COALESCE(m.access_type, m."accessType")) = LOWER($${params.length})`);
-  }
-
-  if (opennessType && opennessType.trim()) {
-    params.push(opennessType.trim());
-    conditions.push(`LOWER(COALESCE(m.openness_type, m."opennessType")) = LOWER($${params.length})`);
-  }
-
-  if (modelFamily && modelFamily.trim()) {
-    params.push(modelFamily.trim());
-    const idx = params.length;
-    conditions.push(`(LOWER(COALESCE(m.model_family, m."modelFamily")) = LOWER($${idx}) OR LOWER(m.name) LIKE '%' || LOWER($${idx}) || '%')`);
-  }
-
-  if (category && category.trim()) {
-    params.push(category.trim());
-    conditions.push(`LOWER(m.category) = LOWER($${params.length})`);
-  }
-
-  if (capability && capability.trim()) {
-    params.push(capability.trim());
-    const idx = params.length;
-    conditions.push(`EXISTS (
-      SELECT 1 FROM jsonb_array_elements_text(
-        CASE 
-          WHEN jsonb_typeof(m.capabilities::jsonb) = 'array' THEN m.capabilities::jsonb 
-          ELSE '[]'::jsonb 
-        END
-      ) elem 
-      WHERE LOWER(elem) LIKE '%' || LOWER($${idx}) || '%'
-    )`);
-  }
-
-  if (researchArea && researchArea.trim()) {
-    params.push(researchArea.trim());
-    const idx = params.length;
-    conditions.push(`EXISTS (
-      SELECT 1 FROM jsonb_array_elements_text(
-        CASE 
-          WHEN jsonb_typeof(COALESCE(m.research_areas, m."researchAreas")::jsonb) = 'array' 
-            THEN COALESCE(m.research_areas, m."researchAreas")::jsonb 
-          ELSE '[]'::jsonb 
-        END
-      ) elem 
-      WHERE LOWER(elem) LIKE '%' || LOWER($${idx}) || '%'
-    )`);
-  }
-
-  const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-
-  let orderByClause = "ORDER BY m.name ASC";
-  if (sort === "recent") {
-    orderByClause = "ORDER BY COALESCE(m.release_date, m.\"releaseDate\", m.created_at, m.\"createdAt\") DESC NULLS LAST, m.name ASC";
-  } else if (sort === "trending") {
-    orderByClause = "ORDER BY (COALESCE(m.trending_score, 0) + COALESCE(ms.citation_count, 0) + COALESCE(ms.github_stars, 0)) DESC, COALESCE(ms.paper_count, 0) DESC, m.name ASC";
-  } else if (sort === "papers") {
-    orderByClause = "ORDER BY COALESCE(ms.paper_count, 0) DESC, m.name ASC";
-  } else if (sort === "benchmark") {
-    orderByClause = "ORDER BY (COALESCE((COALESCE(m.benchmark_score, m.\"benchmarkScore\")->>'mmlu')::numeric, 0)) DESC NULLS LAST, m.name ASC";
-  }
-
-  params.push(limit);
-  const limitIdx = params.length;
-  params.push(skip);
-  const skipIdx = params.length;
-
-  const sql = `
-    WITH model_stats AS (
-      SELECT 
-        pm.model_id,
-        COUNT(pm.paper_id)::int as paper_count,
-        SUM(COALESCE(p.citation_count, 0))::int as citation_count,
-        SUM(COALESCE(p.github_stars, 0))::int as github_stars
-      FROM paper_models pm
-      JOIN papers p ON p.id = pm.paper_id
-      GROUP BY pm.model_id
-    ),
-    model_latest_paper AS (
-      SELECT DISTINCT ON (pm.model_id)
-        pm.model_id,
-        p.title as "latestPaperTitle",
-        p.slug as "latestPaperSlug",
-        p.publication_date as "latestPaperDate"
-      FROM paper_models pm
-      JOIN papers p ON p.id = pm.paper_id
-      ORDER BY pm.model_id, p.publication_date DESC NULLS LAST, p.created_at DESC
-    ),
-    model_tasks AS (
-      SELECT 
-        sub.model_id,
-        json_agg(json_build_object('id', sub.id, 'name', sub.name, 'slug', sub.slug, 'color', sub.color)) as tasks
-      FROM (
-        SELECT DISTINCT ON (pm.model_id, t.id)
-          pm.model_id,
-          t.id,
-          t.name,
-          t.slug,
-          t.color
-        FROM paper_models pm
-        JOIN paper_tasks pt ON pt.paper_id = pm.paper_id
-        JOIN tasks t ON t.id = pt.task_id
-      ) sub
-      GROUP BY sub.model_id
-    )
-    SELECT 
-      m.id,
-      m.name,
-      m.slug,
-      m.vendor,
-      m.vendor_logo_url as "vendorLogoUrl",
-      COALESCE(m.release_date, m."releaseDate") as "releaseDate",
-      COALESCE(m.parameter_count, m."parameterCount") as "parameterCount",
-      m.modality,
-      COALESCE(m.access_type, m."accessType") as "accessType",
-      COALESCE(m.openness_type, m."opennessType") as "opennessType",
-      m.description,
-      COALESCE(m.benchmark_score, m."benchmarkScore") as "benchmarkScore",
-      COALESCE(m.model_family, m."modelFamily") as "modelFamily",
-      m.category,
-      m.capabilities,
-      COALESCE(m.research_areas, m."researchAreas") as "researchAreas",
-      m.architecture,
-      COALESCE(m.context_window, m."contextWindow") as "contextWindow",
-      m.license,
-      COALESCE(m.model_versions, m."modelVersions") as "modelVersions",
-      COALESCE(m.release_notes, m."releaseNotes") as "releaseNotes",
-      COALESCE(m.paper_url, m."paperUrl") as "paperUrl",
-      COALESCE(m.repository_url, m."repositoryUrl") as "repositoryUrl",
-      COALESCE(m.api_url, m."apiUrl") as "apiUrl",
-      COALESCE(m.created_at, m."createdAt") as "createdAt",
-      COALESCE(m.trending_score, 0) as "trendingScore",
-      COALESCE(ms.paper_count, 0) as "paperCount",
-      COALESCE(ms.citation_count, 0) as "citationCount",
-      COALESCE(ms.github_stars, 0) as "githubStars",
-      mlp."latestPaperTitle",
-      mlp."latestPaperSlug",
-      mlp."latestPaperDate",
-      COALESCE(mt.tasks, '[]'::json) as tasks
-    FROM models m
-    LEFT JOIN model_stats ms ON ms.model_id = m.id
-    LEFT JOIN model_latest_paper mlp ON mlp.model_id = m.id
-    LEFT JOIN model_tasks mt ON mt.model_id = m.id
-    ${whereClause}
-    ${orderByClause}
-    LIMIT $${limitIdx} OFFSET $${skipIdx};
-  `;
-
-  const rows = await queryRouter.routeQuery<any[]>(async (prisma: PrismaClient) => {
-    return prisma.$queryRawUnsafe<any[]>(sql, ...params);
+  const routingResult = await queryRouter.routeQuery(intent, async (prisma) => {
+    return prisma.model.findMany({
+      where: {
+        ...(vendor
+          ? {
+              vendor: {
+                equals: vendor,
+                mode: "insensitive",
+              },
+            }
+          : {}),
+        ...(modality
+          ? {
+              modality: {
+                equals: modality,
+                mode: "insensitive",
+              },
+            }
+          : {}),
+        ...(accessType
+          ? {
+              accessType: {
+                equals: accessType,
+                mode: "insensitive",
+              },
+            }
+          : {}),
+        ...(opennessType
+          ? {
+              opennessType: {
+                equals: opennessType,
+                mode: "insensitive",
+              },
+            }
+          : {}),
+        ...(modelFamily
+          ? {
+              OR: [
+                {
+                  modelFamily: {
+                    equals: modelFamily,
+                    mode: "insensitive",
+                  },
+                },
+                {
+                  model_family: {
+                    equals: modelFamily,
+                    mode: "insensitive",
+                  },
+                },
+              ],
+            }
+          : {}),
+        ...(category
+          ? {
+              category: {
+                equals: category,
+                mode: "insensitive",
+              },
+            }
+          : {}),
+        ...(capability
+          ? {
+              capabilities: {
+                array_contains: [capability],
+              },
+            }
+          : {}),
+        ...(researchArea
+          ? {
+              researchAreas: {
+                array_contains: [researchArea],
+              },
+            }
+          : {}),
+      },
+      take: needsFullSort ? Math.max(200, skip + limit) : limit,
+      skip: needsFullSort ? 0 : skip,
+      orderBy:
+        sort === "recent"
+          ? { releaseDate: "desc" }
+          : { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        vendor: true,
+        vendor_logo_url: true,
+        releaseDate: true,
+        parameterCount: true,
+        modality: true,
+        accessType: true,
+        opennessType: true,
+        description: true,
+        benchmark_score: true,
+        model_family: true,
+        modelFamily: true,
+        category: true,
+        capabilities: true,
+        research_areas: true,
+        researchAreas: true,
+        architecture: true,
+        context_window: true,
+        contextWindow: true,
+        license: true,
+        model_versions: true,
+        modelVersions: true,
+        release_notes: true,
+        releaseNotes: true,
+        paper_url: true,
+        paperUrl: true,
+        repository_url: true,
+        repositoryUrl: true,
+        api_url: true,
+        apiUrl: true,
+        trendingScore: true,
+        createdAt: true,
+        _count: {
+          select: {
+            papers: true,
+          },
+        },
+        papers: isTrending
+          ? {
+              take: 100,
+              select: {
+                paper: {
+                  select: {
+                    id: true,
+                    citationCount: true,
+                    githubStars: true,
+                  },
+                },
+              },
+            }
+          : false,
+      },
+    });
   });
 
-  if (!Array.isArray(rows)) return [];
-  return rows.map(mapModelRow);
+  const modelsById = new Map<string, ModelRecord>();
+
+  for (const result of routingResult.results) {
+    if (!Array.isArray(result)) continue;
+    for (const model of result as ModelRecord[]) {
+      if (!modelsById.has(model.id)) {
+        modelsById.set(model.id, model);
+      } else {
+        const existing = modelsById.get(model.id);
+        if (existing && existing._count) {
+          existing._count.papers += model._count?.papers || 0;
+        }
+      }
+    }
+  }
+
+  const models = Array.from(modelsById.values()).map((model) => {
+    let citationCount = 0;
+    let githubStars = 0;
+
+    if (isTrending && Array.isArray(model.papers)) {
+      const seenPaperIds = new Set<string>();
+
+      for (const paperRelation of model.papers) {
+        const paper = paperRelation?.paper;
+        if (!paper || !paper.id) continue;
+
+        if (seenPaperIds.has(paper.id)) continue;
+        seenPaperIds.add(paper.id);
+
+        citationCount += paper.citationCount || 0;
+        githubStars += paper.githubStars || 0;
+      }
+    }
+
+    const trendingScore = citationCount + githubStars;
+
+    return {
+      id: model.id,
+      name: model.name,
+      slug: model.slug,
+      vendor: model.vendor,
+      vendorLogoUrl: model.vendor_logo_url,
+      releaseDate: model.releaseDate,
+      parameterCount: model.parameterCount,
+      modality: model.modality,
+      accessType: model.accessType,
+      opennessType: model.opennessType,
+      description: model.description,
+      benchmarkScore: model.benchmark_score,
+      modelFamily: model.modelFamily ?? model.model_family,
+      category: model.category,
+      capabilities: model.capabilities,
+      researchAreas: model.researchAreas ?? model.research_areas,
+      architecture: model.architecture,
+      contextWindow: model.contextWindow ?? model.context_window,
+      license: model.license,
+      modelVersions: model.modelVersions ?? model.model_versions,
+      releaseNotes: model.releaseNotes ?? model.release_notes,
+      paperUrl: model.paperUrl ?? model.paper_url,
+      repositoryUrl: model.repositoryUrl ?? model.repository_url,
+      apiUrl: model.apiUrl ?? model.api_url,
+      createdAt: model.createdAt,
+      trendingScore: model.trendingScore ?? trendingScore,
+      paperCount: model._count?.papers || 0,
+      citationCount: isTrending ? citationCount : undefined,
+      githubStars: isTrending ? githubStars : undefined,
+    };
+  });
+
+  models.sort((a, b) => {
+    if (sort === "recent") {
+      const dateA = a.releaseDate ? new Date(a.releaseDate).getTime() : 0;
+      const dateB = b.releaseDate ? new Date(b.releaseDate).getTime() : 0;
+      return dateB - dateA;
+    }
+
+    if (sort === "trending") {
+      const scoreDiff = (b.trendingScore || 0) - (a.trendingScore || 0);
+      if (scoreDiff !== 0) return scoreDiff;
+      const paperDiff = b.paperCount - a.paperCount;
+      if (paperDiff !== 0) return paperDiff;
+      return a.name.localeCompare(b.name);
+    }
+
+    if (sort === "papers") {
+      return b.paperCount - a.paperCount;
+    }
+
+    if (sort === "benchmark") {
+      const benchmarkA = a.benchmarkScore as Record<string, number> | null;
+      const benchmarkB = b.benchmarkScore as Record<string, number> | null;
+      const scoreA = typeof benchmarkA?.mmlu === "number" ? benchmarkA.mmlu : 0;
+      const scoreB = typeof benchmarkB?.mmlu === "number" ? benchmarkB.mmlu : 0;
+      return scoreB - scoreA;
+    }
+
+    return a.name.localeCompare(b.name);
+  });
+
+  return needsFullSort
+    ? models.slice(skip, skip + limit)
+    : models.slice(0, limit);
 };
 
 export const getModelBySlug = async (
   queryRouter: QueryRouter,
   slug: string
-): Promise<ModelDetailItem | null> => {
-  if (!slug || !slug.trim()) return null;
+) => {
+  const intent: QueryIntent = {
+    type: QueryType.READ,
+    entity: "model",
+    operation: "findUnique",
+    filters: { slug },
+  };
 
-  const sql = `
-    SELECT 
-      m.id,
-      m.name,
-      m.slug,
-      m.vendor,
-      m.vendor_logo_url as "vendorLogoUrl",
-      COALESCE(m.release_date, m."releaseDate") as "releaseDate",
-      COALESCE(m.parameter_count, m."parameterCount") as "parameterCount",
-      m.modality,
-      COALESCE(m.access_type, m."accessType") as "accessType",
-      COALESCE(m.openness_type, m."opennessType") as "opennessType",
-      m.description,
-      COALESCE(m.benchmark_score, m."benchmarkScore") as "benchmarkScore",
-      COALESCE(m.model_family, m."modelFamily") as "modelFamily",
-      m.category,
-      m.capabilities,
-      COALESCE(m.research_areas, m."researchAreas") as "researchAreas",
-      m.architecture,
-      COALESCE(m.context_window, m."contextWindow") as "contextWindow",
-      m.license,
-      COALESCE(m.model_versions, m."modelVersions") as "modelVersions",
-      COALESCE(m.release_notes, m."releaseNotes") as "releaseNotes",
-      COALESCE(m.paper_url, m."paperUrl") as "paperUrl",
-      COALESCE(m.repository_url, m."repositoryUrl") as "repositoryUrl",
-      COALESCE(m.api_url, m."apiUrl") as "apiUrl",
-      COALESCE(m.created_at, m."createdAt") as "createdAt",
-      COALESCE(m.trending_score, 0) as "trendingScore",
-      COALESCE(stats.paper_count, 0)::int as "paperCount",
-      COALESCE(stats.citation_count, 0)::int as "citationCount",
-      COALESCE(stats.github_stars, 0)::int as "githubStars",
-      COALESCE((
-        SELECT json_agg(json_build_object(
-          'id', p.id,
-          'title', p.title,
-          'slug', p.slug,
-          'citationCount', COALESCE(p.citation_count, 0),
-          'githubStars', COALESCE(p.github_stars, 0)
-        ) ORDER BY COALESCE(p.github_stars, 0) DESC, COALESCE(p.citation_count, 0) DESC)
-        FROM paper_models pm
-        JOIN papers p ON p.id = pm.paper_id
-        WHERE pm.model_id = m.id
-      ), '[]'::json) as papers,
-      COALESCE((
-        SELECT json_agg(json_build_object('id', t.id, 'name', t.name, 'slug', t.slug, 'color', t.color) ORDER BY t.name ASC)
-        FROM (
-          SELECT DISTINCT ON (t.id) t.id, t.name, t.slug, t.color
-          FROM paper_models pm
-          JOIN paper_tasks pt ON pt.paper_id = pm.paper_id
-          JOIN tasks t ON t.id = pt.task_id
-          WHERE pm.model_id = m.id
-        ) t
-      ), '[]'::json) as tasks,
-      COALESCE((
-        SELECT json_agg(json_build_object('id', me.id, 'name', me.name, 'slug', me.slug, 'category', me.category) ORDER BY me.name ASC)
-        FROM (
-          SELECT DISTINCT ON (me.id) me.id, me.name, me.slug, me.category
-          FROM paper_models pm
-          JOIN paper_methods pme ON pme.paper_id = pm.paper_id
-          JOIN methods me ON me.id = pme.method_id
-          WHERE pm.model_id = m.id
-        ) me
-      ), '[]'::json) as methods,
-      COALESCE((
-        SELECT json_agg(json_build_object('id', d.id, 'name', d.name, 'slug', d.slug) ORDER BY d.name ASC)
-        FROM (
-          SELECT DISTINCT ON (d.id) d.id, d.name, d.slug
-          FROM paper_models pm
-          JOIN paper_datasets pd ON pd.paper_id = pm.paper_id
-          JOIN datasets d ON d.id = pd.dataset_id
-          WHERE pm.model_id = m.id
-        ) d
-      ), '[]'::json) as datasets,
-      COALESCE((
-        SELECT json_agg(json_build_object(
-          'rank', r.rank,
-          'benchmark', json_build_object('id', r.b_id, 'name', r.b_name, 'slug', r.b_slug)
-        ))
-        FROM (
-          SELECT DISTINCT ON (b.id) r.rank, b.id as b_id, b.name as b_name, b.slug as b_slug
-          FROM paper_models pm
-          JOIN rankings r ON r.paper_id = pm.paper_id
-          JOIN benchmarks b ON b.id = r.benchmark_id
-          WHERE pm.model_id = m.id
-        ) r
-      ), '[]'::json) as benchmarks,
-      COALESCE((
-        SELECT json_agg(json_build_object('id', rm.id, 'name', rm.name, 'slug', rm.slug, 'paperCount', rm.paper_count))
-        FROM (
-          SELECT rm2.id, rm2.name, rm2.slug, COUNT(DISTINCT pm3.paper_id)::int as paper_count
-          FROM paper_models pm1
-          JOIN paper_models pm2 ON pm1.paper_id = pm2.paper_id AND pm2.model_id != m.id
-          JOIN models rm2 ON rm2.id = pm2.model_id
-          LEFT JOIN paper_models pm3 ON pm3.model_id = rm2.id
-          WHERE pm1.model_id = m.id
-          GROUP BY rm2.id, rm2.name, rm2.slug
-          ORDER BY paper_count DESC
-          LIMIT 6
-        ) rm
-      ), '[]'::json) as "relatedModels"
-    FROM models m
-    LEFT JOIN LATERAL (
-      SELECT 
-        COUNT(pm.paper_id) as paper_count,
-        SUM(COALESCE(p.citation_count, 0)) as citation_count,
-        SUM(COALESCE(p.github_stars, 0)) as github_stars
-      FROM paper_models pm
-      JOIN papers p ON p.id = pm.paper_id
-      WHERE pm.model_id = m.id
-    ) stats ON true
-    WHERE LOWER(m.slug) = LOWER($1) OR m.id = $1
-    LIMIT 1;
-  `;
+  const routingResult = await queryRouter.routeQuery(intent, async (prisma) => {
+    return Promise.all([
+      prisma.model.findUnique({
+        where: { slug },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          vendor: true,
+          vendor_logo_url: true,
+          releaseDate: true,
+          parameterCount: true,
+          modality: true,
+          accessType: true,
+          opennessType: true,
+          description: true,
+          benchmark_score: true,
+          model_family: true,
+          modelFamily: true,
+          category: true,
+          capabilities: true,
+          research_areas: true,
+          researchAreas: true,
+          architecture: true,
+          context_window: true,
+          contextWindow: true,
+          license: true,
+          model_versions: true,
+          modelVersions: true,
+          release_notes: true,
+          releaseNotes: true,
+          paper_url: true,
+          paperUrl: true,
+          repository_url: true,
+          repositoryUrl: true,
+          api_url: true,
+          apiUrl: true,
+          createdAt: true,
+          _count: {
+            select: {
+              papers: true,
+            },
+          },
+          papers: {
+            take: 100,
+            select: {
+              paper: {
+                select: {
+                  id: true,
+                  title: true,
+                  slug: true,
+                  citationCount: true,
+                  githubStars: true,
+                },
+              },
+            },
+            orderBy: { paper: { githubStars: "desc" } },
+          },
+        },
+      }),
 
-  const rows = await queryRouter.routeQuery<any[]>(async (prisma: PrismaClient) => {
-    return prisma.$queryRawUnsafe<any[]>(sql, slug.trim());
+      prisma.paper.findMany({
+        take: 200,
+        where: {
+          models: {
+            some: {
+              model: { slug },
+            },
+          },
+        },
+        select: {
+          id: true,
+          citationCount: true,
+          githubStars: true,
+          tasks: {
+            select: {
+              task: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  color: true,
+                },
+              },
+            },
+          },
+          methods: {
+            select: {
+              method: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                  category: true,
+                },
+              },
+            },
+          },
+          datasets: {
+            select: {
+              dataset: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                },
+              },
+            },
+          },
+          rankings: {
+            select: {
+              rank: true,
+              benchmark: {
+                select: {
+                  id: true,
+                  name: true,
+                  slug: true,
+                },
+              },
+            },
+          },
+        },
+      }),
+
+      prisma.model.findMany({
+        take: 6,
+        where: {
+          slug: {
+            not: slug,
+          },
+          papers: {
+            some: {
+              paper: {
+                models: {
+                  some: {
+                    model: { slug },
+                  },
+                },
+              },
+            },
+          },
+        },
+        select: {
+          id: true,
+          name: true,
+          slug: true,
+          _count: {
+            select: {
+              papers: true,
+            },
+          },
+        },
+      }),
+    ]);
   });
 
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return null;
+  let baseModel: ModelRecord | null = null;
+  let paperCount = 0;
+
+  const allPapers: RelationItem[] = [];
+  const allModelPapers: Array<{
+    id: string;
+    citationCount: number;
+    githubStars: number;
+    tasks?: Array<{ task: { id: string; name: string; slug: string; color: string | null } }>;
+    methods?: Array<{ method: { id: string; name: string; slug: string; category: string } }>;
+    datasets?: Array<{ dataset: { id: string; name: string; slug: string } }>;
+    rankings?: Array<{ rank: number; benchmark: { id: string; name: string; slug: string } }>;
+  }> = [];
+
+  const relatedModelsById = new Map<string, { id: string; name: string; slug: string; _count: { papers: number } }>();
+
+  for (const result of routingResult.results) {
+    if (!Array.isArray(result)) continue;
+    const [model, modelPapers, relatedModels] = result;
+
+    if (model) {
+      paperCount += model._count?.papers || 0;
+
+      if (!baseModel) {
+        const { papers: _p, ...rest } = model;
+        baseModel = { ...rest, _count: model._count };
+      }
+
+      if (Array.isArray(model.papers)) {
+        allPapers.push(...model.papers);
+      }
+    }
+
+    if (Array.isArray(modelPapers)) {
+      allModelPapers.push(...modelPapers);
+    }
+
+    if (Array.isArray(relatedModels)) {
+      for (const relatedModel of relatedModels) {
+        if (relatedModel && !relatedModelsById.has(relatedModel.id)) {
+          relatedModelsById.set(relatedModel.id, relatedModel);
+        }
+      }
+    }
   }
 
-  const row = rows[0];
-  const base = mapModelRow(row);
+  if (!baseModel) return null;
+
+  const seenPaperIds = new Set<string>();
+  const dedupPapers: RelationItem[] = [];
+
+  for (const paperRelation of allPapers) {
+    const paperId = paperRelation?.paper?.id;
+    if (paperId && !seenPaperIds.has(paperId)) {
+      seenPaperIds.add(paperId);
+      dedupPapers.push(paperRelation);
+    }
+  }
+
+  const seenModelPaperIds = new Set<string>();
+
+  const tasksBySlug = new Map<string, unknown>();
+  const methodsBySlug = new Map<string, unknown>();
+  const datasetsBySlug = new Map<string, unknown>();
+  const benchmarksBySlug = new Map<string, unknown>();
+
+  let citationCount = 0;
+  let githubStars = 0;
+
+  for (const paper of allModelPapers) {
+    if (!paper || !paper.id || seenModelPaperIds.has(paper.id)) continue;
+
+    seenModelPaperIds.add(paper.id);
+
+    citationCount += paper.citationCount || 0;
+    githubStars += paper.githubStars || 0;
+
+    if (Array.isArray(paper.tasks)) {
+      for (const taskRelation of paper.tasks) {
+        const task = taskRelation?.task;
+        if (task && task.slug && !tasksBySlug.has(task.slug)) {
+          tasksBySlug.set(task.slug, task);
+        }
+      }
+    }
+
+    if (Array.isArray(paper.methods)) {
+      for (const methodRelation of paper.methods) {
+        const method = methodRelation?.method;
+        if (method && method.slug && !methodsBySlug.has(method.slug)) {
+          methodsBySlug.set(method.slug, method);
+        }
+      }
+    }
+
+    if (Array.isArray(paper.datasets)) {
+      for (const datasetRelation of paper.datasets) {
+        const dataset = datasetRelation?.dataset;
+        if (dataset && dataset.slug && !datasetsBySlug.has(dataset.slug)) {
+          datasetsBySlug.set(dataset.slug, dataset);
+        }
+      }
+    }
+
+    if (Array.isArray(paper.rankings)) {
+      for (const ranking of paper.rankings) {
+        const benchmark = ranking?.benchmark;
+        if (benchmark && benchmark.slug && !benchmarksBySlug.has(benchmark.slug)) {
+          benchmarksBySlug.set(benchmark.slug, {
+            ...benchmark,
+            rank: ranking.rank,
+          });
+        }
+      }
+    }
+  }
+
+  dedupPapers.sort((a, b) => {
+    const scoreA = Math.max(
+      a.paper?.githubStars || 0,
+      a.paper?.citationCount || 0
+    );
+    const scoreB = Math.max(
+      b.paper?.githubStars || 0,
+      b.paper?.citationCount || 0
+    );
+    return scoreB - scoreA;
+  });
 
   return {
-    ...base,
-    papers: Array.isArray(row.papers) ? row.papers : [],
-    methods: Array.isArray(row.methods) ? row.methods : [],
-    datasets: Array.isArray(row.datasets) ? row.datasets : [],
-    benchmarks: Array.isArray(row.benchmarks) ? row.benchmarks : [],
-    relatedModels: Array.isArray(row.relatedModels) ? row.relatedModels : [],
+    id: baseModel.id,
+    name: baseModel.name,
+    slug: baseModel.slug,
+    vendor: baseModel.vendor,
+    vendorLogoUrl: baseModel.vendor_logo_url,
+    releaseDate: baseModel.releaseDate,
+    parameterCount: baseModel.parameterCount,
+    modality: baseModel.modality,
+    accessType: baseModel.accessType,
+    opennessType: baseModel.opennessType,
+    description: baseModel.description,
+    benchmarkScore: baseModel.benchmark_score,
+    modelFamily: baseModel.modelFamily ?? baseModel.model_family,
+    category: baseModel.category,
+    capabilities: baseModel.capabilities,
+    researchAreas: baseModel.researchAreas ?? baseModel.research_areas,
+    architecture: baseModel.architecture,
+    contextWindow: baseModel.contextWindow ?? baseModel.context_window,
+    license: baseModel.license,
+    modelVersions: baseModel.modelVersions ?? baseModel.model_versions,
+    releaseNotes: baseModel.releaseNotes ?? baseModel.release_notes,
+    paperUrl: baseModel.paperUrl ?? baseModel.paper_url,
+    repositoryUrl: baseModel.repositoryUrl ?? baseModel.repository_url,
+    apiUrl: baseModel.apiUrl ?? baseModel.api_url,
+    createdAt: baseModel.createdAt,
+    paperCount,
+    citationCount,
+    githubStars,
+    papers: dedupPapers.slice(0, 100),
+    tasks: Array.from(tasksBySlug.values()),
+    methods: Array.from(methodsBySlug.values()),
+    datasets: Array.from(datasetsBySlug.values()),
+    benchmarks: Array.from(benchmarksBySlug.values()),
+    relatedModels: Array.from(relatedModelsById.values()).map((model) => ({
+      id: model.id,
+      name: model.name,
+      slug: model.slug,
+      paperCount: model._count?.papers || 0,
+    })),
   };
 };
 
-export const getModelFacets = async (queryRouter: QueryRouter): Promise<ModelFacets> => {
-  const sql = `
-    WITH 
-    total AS (
-      SELECT COUNT(*)::int as count FROM models
-    ),
-    vendors AS (
-      SELECT vendor as name, COUNT(*)::int as count 
-      FROM models 
-      WHERE vendor IS NOT NULL AND TRIM(vendor) != ''
-      GROUP BY vendor 
-      ORDER BY count DESC
-    ),
-    modalities AS (
-      SELECT modality as name, COUNT(*)::int as count 
-      FROM models 
-      WHERE modality IS NOT NULL AND TRIM(modality) != ''
-      GROUP BY modality 
-      ORDER BY count DESC
-    ),
-    access_types AS (
-      SELECT COALESCE(access_type, "accessType") as name, COUNT(*)::int as count 
-      FROM models 
-      WHERE COALESCE(access_type, "accessType") IS NOT NULL AND TRIM(COALESCE(access_type, "accessType")) != ''
-      GROUP BY COALESCE(access_type, "accessType") 
-      ORDER BY count DESC
-    ),
-    openness_types AS (
-      SELECT COALESCE(openness_type, "opennessType") as name, COUNT(*)::int as count 
-      FROM models 
-      WHERE COALESCE(openness_type, "opennessType") IS NOT NULL AND TRIM(COALESCE(openness_type, "opennessType")) != ''
-      GROUP BY COALESCE(openness_type, "opennessType") 
-      ORDER BY count DESC
-    ),
-    model_families AS (
-      SELECT COALESCE(model_family, "modelFamily") as name, COUNT(*)::int as count 
-      FROM models 
-      WHERE COALESCE(model_family, "modelFamily") IS NOT NULL AND TRIM(COALESCE(model_family, "modelFamily")) != ''
-      GROUP BY COALESCE(model_family, "modelFamily") 
-      ORDER BY count DESC
-    ),
-    caps AS (
-      SELECT elem as name, COUNT(*)::int as count
-      FROM models m,
-      LATERAL (
-        SELECT jsonb_array_elements_text(
-          CASE 
-            WHEN jsonb_typeof(m.capabilities::jsonb) = 'array' THEN m.capabilities::jsonb
-            ELSE '[]'::jsonb
-          END
-        ) as elem
-      ) t
-      WHERE elem IS NOT NULL AND TRIM(elem) != ''
-      GROUP BY elem
-      ORDER BY count DESC
-    ),
-    areas AS (
-      SELECT elem as name, COUNT(*)::int as count
-      FROM models m,
-      LATERAL (
-        SELECT jsonb_array_elements_text(
-          CASE 
-            WHEN jsonb_typeof(COALESCE(m.research_areas, m."researchAreas")::jsonb) = 'array' 
-              THEN COALESCE(m.research_areas, m."researchAreas")::jsonb
-            ELSE '[]'::jsonb
-          END
-        ) as elem
-      ) t
-      WHERE elem IS NOT NULL AND TRIM(elem) != ''
-      GROUP BY elem
-      ORDER BY count DESC
-    )
-    SELECT 
-      (SELECT count FROM total) as "totalModels",
-      COALESCE((SELECT json_agg(json_build_object('name', name, 'count', count)) FROM vendors), '[]'::json) as vendors,
-      COALESCE((SELECT json_agg(json_build_object('name', name, 'count', count)) FROM modalities), '[]'::json) as modalities,
-      COALESCE((SELECT json_agg(json_build_object('name', name, 'count', count)) FROM access_types), '[]'::json) as "accessTypes",
-      COALESCE((SELECT json_agg(json_build_object('name', name, 'count', count)) FROM openness_types), '[]'::json) as "opennessTypes",
-      COALESCE((SELECT json_agg(json_build_object('name', name, 'count', count)) FROM model_families), '[]'::json) as "modelFamilies",
-      COALESCE((SELECT json_agg(json_build_object('name', name, 'count', count)) FROM caps), '[]'::json) as capabilities,
-      COALESCE((SELECT json_agg(json_build_object('name', name, 'count', count)) FROM areas), '[]'::json) as "researchAreas";
-  `;
+export const getModelFacets = async (queryRouter: QueryRouter) => {
+  const intent: QueryIntent = {
+    type: QueryType.READ,
+    entity: "model",
+    operation: "facets",
+  };
 
-  const rows = await queryRouter.routeQuery<any[]>(async (prisma: PrismaClient) => {
-    return prisma.$queryRawUnsafe<any[]>(sql);
+  const routingResult = await queryRouter.routeQuery(intent, async (prisma) => {
+    return prisma.model.findMany({
+      select: {
+        id: true,
+        vendor: true,
+        modality: true,
+        accessType: true,
+        opennessType: true,
+        model_family: true,
+        modelFamily: true,
+        capabilities: true,
+        research_areas: true,
+        researchAreas: true,
+      },
+    });
   });
 
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return {
-      totalModels: 0,
-      vendors: [],
-      modalities: [],
-      accessTypes: [],
-      opennessTypes: [],
-      modelFamilies: [],
-      capabilities: [],
-      researchAreas: [],
-    };
+  const modelsById = new Map<string, ModelRecord>();
+
+  for (const result of routingResult.results) {
+    if (!Array.isArray(result)) continue;
+    for (const model of result as ModelRecord[]) {
+      if (model && model.id && !modelsById.has(model.id)) {
+        modelsById.set(model.id, model);
+      }
+    }
   }
 
-  const r = rows[0];
+  const vendors = new Map<string, number>();
+  const modalities = new Map<string, number>();
+  const accessTypes = new Map<string, number>();
+  const opennessTypes = new Map<string, number>();
+  const modelFamilies = new Map<string, number>();
+  const capabilities = new Map<string, number>();
+  const researchAreas = new Map<string, number>();
+
+  const incrementCount = (
+    map: Map<string, number>,
+    value: string | null | undefined
+  ) => {
+    if (!value || typeof value !== "string") return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    map.set(trimmed, (map.get(trimmed) || 0) + 1);
+  };
+
+  for (const model of modelsById.values()) {
+    incrementCount(vendors, model.vendor);
+    incrementCount(modalities, model.modality);
+    incrementCount(accessTypes, model.accessType);
+    incrementCount(opennessTypes, model.opennessType);
+    incrementCount(
+      modelFamilies,
+      model.modelFamily ?? model.model_family
+    );
+
+    const modelCapabilities = Array.isArray(model.capabilities)
+      ? model.capabilities
+      : [];
+
+    for (const capability of modelCapabilities) {
+      if (typeof capability === "string") {
+        incrementCount(capabilities, capability);
+      }
+    }
+
+    const modelResearchAreas = model.researchAreas ?? model.research_areas;
+
+    if (Array.isArray(modelResearchAreas)) {
+      for (const researchArea of modelResearchAreas) {
+        if (typeof researchArea === "string") {
+          incrementCount(researchAreas, researchArea);
+        }
+      }
+    }
+  }
+
+  const toFacetArray = (map: Map<string, number>) =>
+    Array.from(map.entries())
+      .map(([name, count]) => ({
+        name,
+        count,
+      }))
+      .sort((a, b) => b.count - a.count);
+
   return {
-    totalModels: Number(r.totalModels) || 0,
-    vendors: Array.isArray(r.vendors) ? r.vendors : [],
-    modalities: Array.isArray(r.modalities) ? r.modalities : [],
-    accessTypes: Array.isArray(r.accessTypes) ? r.accessTypes : [],
-    opennessTypes: Array.isArray(r.opennessTypes) ? r.opennessTypes : [],
-    modelFamilies: Array.isArray(r.modelFamilies) ? r.modelFamilies : [],
-    capabilities: Array.isArray(r.capabilities) ? r.capabilities : [],
-    researchAreas: Array.isArray(r.researchAreas) ? r.researchAreas : [],
+    totalModels: modelsById.size,
+    vendors: toFacetArray(vendors),
+    modalities: toFacetArray(modalities),
+    accessTypes: toFacetArray(accessTypes),
+    opennessTypes: toFacetArray(opennessTypes),
+    modelFamilies: toFacetArray(modelFamilies),
+    capabilities: toFacetArray(capabilities),
+    researchAreas: toFacetArray(researchAreas),
   };
 };
