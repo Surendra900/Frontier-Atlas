@@ -41,11 +41,6 @@ const indexStatements = [
   "CREATE INDEX IF NOT EXISTS idx_papers_arxiv_id ON papers(arxiv_id)",
   "CREATE INDEX IF NOT EXISTS idx_papers_pubdate_stars ON papers(publication_date DESC, github_stars DESC)",
   "CREATE INDEX IF NOT EXISTS idx_papers_stars_citations ON papers(github_stars DESC, citation_count DESC)",
-  "CREATE INDEX IF NOT EXISTS idx_models_vendor ON models(vendor)",
-  "CREATE INDEX IF NOT EXISTS idx_models_modality ON models(modality)",
-  "CREATE INDEX IF NOT EXISTS idx_models_name ON models(name)",
-  "CREATE INDEX IF NOT EXISTS idx_models_family ON models(model_family)",
-  "CREATE INDEX IF NOT EXISTS idx_models_trending_score ON models(trending_score DESC)",
 ];
 
 async function applyIndexes() {
