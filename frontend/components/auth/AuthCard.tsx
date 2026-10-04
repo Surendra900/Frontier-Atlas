@@ -13,13 +13,17 @@ export default function AuthCard() {
   return (
     <div className="mx-auto flex w-full max-w-[400px] flex-col items-center">
       {/* Logo */}
-      <div className="mb-0 flex justify-center">
+      <div className="mb-4 flex items-center justify-center gap-2">
         <img
-          src="https://frontieratlas.pages.dev/logo.png"
+          src="/logo.png"
           alt="FrontierAtlas"
-          width={165}
-          height={34}
+          width={28}
+          height={28}
+          className="w-7 h-7 object-contain"
         />
+        <span className="font-bold tracking-tight text-[#111111] text-[20px] select-none">
+          FrontierAtlas
+        </span>
       </div>
 
       {/* Card */}

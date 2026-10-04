@@ -102,13 +102,19 @@ export default function Navbar({
           {/* Logo */}
           <a
             href="/"
-            className="flex items-center justify-center lg:justify-start cursor-pointer absolute left-1/2 -translate-x-1/2 lg:relative lg:left-auto lg:-translate-x-0 w-[160px] sm:w-[200px] xl:w-[240px] h-12 xl:h-14"
+            aria-label="FrontierAtlas"
+            className="flex items-center justify-center lg:justify-start gap-2 cursor-pointer absolute left-1/2 -translate-x-1/2 lg:relative lg:left-auto lg:-translate-x-0 h-12 xl:h-14"
           >
             <img
-              src="https://frontieratlas.pages.dev/logo.png"
-              alt="Frontier Atlas"
-              className="w-full h-full object-contain object-center lg:object-left"
+              src="/logo.png"
+              alt="FrontierAtlas"
+              width={28}
+              height={28}
+              className="w-6 h-6 xl:w-7 xl:h-7 object-contain shrink-0"
             />
+            <span className="font-bold tracking-tight text-[#111111] text-[17px] sm:text-[18px] xl:text-[20px] select-none leading-none">
+              FrontierAtlas
+            </span>
           </a>
         </div>
 
@@ -311,13 +317,19 @@ export default function Navbar({
           <a
             href="/"
             onClick={closeMenu}
-            className="relative block w-[170px] h-10 cursor-pointer"
+            aria-label="FrontierAtlas"
+            className="flex items-center gap-2 h-10 cursor-pointer"
           >
             <img
-              src="https://frontieratlas.pages.dev/logo.png"
-              alt="Frontier Atlas"
-              className="w-full h-full object-contain object-left"
+              src="/logo.png"
+              alt="FrontierAtlas"
+              width={20}
+              height={20}
+              className="w-5 h-5 object-contain shrink-0"
             />
+            <span className="font-bold tracking-tight text-[#111111] text-[16px] select-none leading-none">
+              FrontierAtlas
+            </span>
           </a>
 
           {/* Close Button */}
